@@ -1,0 +1,11 @@
+{
+  "name": "cigram-admin-api-worker",
+  "private": true,
+  "type": "module",
+  "description": "cigram-admin-api Worker: live baseline + the What's New discovery/import section (built by build.mjs).",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node build.mjs && node --test --test-concurrency=1 test/*.test.mjs"
+  },
+  "engines": { "node": ">=20" }
+}
