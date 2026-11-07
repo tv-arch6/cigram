@@ -47,6 +47,21 @@ android {
         viewBinding = true
         buildConfig = true
     }
+
+    lint {
+        // targetSdk is deliberately 24 (legacy storage / background behaviour the app was built around; raising it
+        // needs a full on-device QA pass). Lint-vital treats it as fatal for release builds, which aborted every
+        // assembleRelease / bundleRelease. It stays visible in the lint report as a warning. NOTE: Google Play
+        // rejects uploads that target below the current minimum, so the "play" flavor must be raised before it ships there.
+        warning += "ExpiredTargetSdkVersion"
+    }
+}
+
+// CodeAssist's own compiler needs the tiny androidx.viewbinding.ViewBinding stub that sits in src/main/java.
+// Gradle already gets the real class from the library that buildFeatures.viewBinding adds, and compiling the stub as
+// well makes every release build fail in D8 with "Type androidx.viewbinding.ViewBinding is defined multiple times".
+tasks.withType<JavaCompile>().configureEach {
+    exclude("androidx/viewbinding/ViewBinding.java")
 }
 
 dependencies {
