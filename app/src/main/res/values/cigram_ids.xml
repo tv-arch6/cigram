@@ -2,4 +2,6 @@
 <resources>
     <!-- v10.83: which Material Symbol a bottom-bar icon currently shows -->
     <item name="cg_nav_symbol" type="id" />
+    <!-- a TextView carrying this tag keeps its own typeface (CigramFontGuard skips it): monospace readouts -->
+    <item name="cg_keep_font" type="id" />
 </resources>

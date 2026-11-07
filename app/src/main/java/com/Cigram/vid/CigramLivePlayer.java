@@ -753,7 +753,7 @@ public final class CigramLivePlayer {
         nameRow.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         nameRow.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
         s.quality = CigramUI.label(a, "", 10f, Color.WHITE, true);
-        s.quality.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        s.quality.setTypeface(CigramTypefaces.bold());
         s.quality.setGravity(Gravity.CENTER);
         s.quality.setIncludeFontPadding(false);
         s.quality.setPadding(dp(a, 5), dp(a, 3), dp(a, 5), dp(a, 3));

@@ -1059,7 +1059,7 @@ public final class CigramSketchwareNotifications {
 
     private static Typeface loadSima(Context context) {
         try {
-            return CigramTypefaces.get(context.getAssets(), "fonts/sima.ttf");
+            return CigramTypefaces.get(context.getAssets(), CigramTypefaces.APP_FONT);
         } catch (Throwable ignored) {
             return Typeface.DEFAULT;
         }

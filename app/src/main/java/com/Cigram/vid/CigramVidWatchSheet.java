@@ -193,7 +193,7 @@ public final class CigramVidWatchSheet {
         titleTv.setText("🎬  شاهد: " + title + subTitle);
         titleTv.setTextColor(TEXT_P);
         titleTv.setTextSize(15);
-        titleTv.setTypeface(Typeface.DEFAULT_BOLD);
+        titleTv.setTypeface(CigramTypefaces.bold());
         titleTv.setGravity(Gravity.RIGHT);
         titleTv.setLayoutParams(fw(0, 0, 0, dp(20)));
         parent.addView(titleTv);
@@ -558,7 +558,7 @@ public final class CigramVidWatchSheet {
         tv.setText(text);
         tv.setTextColor(0xFFFFFFFF);
         tv.setTextSize(14);
-        tv.setTypeface(Typeface.DEFAULT_BOLD);
+        tv.setTypeface(CigramTypefaces.bold());
         tv.setGravity(Gravity.CENTER);
         tv.setPadding(dp(16), dp(14), dp(16), dp(14));
         GradientDrawable bg = new GradientDrawable();

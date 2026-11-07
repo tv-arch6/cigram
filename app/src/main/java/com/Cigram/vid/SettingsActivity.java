@@ -421,7 +421,7 @@ public class SettingsActivity extends AppCompatActivity {
 						android.graphics.Typeface editFont =
 						CigramTypefaces.get(
 						getAssets(),
-						"fonts/sima.ttf"
+						CigramTypefaces.APP_FONT
 						);
 						
 						editTitle.setTypeface(editFont);
@@ -915,7 +915,7 @@ public class SettingsActivity extends AppCompatActivity {
 					android.graphics.Typeface font =
 					CigramTypefaces.get(
 					getAssets(),
-					"fonts/sima.ttf"
+					CigramTypefaces.APP_FONT
 					);
 					
 					title.setTypeface(font);
@@ -1253,7 +1253,7 @@ public class SettingsActivity extends AppCompatActivity {
 				settingsFont =
 				CigramTypefaces.get(
 				getAssets(),
-				"fonts/sima.ttf"
+				CigramTypefaces.APP_FONT
 				);
 			} catch (Exception ignored) {}
 			
@@ -1554,7 +1554,7 @@ public class SettingsActivity extends AppCompatActivity {
 				avatarFontTemp =
 				CigramTypefaces.get(
 				getAssets(),
-				"fonts/sima.ttf"
+				CigramTypefaces.APP_FONT
 				);
 			} catch (Exception ignored) {}
 			avatarFont = avatarFontTemp;
@@ -2020,7 +2020,7 @@ public class SettingsActivity extends AppCompatActivity {
 			final android.graphics.Typeface appFontGlobal =
 			CigramTypefaces.get(
 			getAssets(),
-			"fonts/sima.ttf"
+			CigramTypefaces.APP_FONT
 			);
 			
 			java.util.ArrayList<android.view.View> fontViews =

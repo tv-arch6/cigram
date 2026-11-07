@@ -112,7 +112,7 @@ public class SectionActivity extends AppCompatActivity {
 				android.graphics.Typeface.DEFAULT;
 				try {
 					loaded = CigramTypefaces.get(
-					value.getAssets(), "fonts/sima.ttf"
+					value.getAssets(), CigramTypefaces.APP_FONT
 					);
 				} catch (Exception ignored) {}
 				font = loaded;

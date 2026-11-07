@@ -137,10 +137,10 @@ public class ChannelsActivity extends AppCompatActivity {
 	}
 	
 	private void initializeLogic() {
-		binding.textviewSportsTitle.setTypeface(CigramTypefaces.get(getAssets(),"fonts/sima.ttf"), 1);
+		binding.textviewSportsTitle.setTypeface(CigramTypefaces.get(getAssets(),CigramTypefaces.APP_FONT), 1);
 		binding.textBein3.setTypeface(Typeface.DEFAULT, 0);
-		binding.textview3.setTypeface(CigramTypefaces.get(getAssets(),"fonts/sima.ttf"), 0);
-		binding.textview6.setTypeface(CigramTypefaces.get(getAssets(),"fonts/sima.ttf"), 0);
+		binding.textview3.setTypeface(CigramTypefaces.get(getAssets(),CigramTypefaces.APP_FONT), 0);
+		binding.textview6.setTypeface(CigramTypefaces.get(getAssets(),CigramTypefaces.APP_FONT), 0);
 		// v10.63: الصفحة الجديدة للقنوات (CigramChannelHub). الكود القديم أدناه يعمل فقط إذا تعذّر بناؤها.
 		boolean cgChannelsHub = false;
 		try { cgChannelsHub = CigramChannelHub.install(ChannelsActivity.this); }
@@ -301,7 +301,7 @@ public class ChannelsActivity extends AppCompatActivity {
 				
 				final android.graphics.Typeface cgChannelFont;
 				android.graphics.Typeface cgTempFont = android.graphics.Typeface.DEFAULT;
-				try { cgTempFont = CigramTypefaces.get(getAssets(), "fonts/sima.ttf"); }
+				try { cgTempFont = CigramTypefaces.get(getAssets(), CigramTypefaces.APP_FONT); }
 				catch (Exception ignored) {}
 				cgChannelFont = cgTempFont;
 				
@@ -1352,7 +1352,7 @@ public class ChannelsActivity extends AppCompatActivity {
 						tnLabel.setTypeface(
 						CigramTypefaces.get(
 						getAssets(),
-						"fonts/sima.ttf"));
+						CigramTypefaces.APP_FONT));
 					} catch (Throwable ignored) {}
 					
 					android.widget.LinearLayout.LayoutParams tnTextParams =

@@ -264,6 +264,8 @@ public final class CigramStage1InitProvider extends ContentProvider {
 
         appContext = context.getApplicationContext();
         CigramStability.init(appContext);   // v10.49: memory trimming + crash record, first of all
+        CigramTypefaces.warm(appContext);   // app font parsed on a background thread, ready before the first label
+        if (appContext instanceof Application) CigramFontGuard.install((Application) appContext);
         if (appContext instanceof Application) CigramTheme.install((Application) appContext);   // v10.70 Light / Dark
         // v10.42: the catalog warm-up MUST stay synchronous so the cached catalog is in memory
         // before Home builds; backgrounding it (v10.39) made Home wait on the network instead,
@@ -2899,20 +2901,10 @@ public final class CigramStage1InitProvider extends ContentProvider {
         openTitleDetails(activity, item, clicked);
     }
 
-    // v4.4: sima.ttf is loaded once per process. Before, every card / label / dialog parsed the
-    // asset again (no Typeface cache before Android 8), three times per home card.
-    private static volatile Typeface SIMA_TYPEFACE;
-
+    // The app font (Beiruti) is loaded once per process by CigramTypefaces; every card / label / dialog
+    // shares that one Typeface instead of parsing the asset again.
     private static Typeface cigramTypeface(Context context) {
-        Typeface cached = SIMA_TYPEFACE;
-        if (cached != null) return cached;
-        try {
-            cached = CigramTypefaces.get(context.getAssets(), "fonts/sima.ttf");
-        } catch (Throwable ignored) {
-            return Typeface.DEFAULT;
-        }
-        if (cached != null) SIMA_TYPEFACE = cached;
-        return cached == null ? Typeface.DEFAULT : cached;
+        return CigramTypefaces.app(context);
     }
 
     private static GradientDrawable roundedDrawable(int color, float radiusPx) {

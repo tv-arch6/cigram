@@ -317,7 +317,7 @@ final class CigramSeekPreview {
         TextView t = new TextView(a);
         t.setTextColor(Color.WHITE);
         t.setTextSize(15);
-        t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setTypeface(CigramTypefaces.bold());
         t.setShadowLayer(4f, 0f, 1f, 0xCC000000);
         t.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(-2, -2);

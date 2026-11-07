@@ -61,19 +61,37 @@ public final class CigramFonts {
 
     // ---- الخطوط المدمجة -------------------------------------------------
 
+    /** المفتاح الافتراضي لخط الترجمة: خط التطبيق (بيروتي). */
+    static final String DEFAULT_KEY = "beiruti";
+
+    /** {key, اسم العرض, مسار الملف}. كل ملف هنا موجود فعلاً في assets/fonts. */
     private static final String[][] BUILTIN = {
-            {"lmohanad", "مهنّد", "fonts/lmohanad.ttf"},
-            {"lmohanadbold", "مهنّد عريض", "fonts/lmohanadbold.ttf"},
-            {"lfont_com_alyamamabold", "اليمامة عريض", "fonts/lfont_com_alyamamabold.ttf"},
-            {"lfont_com_alyamamasemibold", "اليمامة نصف عريض", "fonts/lfont_com_alyamamasemibold.ttf"},
+            {DEFAULT_KEY, "بيروتي", CigramTypefaces.APP_FONT},
             {"lfont_com_nsd96generosityotf", "جينيروسِتي", "fonts/lfont_com_nsd96generosityotf.ttf"},
             {"amiri_regular", "أميري", "fonts/amiri_regular.ttf"},
             {"amiri_bold", "أميري عريض", "fonts/amiri_bold.ttf"},
-            {"cairo_regular", "القاهرة", "fonts/cairo_regular.ttf"},
             {"cairo_bold", "القاهرة عريض", "fonts/cairo_bold.ttf"},
             {"scheherazade_regular", "شهرزاد", "fonts/scheherazade_regular.ttf"},
             {"scheherazade_bold", "شهرزاد عريض", "fonts/scheherazade_bold.ttf"}
     };
+
+    /**
+     * مسار ملف الخط المدمج لمفتاح محفوظ. المفاتيح القديمة التي لم يعد ملفها موجوداً
+     * (مهنّد، اليمامة، القاهرة العادي) وأي مفتاح مجهول تعود إلى خط التطبيق بدل أن تسقط على خط النظام بصمت.
+     */
+    private static String normalizeKey(String key) {
+        if (key == null || key.length() == 0) return DEFAULT_KEY;
+        if (key.startsWith("custom:")) return key;
+        for (String[] row : BUILTIN) if (row[0].equals(key)) return key;
+        return DEFAULT_KEY;
+    }
+
+    static String assetPathForKey(String key) {
+        if (key != null) {
+            for (String[] row : BUILTIN) if (row[0].equals(key)) return row[2];
+        }
+        return CigramTypefaces.APP_FONT;
+    }
 
     // ---- قيم افتراضية ---------------------------------------------------
 
@@ -98,7 +116,7 @@ public final class CigramFonts {
     /** خط الترجمة النهائي: خط مستورد إن اختير، وإلا الخط المدمج الممرَّر من المشغّل. */
     public static Typeface subtitleTypeface(Context c, Typeface fallback) {
         try {
-            String key = prefs(c).getString(K_FONT, "lmohanad");
+            String key = prefs(c).getString(K_FONT, DEFAULT_KEY);
             if (key != null && key.startsWith("custom:")) {
                 File f = new File(subfontDir(c), key.substring("custom:".length()));
                 if (f.isFile() && f.length() > 0) {
@@ -324,7 +342,7 @@ public final class CigramFonts {
             File f = new File(subfontDir(c), file);
             if (f.exists()) f.delete();
             if (("custom:" + file).equals(prefs(c).getString(K_FONT, ""))) {
-                prefs(c).edit().putString(K_FONT, "lmohanad").apply();
+                prefs(c).edit().putString(K_FONT, DEFAULT_KEY).apply();
             }
         } catch (Throwable ignored) { }
     }
@@ -509,7 +527,7 @@ public final class CigramFonts {
         parent.addView(sectionTitle(a, "خط الترجمة"), new LinearLayout.LayoutParams(-1, -2));
 
         final SharedPreferences p = prefs(a);
-        final String current = p.getString(K_FONT, "lmohanad");
+        final String current = normalizeKey(p.getString(K_FONT, DEFAULT_KEY));
 
         for (int i = 0; i < BUILTIN.length; i++) {
             addFontRow(a, parent, BUILTIN[i][0], BUILTIN[i][1], BUILTIN[i][2], false,

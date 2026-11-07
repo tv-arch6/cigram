@@ -140,7 +140,7 @@ public final class CigramPlayerSheet {
         this.density = activity.getResources().getDisplayMetrics().density;
         Typeface f = Typeface.DEFAULT;
         try {
-            f = CigramTypefaces.get(activity.getAssets(), "fonts/sima.ttf");
+            f = CigramTypefaces.get(activity.getAssets(), CigramTypefaces.APP_FONT);
         } catch (Throwable ignored) { }
         this.font = f;
 
@@ -827,7 +827,7 @@ public final class CigramPlayerSheet {
             teeth.setStrokeCap(Paint.Cap.BUTT);
             teeth.setColor(color);
             cut.setColor(ROW); // "holes" in filled icons take the row colour
-            cut.setTypeface(Typeface.DEFAULT_BOLD);
+            cut.setTypeface(CigramTypefaces.bold());
             cut.setTextAlign(Paint.Align.CENTER);
             setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         }

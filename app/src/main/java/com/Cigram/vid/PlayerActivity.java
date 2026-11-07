@@ -143,7 +143,7 @@ public class PlayerActivity extends AppCompatActivity {
 				context = value;
 				density = value.getResources().getDisplayMetrics().density;
 				android.graphics.Typeface f = android.graphics.Typeface.DEFAULT;
-				try { f = CigramTypefaces.get(value.getAssets(), "fonts/sima.ttf"); }
+				try { f = CigramTypefaces.get(value.getAssets(), CigramTypefaces.APP_FONT); }
 				catch (Exception ignored) {}
 				font = f;
 			}
@@ -692,33 +692,11 @@ public class PlayerActivity extends AppCompatActivity {
 		getSharedPreferences("subtitle_settings", MODE_PRIVATE);
 		
 		final String selectedSubtitleFont =
-		subtitlePrefs.getString("subtitle_font", "lmohanad");
+		subtitlePrefs.getString("subtitle_font", CigramFonts.DEFAULT_KEY);
 		
-		String selectedSubtitleFontPath = "fonts/lmohanad.ttf";
+		final String selectedSubtitleFontPath = CigramFonts.assetPathForKey(selectedSubtitleFont);
 		
-		if ("lmohanadbold".equals(selectedSubtitleFont)) {
-			selectedSubtitleFontPath = "fonts/lmohanadbold.ttf";
-		} else if ("lfont_com_alyamamabold".equals(selectedSubtitleFont)) {
-			selectedSubtitleFontPath = "fonts/lfont_com_alyamamabold.ttf";
-		} else if ("lfont_com_alyamamasemibold".equals(selectedSubtitleFont)) {
-			selectedSubtitleFontPath = "fonts/lfont_com_alyamamasemibold.ttf";
-		} else if ("lfont_com_nsd96generosityotf".equals(selectedSubtitleFont)) {
-			selectedSubtitleFontPath = "fonts/lfont_com_nsd96generosityotf.ttf";
-		} else if ("amiri_regular".equals(selectedSubtitleFont)) {
-			selectedSubtitleFontPath = "fonts/amiri_regular.ttf";
-		} else if ("amiri_bold".equals(selectedSubtitleFont)) {
-			selectedSubtitleFontPath = "fonts/amiri_bold.ttf";
-		} else if ("cairo_regular".equals(selectedSubtitleFont)) {
-			selectedSubtitleFontPath = "fonts/cairo_regular.ttf";
-		} else if ("cairo_bold".equals(selectedSubtitleFont)) {
-			selectedSubtitleFontPath = "fonts/cairo_bold.ttf";
-		} else if ("scheherazade_regular".equals(selectedSubtitleFont)) {
-			selectedSubtitleFontPath = "fonts/scheherazade_regular.ttf";
-		} else if ("scheherazade_bold".equals(selectedSubtitleFont)) {
-			selectedSubtitleFontPath = "fonts/scheherazade_bold.ttf";
-		}
-		
-		android.graphics.Typeface loadedSubtitleTypeface = android.graphics.Typeface.DEFAULT;
+		android.graphics.Typeface loadedSubtitleTypeface = CigramTypefaces.app(getAssets());
 		
 		try {
 			loadedSubtitleTypeface =
@@ -726,7 +704,9 @@ public class PlayerActivity extends AppCompatActivity {
 			getAssets(),
 			selectedSubtitleFontPath
 			);
-		} catch (Exception ignored) {}
+		} catch (RuntimeException error) {
+			android.util.Log.w("CigramPlayer", "subtitle font " + selectedSubtitleFontPath + " unavailable, using the app font", error);
+		}
 		
 		try { loadedSubtitleTypeface = CigramFonts.subtitleTypeface(PlayerActivity.this, loadedSubtitleTypeface); } catch (Throwable ignored) {}
 		final android.graphics.Typeface subtitleTypeface = loadedSubtitleTypeface;
@@ -1537,7 +1517,7 @@ public class PlayerActivity extends AppCompatActivity {
 		// v6.0 design 5: series name small and dim, episode line bold and white
 		seriesTitleView.setTextColor(0xFFA9B4BA);
 		seriesTitleView.setTextSize(14);
-		seriesTitleView.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+		seriesTitleView.setTypeface(CigramTypefaces.bold());
 		seriesTitleView.setSingleLine(true);
 		seriesTitleView.setEllipsize(android.text.TextUtils.TruncateAt.END);
 		seriesTitleView.setGravity(android.view.Gravity.LEFT);
@@ -1575,7 +1555,7 @@ public class PlayerActivity extends AppCompatActivity {
 			android.graphics.Typeface playerFont =
 			CigramTypefaces.get(
 			getAssets(),
-			"fonts/sima.ttf"
+			CigramTypefaces.APP_FONT
 			);
 			
 			seriesTitleView.setTypeface(playerFont);
@@ -1985,7 +1965,7 @@ public class PlayerActivity extends AppCompatActivity {
 		);
 		
 		seekFeedback.setTypeface(
-		android.graphics.Typeface.DEFAULT_BOLD
+		CigramTypefaces.bold()
 		);
 		
 		seekFeedback.setPadding(
@@ -2169,6 +2149,8 @@ public class PlayerActivity extends AppCompatActivity {
 		android.graphics.Typeface.MONOSPACE,
 		android.graphics.Typeface.BOLD
 		);
+		CigramFontGuard.keepFont(currentTime);   // monospace digits keep the time readout from jittering
+		CigramFontGuard.keepFont(totalTime);
 		
 		currentTime.setShadowLayer(
 		3f,

@@ -50,7 +50,7 @@ final class CigramImdbIcon {
             if (bmp == null || bmp.isRecycled()) {
                 int id = resId(c, name);
                 if (id == 0) return null;
-                bmp = BitmapFactory.decodeResource(c.getResources(), id);
+                bmp = decodeSmall(c, id);
                 if (bmp == null) return null;
                 BITMAPS.put(name, bmp);
             }
@@ -58,6 +58,22 @@ final class CigramImdbIcon {
         } catch (Throwable error) {
             return null;
         }
+    }
+
+    /** The badges are drawn 17-30 dp tall; decoding them at their file size (scaled up by the screen density) wasted several MB each. */
+    private static final int TARGET_HEIGHT_PX = 144;
+
+    private static Bitmap decodeSmall(Context c, int id) {
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        BitmapFactory.decodeResource(c.getResources(), id, bounds);
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
+        int sample = 1;
+        while (bounds.outHeight / (sample * 2) >= TARGET_HEIGHT_PX) sample *= 2;
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = sample;
+        options.inScaled = false;   // keep the file's pixels: the drawable is scaled to its bounds anyway
+        return BitmapFactory.decodeResource(c.getResources(), id, options);
     }
 
     private static Drawable any(Context c) {

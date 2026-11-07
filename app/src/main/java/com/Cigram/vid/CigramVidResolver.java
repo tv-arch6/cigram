@@ -260,7 +260,7 @@ public final class CigramVidResolver {
         titleLabel.setText("مشغّل الفيديو الذكي");
         titleLabel.setTextColor(TEXT_PRI);
         titleLabel.setTextSize(16);
-        titleLabel.setTypeface(Typeface.DEFAULT_BOLD);
+        titleLabel.setTypeface(CigramTypefaces.bold());
         titleLabel.setGravity(Gravity.RIGHT);
         titleLabel.setLayoutParams(fullWidth(0, 0, 0, dp(12)));
         parent.addView(titleLabel);
@@ -921,7 +921,7 @@ public final class CigramVidResolver {
         tv.setText(text);
         tv.setTextColor(0xFFFFFFFF);
         tv.setTextSize(14);
-        tv.setTypeface(Typeface.DEFAULT_BOLD);
+        tv.setTypeface(CigramTypefaces.bold());
         tv.setGravity(Gravity.CENTER);
         tv.setPadding(dp(20), dp(14), dp(20), dp(14));
         GradientDrawable bg = new GradientDrawable();

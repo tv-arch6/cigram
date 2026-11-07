@@ -34,7 +34,7 @@ public class CigramWaitActivity extends Activity {
         label.setTextColor(0xFFFFFFFF);
         label.setTextSize(22f);
         label.setGravity(Gravity.CENTER);
-        label.setTypeface(Typeface.DEFAULT_BOLD);
+        label.setTypeface(CigramTypefaces.bold());
         box.addView(label, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
         setContentView(box);
         hideSystemBars();

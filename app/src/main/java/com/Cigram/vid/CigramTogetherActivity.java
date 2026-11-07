@@ -448,6 +448,7 @@ public class CigramTogetherActivity extends Activity implements CigramTogetherSe
         // v4.4: same monospace face as the code shown to the owner. The hint stays in sima
         // because a hint uses the field typeface: only switch once the field has text.
         final android.graphics.Typeface hintFace = input.getTypeface();
+        CigramFontGuard.keepFont(input);   // the code is shown in monospace; the guard must not undo it
         input.addTextChangedListener(new android.text.TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) { }

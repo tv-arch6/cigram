@@ -405,7 +405,7 @@ public class AdsActivity extends AppCompatActivity {
 				final android.graphics.Typeface adsFont =
 				CigramTypefaces.get(
 				getAssets(),
-				"fonts/sima.ttf"
+				CigramTypefaces.APP_FONT
 				);
 				
 				

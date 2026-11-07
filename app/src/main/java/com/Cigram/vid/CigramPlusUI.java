@@ -381,7 +381,7 @@ final class CigramPlusUI {
         badge.setText(index == 1 ? "ZainCash" : "Asiacell");
         badge.setTextColor(0xFFFFFFFF);
         badge.setTextSize(10.5f);
-        badge.setTypeface(Typeface.DEFAULT_BOLD);
+        badge.setTypeface(CigramTypefaces.bold());
         badge.setGravity(Gravity.CENTER);
         badge.setBackground(pill(c, 0xFF2A5563, 8));
         return badge;

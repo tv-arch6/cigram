@@ -1049,7 +1049,7 @@ public class MainActivity extends AppCompatActivity {
 						android.graphics.Typeface font =
 						CigramTypefaces.get(
 						getAssets(),
-						"fonts/sima.ttf"
+						CigramTypefaces.APP_FONT
 						);
 						
 						name.setTypeface(
@@ -1808,13 +1808,13 @@ public class MainActivity extends AppCompatActivity {
 							heading.setTypeface(
 							CigramTypefaces.get(
 							getAssets(),
-							"fonts/sima.ttf"
+							CigramTypefaces.APP_FONT
 							),
 							1
 							);
 						} catch (Exception ignored) {
 							heading.setTypeface(
-							android.graphics.Typeface.DEFAULT_BOLD
+							CigramTypefaces.bold()
 							);
 						}
 						
@@ -2036,7 +2036,7 @@ public class MainActivity extends AppCompatActivity {
 								caption.setTypeface(
 								CigramTypefaces.get(
 								getAssets(),
-								"fonts/sima.ttf"
+								CigramTypefaces.APP_FONT
 								)
 								);
 							} catch (Exception ignored) {
@@ -2870,7 +2870,7 @@ public class MainActivity extends AppCompatActivity {
 						status.setTypeface(
 						CigramTypefaces.get(
 						getAssets(),
-						"fonts/sima.ttf"
+						CigramTypefaces.APP_FONT
 						)
 						);
 					} catch (Exception ignored) {
@@ -2893,7 +2893,7 @@ public class MainActivity extends AppCompatActivity {
 						retry.setTypeface(
 						CigramTypefaces.get(
 						getAssets(),
-						"fonts/sima.ttf"
+						CigramTypefaces.APP_FONT
 						)
 						);
 					} catch (Exception ignored) {
@@ -3005,11 +3005,11 @@ public class MainActivity extends AppCompatActivity {
 	
 	private void initializeLogic() {
 		cgStartCatalogRequest();
-		binding.textviewMoreLatestMovies.setTypeface(CigramTypefaces.get(getAssets(),"fonts/sima.ttf"), 0);
-		binding.textviewMoreLatestSeries.setTypeface(CigramTypefaces.get(getAssets(),"fonts/sima.ttf"), 0);
-		binding.textview6.setTypeface(CigramTypefaces.get(getAssets(),"fonts/sima.ttf"), 0);
-		binding.textviewLatestMoviesTitle.setTypeface(CigramTypefaces.get(getAssets(),"fonts/sima.ttf"), 0);
-		binding.textview4.setTypeface(CigramTypefaces.get(getAssets(),"fonts/sima.ttf"), 0);
+		binding.textviewMoreLatestMovies.setTypeface(CigramTypefaces.get(getAssets(),CigramTypefaces.APP_FONT), 0);
+		binding.textviewMoreLatestSeries.setTypeface(CigramTypefaces.get(getAssets(),CigramTypefaces.APP_FONT), 0);
+		binding.textview6.setTypeface(CigramTypefaces.get(getAssets(),CigramTypefaces.APP_FONT), 0);
+		binding.textviewLatestMoviesTitle.setTypeface(CigramTypefaces.get(getAssets(),CigramTypefaces.APP_FONT), 0);
+		binding.textview4.setTypeface(CigramTypefaces.get(getAssets(),CigramTypefaces.APP_FONT), 0);
 		/* إعداد السحب العمودي للصفحة */
 		android.widget.ScrollView mainScroll =
 		(android.widget.ScrollView)
@@ -3240,7 +3240,7 @@ public class MainActivity extends AppCompatActivity {
 				offlineTitle.setTextColor(android.graphics.Color.WHITE);
 				offlineTitle.setTextSize(22);
 				offlineTitle.setGravity(android.view.Gravity.CENTER);
-				offlineTitle.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+				offlineTitle.setTypeface(CigramTypefaces.bold());
 				
 				offlineBox.addView(
 				offlineTitle,
@@ -3271,7 +3271,7 @@ public class MainActivity extends AppCompatActivity {
 				retryButton.setTextColor(android.graphics.Color.WHITE);
 				retryButton.setTextSize(16);
 				retryButton.setGravity(android.view.Gravity.CENTER);
-				retryButton.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+				retryButton.setTypeface(CigramTypefaces.bold());
 				retryButton.setClickable(true);
 				
 				android.graphics.drawable.GradientDrawable retryBackground =
@@ -4091,7 +4091,7 @@ public class MainActivity extends AppCompatActivity {
 										android.graphics.Typeface font =
 										CigramTypefaces.get(
 										getAssets(),
-										"fonts/sima.ttf"
+										CigramTypefaces.APP_FONT
 										);
 										title.setTypeface(
 										font,
@@ -4230,7 +4230,7 @@ public class MainActivity extends AppCompatActivity {
 										android.graphics.Typeface font =
 										CigramTypefaces.get(
 										getAssets(),
-										"fonts/sima.ttf"
+										CigramTypefaces.APP_FONT
 										);
 										updateNow.setTypeface(
 										font,
@@ -4530,7 +4530,7 @@ public class MainActivity extends AppCompatActivity {
 					android.graphics.Typeface font() {
 						try {
 							return CigramTypefaces.get(
-							getAssets(), "fonts/sima.ttf"
+							getAssets(), CigramTypefaces.APP_FONT
 							);
 						} catch (Exception ignored) {
 							return android.graphics.Typeface.DEFAULT;
@@ -5719,7 +5719,7 @@ public class MainActivity extends AppCompatActivity {
 						tnLabel.setTypeface(
 						CigramTypefaces.get(
 						getAssets(),
-						"fonts/sima.ttf"));
+						CigramTypefaces.APP_FONT));
 					} catch (Throwable ignored) {}
 					
 					android.widget.LinearLayout.LayoutParams tnTextParams =

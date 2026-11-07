@@ -558,7 +558,7 @@ public class AccountActivity extends AppCompatActivity {
 				context = value;
 				density = value.getResources().getDisplayMetrics().density;
 				android.graphics.Typeface f = android.graphics.Typeface.DEFAULT;
-				try { f = CigramTypefaces.get(value.getAssets(), "fonts/sima.ttf"); }
+				try { f = CigramTypefaces.get(value.getAssets(), CigramTypefaces.APP_FONT); }
 				catch (Exception ignored) {}
 				font = f;
 			}
@@ -985,7 +985,7 @@ public class AccountActivity extends AppCompatActivity {
 		android.graphics.Typeface simaFont =
 		CigramTypefaces.get(
 		getAssets(),
-		"fonts/sima.ttf"
+		CigramTypefaces.APP_FONT
 		);
 		
 		android.view.ViewGroup accountRoot =
@@ -2436,7 +2436,7 @@ public class AccountActivity extends AppCompatActivity {
 						tnLabel.setTypeface(
 						CigramTypefaces.get(
 						getAssets(),
-						"fonts/sima.ttf"));
+						CigramTypefaces.APP_FONT));
 					} catch (Throwable ignored) {}
 					
 					android.widget.LinearLayout.LayoutParams tnTextParams =

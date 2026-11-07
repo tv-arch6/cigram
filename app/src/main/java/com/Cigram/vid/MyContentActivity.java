@@ -109,7 +109,7 @@ public class MyContentActivity extends AppCompatActivity {
 				context = value;
 				density = value.getResources().getDisplayMetrics().density;
 				android.graphics.Typeface f = android.graphics.Typeface.DEFAULT;
-				try { f = CigramTypefaces.get(value.getAssets(), "fonts/sima.ttf"); }
+				try { f = CigramTypefaces.get(value.getAssets(), CigramTypefaces.APP_FONT); }
 				catch (Exception ignored) {}
 				font = f;
 			}
@@ -518,7 +518,7 @@ public class MyContentActivity extends AppCompatActivity {
 			android.graphics.Typeface sima =
 			CigramTypefaces.get(
 			getAssets(),
-			"fonts/sima.ttf"
+			CigramTypefaces.APP_FONT
 			);
 			
 			if (pageTitle != null) {
@@ -605,7 +605,7 @@ public class MyContentActivity extends AppCompatActivity {
 						empty.setTypeface(
 						CigramTypefaces.get(
 						getAssets(),
-						"fonts/sima.ttf"
+						CigramTypefaces.APP_FONT
 						)
 						);
 					} catch (Exception ignored) {}
@@ -693,7 +693,7 @@ public class MyContentActivity extends AppCompatActivity {
 					android.graphics.Typeface sima =
 					CigramTypefaces.get(
 					getAssets(),
-					"fonts/sima.ttf"
+					CigramTypefaces.APP_FONT
 					);
 					label.setTypeface(sima);
 					cta.setTypeface(sima, android.graphics.Typeface.BOLD);
@@ -1247,7 +1247,7 @@ public class MyContentActivity extends AppCompatActivity {
 					android.graphics.Typeface sima =
 					CigramTypefaces.get(
 					getAssets(),
-					"fonts/sima.ttf"
+					CigramTypefaces.APP_FONT
 					);
 					
 					titleView.setTypeface(
@@ -1784,11 +1784,11 @@ public class MyContentActivity extends AppCompatActivity {
 			new CigramNoSideUi().apply(cigramNoSideRoot);
 		} catch (Exception ignored) {}
 		
-		binding.textviewMyContentTitle.setTypeface(CigramTypefaces.get(getAssets(),"fonts/sima.ttf"), 0);
-		binding.textviewContinueTitle.setTypeface(CigramTypefaces.get(getAssets(),"fonts/sima.ttf"), 0);
-		binding.textviewFavoritesTitle.setTypeface(CigramTypefaces.get(getAssets(),"fonts/sima.ttf"), 0);
-		binding.textviewAdsTitle.setTypeface(CigramTypefaces.get(getAssets(),"fonts/sima.ttf"), 0);
-		binding.textviewMyListTitle.setTypeface(CigramTypefaces.get(getAssets(),"fonts/sima.ttf"), 0);
+		binding.textviewMyContentTitle.setTypeface(CigramTypefaces.get(getAssets(),CigramTypefaces.APP_FONT), 0);
+		binding.textviewContinueTitle.setTypeface(CigramTypefaces.get(getAssets(),CigramTypefaces.APP_FONT), 0);
+		binding.textviewFavoritesTitle.setTypeface(CigramTypefaces.get(getAssets(),CigramTypefaces.APP_FONT), 0);
+		binding.textviewAdsTitle.setTypeface(CigramTypefaces.get(getAssets(),CigramTypefaces.APP_FONT), 0);
+		binding.textviewMyListTitle.setTypeface(CigramTypefaces.get(getAssets(),CigramTypefaces.APP_FONT), 0);
 	}
 	
 }
