@@ -45,23 +45,66 @@ final class CgUi {
     private static Typeface font;
     private static Typeface fontBold;
     private static boolean fontTried;
+    private static final String FONT_ASSET = "fonts/Alyamama.ttf";
 
-    /** App-wide UI typeface: Cairo (regular weight). Falls back to the device default if the asset is missing. */
-    static Typeface font(Context c) {
+    /**
+     * App-wide UI typeface: Alyamama (variable weight font, regular = wght 400, bold = wght 700 on Android 8+; synthetic
+     * bold before that). Falls back to the device default only if the asset is missing.
+     */
+    static synchronized Typeface font(Context c) {
         if (!fontTried) {
             fontTried = true;
+            android.content.res.AssetManager am = c.getApplicationContext().getAssets();
+            Typeface base = null;
             try {
-                font = Typeface.createFromAsset(c.getAssets(), "fonts/Cairo-Regular.ttf");
+                base = Typeface.createFromAsset(am, FONT_ASSET);
             } catch (Exception e) {
-                font = null;
+                base = null;
             }
-            try {
-                fontBold = Typeface.createFromAsset(c.getAssets(), "fonts/Cairo-Bold.ttf");
-            } catch (Exception e) {
-                fontBold = null;
+            font = base;
+            fontBold = base;
+            if (base != null) {
+                if (android.os.Build.VERSION.SDK_INT >= 26) {
+                    try {
+                        font = new Typeface.Builder(am, FONT_ASSET).setFontVariationSettings("'wght' 400").build();
+                        fontBold = new Typeface.Builder(am, FONT_ASSET).setFontVariationSettings("'wght' 700").build();
+                    } catch (Throwable t) {
+                        font = base;
+                        fontBold = Typeface.create(base, Typeface.BOLD);
+                    }
+                } else {
+                    fontBold = Typeface.create(base, Typeface.BOLD);
+                }
+                if (font == null) font = base;
+                if (fontBold == null) fontBold = base;
             }
         }
         return font;
+    }
+
+    /**
+     * Puts the app font on EVERY TextView under {@code root} (labels, buttons, inputs, dialogs) and keeps doing so for views
+     * added later. Bold stays bold. This is what makes the font apply "without exception", not only where applyFont was called.
+     */
+    static void applyTree(View root) {
+        if (root == null) return;
+        Context c = root.getContext();
+        Typeface reg = font(c);
+        if (reg == null) return;
+        Typeface bold = fontBold(c);
+        if (root instanceof TextView) {
+            TextView tv = (TextView) root;
+            Typeface cur = tv.getTypeface();
+            if (cur != reg && cur != bold) tv.setTypeface(cur != null && cur.isBold() ? bold : reg, Typeface.NORMAL);
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) root;
+            for (int i = 0; i < g.getChildCount(); i++) applyTree(g.getChildAt(i));
+            g.setOnHierarchyChangeListener(new ViewGroup.OnHierarchyChangeListener() {
+                @Override public void onChildViewAdded(View parent, View child) { applyTree(child); }
+                @Override public void onChildViewRemoved(View parent, View child) { }
+            });
+        }
     }
 
     /** The real Cairo Bold face (crisper than faux-bolding the regular weight). */
@@ -657,7 +700,19 @@ final class CgUi {
     }
 
     static void toast(Context c, String msg) {
-        Toast.makeText(c, msg, Toast.LENGTH_LONG).show();
+        // a toast in the app font; falls back to the system toast where custom toast views are not allowed
+        try {
+            TextView t = text(c, msg, 13.5f, CgCfg.TEXT, false);
+            t.setBackground(bg(c, CgCfg.CARD3, 14, CgCfg.ACCENT));
+            t.setPadding(dp(c, 16), dp(c, 10), dp(c, 16), dp(c, 10));
+            t.setMaxWidth(dp(c, 320));
+            Toast toast = new Toast(c.getApplicationContext());
+            toast.setDuration(Toast.LENGTH_LONG);
+            toast.setView(t);
+            toast.show();
+        } catch (Throwable e) {
+            Toast.makeText(c, msg, Toast.LENGTH_LONG).show();
+        }
     }
 
     static void info(Activity a, String title, String msg) {

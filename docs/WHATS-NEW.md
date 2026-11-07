@@ -160,3 +160,17 @@ New R2 objects (no schema change to `movies.json`): `_admin_private/whatsnew/con
 * "Appears in the main Cigram app" is verified at the contract level (`GET /movies`, `/home-sections`, undo, duplicates); the
   user app binary was not available.
 * Importing a single title sends the existing «new content» push (as the classic add screens do); bulk defaults to no push.
+
+## v3.3.1 — cron, Telegram, collections, font
+
+* **The Cron Trigger is what keeps three things alive:** the statistics (ops compaction + live history), the Telegram request
+  alerts, and the automatic sync. A deploy that does not list the trigger can silently drop it. Every tick now leaves a heartbeat;
+  `GET /admin/discover/cron` and the dashboard card show «المؤشر الزمني لا يعمل» when it stopped. `worker/wrangler.toml` pins the
+  trigger and the bindings: `cd worker && npm test && npx wrangler deploy --keep-vars`.
+* **Telegram alert for new titles:** after each *automatic* sync that finds new titles, one Arabic message is sent through the existing
+  bot (no app needed). Switch in «السجل والإعدادات». Auto-sync is now ON by default (every 60 min).
+* **Collections (sagas):** movie details carry `collection`; `POST /admin/discover/collection` lists every part with library status;
+  chip «سلاسل أفلام»; one button adds the whole saga (bulk).
+* **Quality** is declared by the admin (720p / 1080p / 4K) and saved in the item's `quality`; it is never guessed.
+* **Font:** Alyamama everywhere (every TextView, dialogs, toasts, charts), regular = wght 400 / bold = wght 700.
+* **401:** any screen that gets «رمز مرفوض» asks for the token again.

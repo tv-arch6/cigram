@@ -20,6 +20,9 @@ final class CgHttp {
 
     private CgHttp() {}
 
+    /** Set when the Worker answered 401 to an authenticated call; the next resumed screen asks for the token again. */
+    static volatile boolean unauthorized;
+
     private static final ExecutorService POOL = Executors.newFixedThreadPool(5);
 
     static final class Res {
@@ -166,6 +169,7 @@ final class CgHttp {
                 os.close();
             }
             res.code = c.getResponseCode();
+            if (auth && res.code == 401) unauthorized = true;
             res.contentType = c.getContentType() == null ? "" : c.getContentType();
             res.contentLength = c.getContentLength();
             InputStream in = res.code >= 400 ? c.getErrorStream() : c.getInputStream();

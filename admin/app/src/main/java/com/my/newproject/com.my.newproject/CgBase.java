@@ -58,10 +58,21 @@ public abstract class CgBase extends Activity {
         column.addView(body, new LinearLayout.LayoutParams(CgUi.MATCH, 0, 1f));
         frame.addView(column, new FrameLayout.LayoutParams(CgUi.MATCH, CgUi.MATCH));
         setContentView(frame);
+        CgUi.applyTree(frame);            // the app font on every text, including views added later
         try {
             getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         } catch (Exception ignored) { }
         onBuild();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // any screen that got a 401 asks for the token again (it was wrong, or never entered)
+        if (CgHttp.unauthorized) {
+            CgHttp.unauthorized = false;
+            TokenGate.rejected(this);
+        }
     }
 
     @Override

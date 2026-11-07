@@ -43,9 +43,9 @@ public class WnLogicTest {
     @Test
     public void everyChipMapsToAWorkerFeedOrView() {
         List<String> known = Arrays.asList("all:new_releases", "movie:new_releases", "tv:recent_episodes", "all:trending", "movie:upcoming",
-                "tv:new_seasons", "recently_added", "ready", "unverified", "missing_video", "missing_subtitle", "imported");
+                "tv:new_seasons", "collections", "recently_added", "ready", "unverified", "missing_video", "missing_subtitle", "imported");
         for (String[] c : WnLogic.CHIPS) assertTrue(c[0], known.contains(c[2]));
-        assertEquals(13, WnLogic.CHIPS.length);
+        assertEquals(14, WnLogic.CHIPS.length);
     }
 
     @Test
@@ -81,7 +81,9 @@ public class WnLogicTest {
         WnLogic.Flags fl = new WnLogic.Flags();
         fl.ackUnverified = true;
         fl.notify = false;
+        fl.quality = "1080p";
         JSONObject plan = WnLogic.basePlan("movie", 1001, p, fl, "req-1");
+        assertEquals("1080p", plan.getJSONObject("options").getString("quality"));
         WnLogic.withMovie(plan, "tok.v", Arrays.asList("fb1", "fb2"), "subtok");
         assertEquals("movie", plan.getString("type"));
         assertEquals(1001, plan.getLong("tmdb_id"));

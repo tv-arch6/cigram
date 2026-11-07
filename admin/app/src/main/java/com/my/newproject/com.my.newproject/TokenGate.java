@@ -15,6 +15,12 @@ final class TokenGate {
         ask(a, after);
     }
 
+    /** The Worker refused the stored token (401). */
+    static void rejected(Activity a) {
+        CgUi.toast(a, "رمز الإدارة مرفوض (401). أدخل الرمز الصحيح — نفس ADMIN_TOKEN في Cloudflare.");
+        ask(a, null);
+    }
+
     static void ask(final Activity a, final Runnable after) {
         if (asking) return;
         asking = true;

@@ -38,6 +38,7 @@ public class SeriesImportActivity extends AppCompatActivity {
 		super.onCreate(_savedInstanceState);
 		binding = SeriesImportBinding.inflate(getLayoutInflater());
 		setContentView(binding.getRoot());
+		CgUi.applyTree(binding.getRoot());
 		initialize(_savedInstanceState);
 		initializeLogic();
 	}
@@ -89,7 +90,7 @@ public class SeriesImportActivity extends AppCompatActivity {
 			try {
 				appFont[0] = android.graphics.Typeface.createFromAsset(
 				getAssets(),
-				"fonts/Cairo-Regular.ttf"
+				"fonts/Alyamama.ttf"
 				);
 			} catch (Exception ignored) {}
 			
@@ -1411,4 +1412,4 @@ public class SeriesImportActivity extends AppCompatActivity {
 		
 	}
 	
-}
+}

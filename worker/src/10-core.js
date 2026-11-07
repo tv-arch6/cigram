@@ -65,17 +65,19 @@ const WN_FEED_KEYS = [
   "tv:new_releases", "tv:recent_episodes", "tv:new_seasons", "tv:popular", "tv:trending",
   "all:new_releases", "all:trending",
 ];
-const WN_VIEW_KEYS = ["recently_added", "ready", "unverified", "missing_video", "missing_subtitle", "imported"];
+const WN_VIEW_KEYS = ["recently_added", "ready", "unverified", "missing_video", "missing_subtitle", "imported", "collections"];
+const WN_HEARTBEAT_FILE = "whatsnew/heartbeat.json";
 const WN_SORTS = { popularity: 1, rating: 1, release: 1 };
 
 const WN_DEFAULT_CONFIG = {
   version: 1,
-  auto_sync: false,
-  interval_minutes: 360,
+  auto_sync: true,          // first-hand updates by default (needs the Cron Trigger + a TMDB key; stays quiet without them)
+  notify_telegram: true,    // one Telegram message per sync that found new titles (works with the app closed)
+  interval_minutes: 60,
   language: "ar-SA",
   region: "",
-  feeds: ["movie:new_releases", "movie:trending", "tv:recent_episodes", "tv:trending"],
-  max_pages: 1,
+  feeds: ["movie:new_releases", "movie:trending", "tv:recent_episodes", "tv:new_releases", "tv:trending"],
+  max_pages: 2,
   enrich_limit: 8,
   subtitle_languages: ["ar", "en"],
   subtitle_required: false,
@@ -220,6 +222,28 @@ function wnSafeUrl(raw, opts) {
   return u;
 }
 
+// ----------------------------------------------------------------------------- cron heartbeat
+// The statistics (ops compaction + live history), the Telegram request alerts and the automatic sync ALL run from the
+// Worker's Cron Trigger. If a redeploy drops the trigger they silently stop, so every tick leaves a heartbeat that the
+// app can show (summary.cron) instead of failing quietly.
+
+async function wnHeartbeat(env) {
+  const doc = await wnRead(env, WN_HEARTBEAT_FILE, { at: 0 });
+  if (Date.now() - (Number(doc.at) || 0) < 120000) return;
+  await wnMutate(env, WN_HEARTBEAT_FILE, { at: 0 }, (d) => {
+    d.at = Date.now();
+    d.runs = (Number(d.runs) || 0) + 1;
+    return { doc: d };
+  });
+}
+
+async function wnCronStatus(env) {
+  const doc = await wnRead(env, WN_HEARTBEAT_FILE, { at: 0 });
+  const at = Number(doc.at) || 0;
+  const age = at ? Math.round((Date.now() - at) / 1000) : -1;
+  return { last_seen_at: at ? new Date(at).toISOString() : "", age_seconds: age, healthy: at > 0 && age < 600 };
+}
+
 // ----------------------------------------------------------------------------- admin-private JSON files
 
 function wnBucket(env) {
@@ -244,6 +268,7 @@ function wnMergeConfig(raw) {
   if (!Array.isArray(cfg.feeds)) cfg.feeds = clone(WN_DEFAULT_CONFIG.feeds);
   cfg.feeds = cfg.feeds.filter((f) => WN_FEED_KEYS.includes(f));
   if (!Array.isArray(cfg.subtitle_languages) || !cfg.subtitle_languages.length) cfg.subtitle_languages = ["ar", "en"];
+  cfg.notify_telegram = cfg.notify_telegram !== false;
   cfg.interval_minutes = Math.min(10080, Math.max(30, numOf(cfg.interval_minutes) || 360));
   cfg.enrich_limit = Math.min(20, Math.max(0, Number.isFinite(Number(cfg.enrich_limit)) ? Number(cfg.enrich_limit) : 8));
   cfg.max_pages = Math.min(3, Math.max(1, numOf(cfg.max_pages) || 1));
@@ -450,6 +475,8 @@ async function wnFetchMeta(env, kind, tmdbId) {
     status: cleanString(ar.status || en.status),
     homepage: cleanString(ar.homepage || en.homepage),
   };
+  const col = ar.belongs_to_collection || en.belongs_to_collection;
+  meta.collection = col && col.id ? { id: Number(col.id), name: cleanString(col.name), poster: tmdbImage(col.poster_path, "w342"), backdrop: tmdbImage(col.backdrop_path, "w780") } : null;
   if (tv) {
     const rawSeasons = Array.isArray(ar.seasons) && ar.seasons.length ? ar.seasons : Array.isArray(en.seasons) ? en.seasons : [];
     meta.season_count = Number(ar.number_of_seasons || en.number_of_seasons) || 0;

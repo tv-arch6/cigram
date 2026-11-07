@@ -126,7 +126,7 @@ export function createWorld(overrides = {}) {
     const m = state.movies[id];
     if (!m) return null;
     const names = lang === "ar-SA" ? Object.fromEntries(GENRES_AR.movie.map((g) => [g.id, g.name])) : GENRES_EN;
-    return { id, title: lang === "ar-SA" ? m.title : m.original_title, original_title: m.original_title, overview: lang === "ar-SA" ? m.overview : "Overview " + id, release_date: m.release_date, poster_path: m.poster_path, backdrop_path: m.backdrop_path, vote_average: m.vote_average, vote_count: m.vote_count, popularity: m.popularity, genres: m.genre_ids.map((g) => ({ id: g, name: names[g] })), runtime: 121, original_language: m.original_language, production_countries: [{ iso_3166_1: "US" }], status: "Released", tagline: "", homepage: "", external_ids: { imdb_id: "tt" + String(id).padStart(7, "0") } };
+    return { id, title: lang === "ar-SA" ? m.title : m.original_title, original_title: m.original_title, overview: lang === "ar-SA" ? m.overview : "Overview " + id, release_date: m.release_date, poster_path: m.poster_path, backdrop_path: m.backdrop_path, vote_average: m.vote_average, vote_count: m.vote_count, popularity: m.popularity, genres: m.genre_ids.map((g) => ({ id: g, name: names[g] })), runtime: 121, belongs_to_collection: id === 1001 || id === 1004 ? { id: 77, name: "سلسلة ألفا", poster_path: "/c77.jpg", backdrop_path: null } : null, original_language: m.original_language, production_countries: [{ iso_3166_1: "US" }], status: "Released", tagline: "", homepage: "", external_ids: { imdb_id: "tt" + String(id).padStart(7, "0") } };
   };
   const detailTv = (id, lang) => {
     const t = state.tv[id];
@@ -161,10 +161,15 @@ export function createWorld(overrides = {}) {
       if (path === "/discover/tv") return jsonRes({ page: Number(u.searchParams.get("page") || 1), total_pages: 2, total_results: 40, results: state.discoverTv.map((id) => state.tv[id]) });
       if (path === "/trending/movie/week") return jsonRes({ page: 1, total_pages: 1, total_results: 2, results: state.trendingMovie.map((id) => state.movies[id]) });
       if (path === "/trending/tv/week") return jsonRes({ page: 1, total_pages: 1, total_results: 2, results: state.discoverTv.map((id) => state.tv[id]) });
+      if (path === "/collection/77") return jsonRes({ id: 77, name: lang === "ar-SA" ? "سلسلة ألفا" : "Alpha Collection", overview: "قصة السلسلة", poster_path: "/c77.jpg", backdrop_path: null, parts: [state.movies[1004], state.movies[1001]] });
       if ((m = path.match(/^\/movie\/(\d+)$/))) { const d = detailMovie(Number(m[1]), lang); return d ? jsonRes(d) : jsonRes({ status_message: "not found" }, 404); }
       if ((m = path.match(/^\/tv\/(\d+)$/))) { const d = detailTv(Number(m[1]), lang); return d ? jsonRes(d) : jsonRes({ status_message: "not found" }, 404); }
       if ((m = path.match(/^\/tv\/(\d+)\/season\/(\d+)$/))) { const d = season(Number(m[1]), Number(m[2]), lang); return d ? jsonRes(d) : jsonRes({ status_message: "not found" }, 404); }
       return jsonRes({ status_message: "unhandled " + path }, 404);
+    }
+    if (host === "api.telegram.org") {
+      (state.telegram = state.telegram || []).push(JSON.parse(req.body));
+      return jsonRes({ ok: true, result: { message_id: 1 } });
     }
     if (host === "image.tmdb.org") return new Response(new Uint8Array(1024), { status: 200, headers: { "content-type": "image/jpeg" } });
     if (host === "vidbolt.pro") {

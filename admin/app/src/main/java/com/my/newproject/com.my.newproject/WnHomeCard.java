@@ -33,9 +33,7 @@ final class WnHomeCard {
 
         LinearLayout head = CgUi.hbox(host);
         LinearLayout titles = CgUi.vbox(host);
-        TextView kicker = CgUi.text(host, "DISCOVER", 11, CgCfg.CYAN, true);
-        CgUi.ltr(kicker);
-        kicker.setLetterSpacing(0.2f);
+        TextView kicker = CgUi.text(host, "اكتشف", 12, CgCfg.CYAN, true);
         titles.addView(kicker);
         LinearLayout nameRow = CgUi.hbox(host);
         nameRow.addView(CgUi.text(host, "ما الجديد؟", 22, CgCfg.TEXT, true));
@@ -91,6 +89,16 @@ final class WnHomeCard {
     /** Shared by the dashboard card and the discovery center header. */
     static void fillStats(final Activity a, LinearLayout box, JSONObject s, boolean openLink) {
         box.removeAllViews();
+        JSONObject cron = s.optJSONObject("cron");
+        if (cron != null && !cron.optBoolean("healthy", false)) {
+            LinearLayout w = CgUi.vbox(a);
+            w.setBackground(CgUi.bg(a, CgUi.alpha(CgCfg.BAD, 0x1C), 14, CgCfg.BAD));
+            w.setPadding(CgUi.dp(a, 12), CgUi.dp(a, 10), CgUi.dp(a, 12), CgUi.dp(a, 10));
+            w.addView(CgUi.text(a, "⚠ المؤشر الزمني (Cron) لا يعمل", 14, CgCfg.BAD, true));
+            w.addView(CgUi.text(a, "بدونه تتوقف الإحصائيات وتنبيهات بوت تليكرام للطلبات والمزامنة التلقائية. افتح Cloudflare ← Workers ← cigram-admin-api ← Settings ← Triggers ← Add Cron Trigger وضع * * * * * ثم احفظ.", 12, CgCfg.TEXT, false));
+            w.setLayoutParams(CgUi.lp(a, CgUi.MATCH, CgUi.WRAP, 0, 0, 0, 8));
+            box.addView(w);
+        }
         JSONObject c = s.optJSONObject("counts");
         if (c == null) c = new JSONObject();
         box.addView(DxUi.row(a,

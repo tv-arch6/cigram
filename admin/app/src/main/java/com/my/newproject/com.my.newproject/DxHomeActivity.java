@@ -112,9 +112,7 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
         LinearLayout hello = CgUi.hbox(this);
         hello.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout hl = CgUi.vbox(this);
-        TextView brand = CgUi.text(this, "CIGRAM", 12, CgCfg.ACCENT, true);
-        CgUi.ltr(brand);
-        brand.setLetterSpacing(0.18f);
+        TextView brand = CgUi.text(this, "سيكرام", 13, CgCfg.ACCENT, true);
         hl.addView(brand);
         hl.addView(CgUi.text(this, "أهلاً بك", 23, CgCfg.TEXT, true));
         hl.addView(CgUi.muted(this, today()));

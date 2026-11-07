@@ -98,6 +98,7 @@ async function wnEnrichOne(env, cfg, entry, lib, list) {
   const nowIso = new Date().toISOString();
   const meta = await wnFetchMeta(env, entry.kind, tmdb);
   const enrich = { checked_at: nowIso };
+  if (entry.kind === "movie" && meta.collection) enrich.collection = { id: meta.collection.id, name: meta.collection.name, poster: meta.collection.poster };
   let target = { kind: "movie", tmdb, season: 0, episode: 0, released: meta.released };
   if (entry.kind === "series") {
     const le = meta.latest_episode;
@@ -203,6 +204,31 @@ function wnFoldCounters(run, c) {
   for (const e of c.errors || []) if (run.errors.length < 30) run.errors.push(e);
 }
 
+/** One Telegram message per sync that found new titles — arrives with the app closed. Never throws. */
+async function wnTelegramNew(env, newKeys) {
+  try {
+    const idx = await wnRead(env, WN_INDEX_FILE, { items: {} });
+    const rows = newKeys.map((k) => idx.items[k]).filter(Boolean).sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+    if (!rows.length) return "empty";
+    const icon = (e) => (e.kind === "series" ? "📺" : "🎬");
+    const vid = (e) => {
+      const s = wnVideoBrief(e).state;
+      return s === "ok" ? " ✅ فيديو متاح" : s === "unverified" ? " ⚠️ فيديو غير مُتحقَّق" : s === "missing" ? " ❌ بلا فيديو" : !e.released ? " ⏳ قريباً" : "";
+    };
+    const lines = ["🆕 <b>جديد في ما الجديد؟</b> — " + rows.length + " عنوان جديد"];
+    for (const e of rows.slice(0, 10)) {
+      lines.push("• " + icon(e) + " <b>" + reqEsc(e.title) + "</b>" + (e.year ? " (" + e.year + ")" : "") + (e.rating ? " ★" + e.rating : "") + vid(e));
+    }
+    if (rows.length > 10) lines.push("… و" + (rows.length - 10) + " غيرها");
+    lines.push("افتح تطبيق الإدارة ← ما الجديد؟ ثم اضغط البوستر لإضافته.");
+    const res = await reqTgSend(env, lines.join("\n"));
+    return res.ok ? "sent" : String(res.description || res.http || "failed");
+  } catch (error) {
+    updLog("whatsnew_telegram_failed", { message: String(error && error.message) });
+    return "failed";
+  }
+}
+
 async function wnSync(env, trigger, enrichLimit) {
   const started = Date.now();
   const at = new Date().toISOString();
@@ -220,6 +246,7 @@ async function wnSync(env, trigger, enrichLimit) {
     recent_episodes: 0, enriched: 0, videos_resolved: 0, videos_unverified: 0, videos_missing: 0, subtitles_available: 0, failed: 0, errors: [], ms: 0,
   };
   let success = false;
+  let freshKeys = [];
   try {
     try { tmdbCredentials(env); } catch { throw new AdminError("missing_tmdb_key", "لم يتم إعداد TMDB_API_KEY أو TMDB_READ_TOKEN في إعدادات الـ Worker.", 503); }
     const list = await readMoviesList(env);
@@ -230,6 +257,7 @@ async function wnSync(env, trigger, enrichLimit) {
     run.failed += errors.length;
     for (const e of errors) run.errors.push(e);
     const newKeys = await wnMergeIndex(env, collected, lib);
+    freshKeys = newKeys;
     run.new_items = newKeys.length;
     run.new_movies = newKeys.filter((k) => k.startsWith("movie:")).length;
     run.new_series = newKeys.filter((k) => k.startsWith("series:")).length;
@@ -237,6 +265,7 @@ async function wnSync(env, trigger, enrichLimit) {
     const limit = Math.min(20, Math.max(0, numOf(enrichLimit)));
     if (limit > 0 && collected.size) wnFoldCounters(run, await wnEnrichBatch(env, cfg, limit));
     await wnCleanParkedSubtitles(env);
+    if (trigger === "cron" && cfg.notify_telegram !== false && freshKeys.length) run.telegram = await wnTelegramNew(env, freshKeys);
     success = collected.size > 0 || errors.length === 0;
     run.status = errors.length && !collected.size ? "failed" : errors.length || run.errors.length ? "partial" : "ok";
   } catch (error) {
@@ -264,6 +293,7 @@ async function wnSync(env, trigger, enrichLimit) {
 
 /** Called by the Worker's every-minute cron. Cheap when auto-sync is off (one small R2 read). */
 async function wnCronTick(env) {
+  await wnHeartbeat(env).catch(() => {});
   const cfg = await wnConfig(env);
   if (!cfg.auto_sync) return;
   if (Date.now() - (Date.parse(cfg.last_started_at) || 0) < cfg.interval_minutes * 60000) return;
@@ -341,5 +371,7 @@ const WN_ROUTES = (() => {
     "POST /admin/discover/sync": A(handleWnSync),
     "POST /admin/discover/enrich": A(handleWnEnrich),
     "GET /admin/discover/history": A(handleWnHistory),
+    "GET /admin/discover/cron": A(handleWnCron),
+    "POST /admin/discover/collection": A(handleWnCollection),
   };
 })();

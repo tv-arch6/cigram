@@ -334,6 +334,6 @@ public class WnPipelineTest {
         JSONObject hist = WnApi.history();
         assertEquals(1, hist.getJSONArray("runs").length());
         assertTrue(WnApi.genres().getJSONArray("movie").length() > 0);
-        assertFalse(WnApi.config().getJSONObject("config").getBoolean("auto_sync"));
+        assertTrue(WnApi.config().getJSONObject("config").getBoolean("auto_sync"));
     }
 }

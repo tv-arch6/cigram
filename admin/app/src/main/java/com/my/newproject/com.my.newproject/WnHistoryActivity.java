@@ -24,6 +24,8 @@ public class WnHistoryActivity extends CgBase {
 
     // editable copy
     private boolean auto;
+    private boolean tg = true;
+    private JSONObject cron;
     private int interval = 360;
     private int enrich = 8;
 
@@ -59,8 +61,10 @@ public class WnHistoryActivity extends CgBase {
                 if (!alive()) return;
                 config = r[0].optJSONObject("config");
                 providers = r[0].optJSONObject("providers");
+                cron = r[0].optJSONObject("cron");
                 if (config != null) {
                     auto = config.optBoolean("auto_sync");
+                    tg = config.optBoolean("notify_telegram", true);
                     interval = config.optInt("interval_minutes", 360);
                     enrich = config.optInt("enrich_limit", 8);
                 }
@@ -93,9 +97,19 @@ public class WnHistoryActivity extends CgBase {
         box.setLayoutParams(CgUi.lp(this, CgUi.MATCH, CgUi.WRAP, 0, 0, 0, 10));
         box.addView(CgUi.text(this, "المزامنة التلقائية", 16, CgCfg.TEXT, true));
         box.addView(CgUi.muted(this, "تعمل عبر Cron Trigger الموجود في الـ Worker (كل دقيقة يفحص هل حان الموعد). لوحة التحكم لا تستدعي TMDB أبداً — الأرقام تُقرأ من آخر مزامنة."));
+        if (cron != null) {
+            boolean ok = cron.optBoolean("healthy", false);
+            TextView cs = CgUi.text(this, ok ? "✓ المؤشر الزمني يعمل (آخر نبضة قبل " + cron.optInt("age_seconds") + " ث)"
+                    : "✕ المؤشر الزمني (Cron) متوقف — فعّله من Cloudflare ← Settings ← Triggers ← * * * * *", 12.5f, ok ? CgCfg.GOOD : CgCfg.BAD, true);
+            cs.setPadding(0, CgUi.dp(this, 6), 0, CgUi.dp(this, 4));
+            box.addView(cs);
+        }
         CgUi.Toggle t = CgUi.toggle(this, "مزامنة تلقائية", auto);
         t.onChange(new Runnable() { @Override public void run() { auto = !auto; } });
         box.addView(t);
+        CgUi.Toggle tgt = CgUi.toggle(this, "تنبيه تليكرام عند ظهور عناوين جديدة (بدون فتح التطبيق)", tg);
+        tgt.onChange(new Runnable() { @Override public void run() { tg = !tg; } });
+        box.addView(tgt);
         TextView l1 = CgUi.muted(this, "الفاصل بين المزامنات");
         l1.setPadding(0, CgUi.dp(this, 6), 0, CgUi.dp(this, 4));
         box.addView(l1);
@@ -166,6 +180,7 @@ public class WnHistoryActivity extends CgBase {
     private void saveSettings() {
         final JSONObject patch = new JSONObject();
         CxJ.put(patch, "auto_sync", auto);
+        CxJ.put(patch, "notify_telegram", tg);
         CxJ.put(patch, "interval_minutes", interval);
         CxJ.put(patch, "enrich_limit", enrich);
         showLoading("جارٍ الحفظ…");

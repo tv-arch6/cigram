@@ -165,7 +165,9 @@ describe("configuration and cron", () => {
   it("settings are validated and merged with defaults", async () => {
     const t = await setup();
     const g = await t.get("/admin/discover/config");
-    assert.equal(g.data.config.auto_sync, false);
+    assert.equal(g.data.config.auto_sync, true, "first-hand updates are on by default");
+    assert.equal(g.data.config.notify_telegram, true);
+    assert.equal(g.data.config.interval_minutes, 60);
     assert.equal(g.data.config.video_providers[0].id, "vidbolt");
     assert.equal(g.data.providers.tmdb, true);
     assert.equal(g.data.providers.subdl, true);
@@ -185,8 +187,10 @@ describe("configuration and cron", () => {
     const t = await setup();
     const tick = async () => { const p = pending(); await t.worker.scheduled({}, t.env, p.ctx); await p.flush(); };
     const runs = () => (t.bucket.json("_admin_private/whatsnew/history.json") || { runs: [] }).runs;
+    await t.cfg({ auto_sync: false });
     await tick();
-    assert.equal(runs().length, 0, "auto-sync is off by default");
+    assert.equal(runs().length, 0, "auto-sync switched off: the tick only leaves its heartbeat");
+    assert.equal((await t.get("/admin/discover/cron")).data.healthy, true);
     await t.cfg({ auto_sync: true, interval_minutes: 30, feeds: ["movie:new_releases"], enrich_limit: 2 });
     await tick();
     assert.equal(runs().length, 1);
@@ -200,7 +204,6 @@ describe("configuration and cron", () => {
     await tick();
     assert.equal(runs().length, 2);
     const noTmdb = await setup({}, { TMDB_API_KEY: "" });
-    await noTmdb.cfg({ auto_sync: true });
     const p = pending();
     await noTmdb.worker.scheduled({}, noTmdb.env, p.ctx);
     await p.flush();

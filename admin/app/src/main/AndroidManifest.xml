@@ -304,6 +304,11 @@
     android:theme="@android:style/Theme.Material.NoActionBar"
     android:windowSoftInputMode="adjustResize" />
 <activity
+    android:name="com.my.newproject.WnCollectionActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar" />
+<activity
     android:name="com.my.newproject.WnHistoryActivity"
     android:exported="false"
     android:configChanges="orientation|screenSize|keyboardHidden"

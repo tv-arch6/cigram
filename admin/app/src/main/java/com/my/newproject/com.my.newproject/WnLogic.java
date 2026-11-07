@@ -32,6 +32,7 @@ final class WnLogic {
             {"trending", "الأكثر رواجاً", "all:trending", "any", ""},
             {"upcoming", "قريباً", "movie:upcoming", "movie", ""},
             {"seasons", "مواسم جديدة", "tv:new_seasons", "series", ""},
+            {"collections", "سلاسل أفلام", "collections", "movie", ""},
             {"recent", "أُضيف حديثاً", "recently_added", "any", ""},
             {"ready", "متاح للاستيراد", "ready", "any", ""},
             {"unverified", "فيديو غير مُتحقَّق", "unverified", "any", ""},
@@ -213,7 +214,7 @@ final class WnLogic {
     }
 
     static String typeLabel(String type) {
-        return "series".equals(type) ? "مسلسل" : "فيلم";
+        return "series".equals(type) ? "مسلسل" : "collection".equals(type) ? "سلسلة" : "فيلم";
     }
 
     static String ratingText(double r) {
@@ -259,6 +260,8 @@ final class WnLogic {
         boolean notify = true;
         boolean subtitleRequired;
         boolean hidden;
+        /** declared by the admin (e.g. 720p / 1080p / 4K); empty = leave blank. Never guessed. */
+        String quality = "";
     }
 
     static JSONObject basePlan(String type, long tmdb, Placement p, Flags f, String requestId) {
@@ -284,6 +287,7 @@ final class WnLogic {
             opt.put("notify", f == null || f.notify);
             opt.put("subtitle_required", f != null && f.subtitleRequired);
             opt.put("hidden", f != null && f.hidden);
+            if (f != null && f.quality != null && f.quality.length() > 0) opt.put("quality", f.quality);
             plan.put("options", opt);
         } catch (Exception ignored) { }
         return plan;

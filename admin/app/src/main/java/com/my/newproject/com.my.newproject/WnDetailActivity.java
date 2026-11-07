@@ -75,6 +75,7 @@ public class WnDetailActivity extends CgBase {
     private boolean ack;
     private boolean notify = true;
     private boolean subRequired;
+    private String quality = "";
 
     // series
     private final TreeMap<Integer, JSONObject> seasonData = new TreeMap<>();
@@ -170,6 +171,21 @@ public class WnDetailActivity extends CgBase {
             return;
         }
 
+        JSONObject col = det.optJSONObject("collection");
+        if (col != null && col.optLong("id") > 0 && !series) {
+            final long colId = col.optLong("id");
+            final String colName = col.optString("name");
+            LinearLayout cb = WnUi.glass(this);
+            cb.addView(CgUi.text(this, "ينتمي إلى سلسلة: " + colName, 14, CgCfg.ORANGE, true));
+            cb.addView(CgUi.muted(this, "اعرض كل أجزاء السلسلة وأضفها دفعة واحدة."));
+            TextView open = CgUi.smallButton(this, "عرض السلسلة وإضافتها كاملة", 1);
+            open.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { WnCollectionActivity.open(WnDetailActivity.this, colId, colName); }
+            });
+            cb.addView(open, CgUi.lp(this, CgUi.WRAP, CgUi.WRAP, 0, 8, 0, 0));
+            cb.setLayoutParams(CgUi.lp(this, CgUi.MATCH, CgUi.WRAP, 0, 0, 0, 10));
+            root.addView(cb);
+        }
         videoBox = CgUi.vbox(this);
         subBox = CgUi.vbox(this);
         catBox = CgUi.vbox(this);
@@ -265,6 +281,7 @@ public class WnDetailActivity extends CgBase {
         fact(facts, "التقييم", WnLogic.ratingText(det.optDouble("rating", 0)) + " (" + det.optInt("vote_count") + " صوت)", false);
         fact(facts, "المدة", det.optString("duration") + (det.optInt("runtime_minutes") > 0 ? " (" + det.optInt("runtime_minutes") + " د)" : ""), true);
         fact(facts, "معرّف TMDB", String.valueOf(det.optLong("tmdb_id")), true);
+        if (det.optJSONObject("collection") != null) fact(facts, "السلسلة", det.optJSONObject("collection").optString("name"), false);
         fact(facts, "معرّف IMDb", det.optString("imdb_id"), true);
         fact(facts, "الحالة", det.optString("status"), true);
         if (series) {
@@ -708,6 +725,7 @@ public class WnDetailActivity extends CgBase {
         f.ackUnverified = ack;
         f.notify = notify;
         f.subtitleRequired = subRequired;
+        f.quality = quality;
         return f;
     }
 
@@ -721,7 +739,7 @@ public class WnDetailActivity extends CgBase {
         seasonBox.removeAllViews();
         seasonBox.addView(WnUi.sectionHeader(this, "المواسم والحلقات", "اختر مواسم أو حلقات. كل حلقة تُفحص مستقلة ولا يُربط رابطها بحلقة أخرى."));
         LinearLayout top = CgUi.hbox(this);
-        TextView all = CgUi.smallButton(this, "كل المواسم", 1);
+        TextView all = CgUi.smallButton(this, "المسلسل كاملاً (كل المواسم)", 1);
         all.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { selectAllSeasons(); }
         });
@@ -1174,6 +1192,24 @@ public class WnDetailActivity extends CgBase {
         CgUi.Toggle s = CgUi.toggle(this, "اشتراط وجود ترجمة (وإلا لا يُستورد)", subRequired);
         s.onChange(new Runnable() { @Override public void run() { subRequired = !subRequired; invalidate(); } });
         opts.addView(s);
+        TextView ql = CgUi.muted(this, "الجودة (تُسجَّل كما تعلنها أنت)");
+        ql.setPadding(0, CgUi.dp(this, 6), 0, CgUi.dp(this, 4));
+        opts.addView(ql);
+        CgUi.ChipBar qb = new CgUi.ChipBar(this);
+        final String[][] qs = {{"بدون", ""}, {"720p", "720p"}, {"1080p", "1080p"}, {"4K", "4K"}};
+        final List<TextView> qChips = new ArrayList<>();
+        for (final String[] q : qs) {
+            TextView t = qb.add(q[0], q[1].equals(quality));
+            qChips.add(t);
+            t.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    quality = q[1];
+                    for (int i = 0; i < qs.length; i++) CgUi.setChipState(qChips.get(i), qs[i][1].equals(quality));
+                    invalidate();
+                }
+            });
+        }
+        opts.addView(qb.scroll, CgUi.lp(this, CgUi.MATCH, CgUi.WRAP, -12, 0, -12, 0));
         opts.setLayoutParams(CgUi.lp(this, CgUi.MATCH, CgUi.WRAP, 0, 0, 0, 10));
         actionBox.addView(opts);
         importBtn = CgUi.button(this, "إضافة إلى Cigram", 0);

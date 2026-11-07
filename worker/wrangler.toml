@@ -1,0 +1,40 @@
+# Reproducible deploy of cigram-admin-api that KEEPS the Cron Trigger and the bindings.
+#
+# A deploy without a trigger list can drop the dashboard Cron Trigger, and then the statistics (ops compaction + live
+# history), the Telegram request alerts and the automatic «ما الجديد؟» sync all stop silently. This file pins them.
+#
+#   cd worker && npm test && npx wrangler deploy --keep-vars
+#
+# Secrets (ADMIN_TOKEN, FCM_SERVICE_ACCOUNT, SUBDL_API_KEY, TELEGRAM_BOT_TOKEN, ...) live in Cloudflare and are kept.
+# Check "compatibility_date" against Dashboard -> cigram-admin-api -> Settings -> Runtime before the first deploy.
+name = "cigram-admin-api"
+main = "dist/cigram-admin-api.worker.js"
+compatibility_date = "2025-09-01"
+workers_dev = true
+
+[triggers]
+crons = ["* * * * *"]
+
+[observability]
+enabled = true
+
+[[r2_buckets]]
+binding = "MOVIES_BUCKET"
+bucket_name = "movies"
+
+[[kv_namespaces]]
+binding = "CIGRAM_CACHE"
+id = "1af374b5a264468c951250b4f13cbc41"
+
+[[kv_namespaces]]
+binding = "REQUESTS_KV"
+id = "b37de9312d55445f981d55814ef1c648"
+
+[[d1_databases]]
+binding = "AUTH_DB"
+database_name = "cigram-users"
+database_id = "3b5c4f39-8931-4398-bcb7-06ab8d8c453a"
+
+[[services]]
+binding = "APP_ADS_SITE"
+service = "calm-wood-9aa4"

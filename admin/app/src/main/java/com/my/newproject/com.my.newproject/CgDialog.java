@@ -37,6 +37,9 @@ final class CgDialog {
                     try {
                         style(ctx, d);
                     } catch (Throwable ignored) { }
+                    try {
+                        if (d.getWindow() != null) CgUi.applyTree(d.getWindow().getDecorView());
+                    } catch (Throwable ignored) { }
                 }
             });
             return d;

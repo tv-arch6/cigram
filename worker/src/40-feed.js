@@ -264,6 +264,26 @@ async function handleWnFeed(request, env) {
   const lib = wnLibraryIndex(list);
   const idx = await wnRead(env, WN_INDEX_FILE, { items: {} });
 
+  if (feed === "collections") {
+    const groups = new Map();
+    for (const e of Object.values(idx.items || {})) {
+      const c = e.enrich && e.enrich.collection;
+      if (!c || !c.id) continue;
+      const g = groups.get(c.id) || { id: c.id, name: c.name, poster: c.poster, parts: 0, latest: "" };
+      g.parts++;
+      if (cleanString(e.release_date) > g.latest) g.latest = cleanString(e.release_date);
+      groups.set(c.id, g);
+    }
+    const all = Array.from(groups.values()).sort((a, b) => (a.latest < b.latest ? 1 : -1));
+    const slice = all.slice((f.page - 1) * WN_PAGE_SIZE, f.page * WN_PAGE_SIZE);
+    const cards = slice.map((g) => ({
+      key: "collection:" + g.id, type: "collection", tmdb_id: g.id, title: g.name, original_title: "", year: g.latest.slice(0, 4), release_date: g.latest, released: true,
+      poster: g.poster, backdrop: "", overview: g.parts + " جزء مكتشف من هذه السلسلة", rating: 0, vote_count: 0, popularity: 0, genres: [], genre_ids: [], language: "", countries: [],
+      imported: false, existing: null, video: { state: "unknown" }, subtitle: { state: "unknown" }, first_seen_at: "", parts_known: g.parts,
+    }));
+    const notes = all.length ? [] : ["لا توجد سلاسل بعد: تظهر السلاسل بعد المزامنة (تُكتشف من تفاصيل الأفلام المفحوصة)."];
+    return okResponse({ feed, page: f.page, total_pages: Math.max(1, Math.ceil(all.length / WN_PAGE_SIZE)), total_results: all.length, cards, source: "index", notes });
+  }
   if (WN_VIEW_KEYS.includes(feed)) {
     const rows = wnViewEntries(feed, idx, lib, f);
     const start = (f.page - 1) * WN_PAGE_SIZE;
@@ -369,8 +389,34 @@ function wnSummaryFrom(idx, lib, cfg) {
 }
 
 async function handleWnSummary(request, env) {
-  const [cfg, idx, list] = await Promise.all([wnConfig(env), wnRead(env, WN_INDEX_FILE, { items: {} }), readMoviesList(env)]);
-  return okResponse(wnSummaryFrom(idx, wnLibraryIndex(list), cfg));
+  const [cfg, idx, list, cron] = await Promise.all([wnConfig(env), wnRead(env, WN_INDEX_FILE, { items: {} }), readMoviesList(env), wnCronStatus(env)]);
+  return okResponse(Object.assign(wnSummaryFrom(idx, wnLibraryIndex(list), cfg), { cron }));
+}
+
+async function handleWnCron(request, env) {
+  return okResponse(await wnCronStatus(env));
+}
+
+/** A movie collection (saga): every part, with what is already in the library, ready for a bulk import. */
+async function handleWnCollection(request, env) {
+  wnRate("collection", 60);
+  const input = await readRequestData(request);
+  const id = wnTmdbId(input.id || input.collection_id);
+  const [ar, en] = await Promise.all([
+    wnTmdb(env, "/collection/" + id, { language: "ar-SA" }, { ttl: 1800, nullOn404: true }),
+    wnTmdb(env, "/collection/" + id, { language: "en-US" }, { ttl: 1800, nullOn404: true }),
+  ]);
+  if (!ar && !en) throw new AdminError("collection_not_found", "السلسلة غير موجودة في TMDB.", 404);
+  const [list, idx, genres] = [await readMoviesList(env), await wnRead(env, WN_INDEX_FILE, { items: {} }), await wnGenres(env, "movie")];
+  const lib = wnLibraryIndex(list);
+  const rows = (Array.isArray(ar && ar.parts) && ar.parts.length ? ar.parts : Array.isArray(en && en.parts) ? en.parts : []).slice().sort((a, b) => cleanString(a.release_date).localeCompare(cleanString(b.release_date)));
+  const enBy = new Map((Array.isArray(en && en.parts) ? en.parts : []).map((p) => [Number(p.id), p]));
+  const cards = rows.map((row) => wnCard(Object.assign({}, enBy.get(Number(row.id)) || {}, row, { title: cleanString(row.title) || cleanString((enBy.get(Number(row.id)) || {}).title) }), "movie", genres, lib, idx));
+  return okResponse({
+    id: Number(id), name: pickText(ar, en, "name"), overview: pickText(ar, en, "overview"), poster: tmdbImage(pickText(ar, en, "poster_path"), "w500"),
+    backdrop: tmdbImage(pickText(ar, en, "backdrop_path"), "w780"), parts: cards, total: cards.length,
+    released: cards.filter((c) => c.released).length, in_library: cards.filter((c) => c.imported).length,
+  });
 }
 
 function wnProviderStatus(env, cfg) {
@@ -394,7 +440,7 @@ function wnProviderStatus(env, cfg) {
 
 async function handleWnConfigGet(request, env) {
   const cfg = await wnConfig(env);
-  return okResponse({ config: cfg, providers: wnProviderStatus(env, cfg), feeds: WN_FEED_KEYS, views: WN_VIEW_KEYS });
+  return okResponse({ config: cfg, providers: wnProviderStatus(env, cfg), feeds: WN_FEED_KEYS, views: WN_VIEW_KEYS, cron: await wnCronStatus(env) });
 }
 
 async function handleWnConfigSave(request, env) {
@@ -434,6 +480,7 @@ async function handleWnConfigSave(request, env) {
     patch.subtitle_languages = input.subtitle_languages.map((l) => wnSubLang(l, false)).slice(0, 5);
   }
   if (input.subtitle_required !== undefined) patch.subtitle_required = truthy(input.subtitle_required);
+  if (input.notify_telegram !== undefined) patch.notify_telegram = truthy(input.notify_telegram);
   if (input.video_providers !== undefined) {
     if (!Array.isArray(input.video_providers) || !input.video_providers.length || input.video_providers.length > 5) {
       throw new AdminError("invalid_provider", "أضف من 1 إلى 5 مزوّدين.", 400);
@@ -476,6 +523,7 @@ async function handleWnDetails(request, env) {
     suggested_sections: suggestSections(registry, meta.genres.map((name) => ({ name, en: "" })), kind),
     existing_categories: wnExistingCategories(list),
     suggested_slug: suggestSlug(list, meta.original_title, meta.title, meta.year, tmdb, kind),
+    collection: meta.collection || null,
     providers: wnProviderStatus(env, cfg),
   });
   if (kind === "series") {

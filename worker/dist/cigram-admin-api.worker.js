@@ -10932,17 +10932,19 @@ const WN_FEED_KEYS = [
   "tv:new_releases", "tv:recent_episodes", "tv:new_seasons", "tv:popular", "tv:trending",
   "all:new_releases", "all:trending",
 ];
-const WN_VIEW_KEYS = ["recently_added", "ready", "unverified", "missing_video", "missing_subtitle", "imported"];
+const WN_VIEW_KEYS = ["recently_added", "ready", "unverified", "missing_video", "missing_subtitle", "imported", "collections"];
+const WN_HEARTBEAT_FILE = "whatsnew/heartbeat.json";
 const WN_SORTS = { popularity: 1, rating: 1, release: 1 };
 
 const WN_DEFAULT_CONFIG = {
   version: 1,
-  auto_sync: false,
-  interval_minutes: 360,
+  auto_sync: true,          // first-hand updates by default (needs the Cron Trigger + a TMDB key; stays quiet without them)
+  notify_telegram: true,    // one Telegram message per sync that found new titles (works with the app closed)
+  interval_minutes: 60,
   language: "ar-SA",
   region: "",
-  feeds: ["movie:new_releases", "movie:trending", "tv:recent_episodes", "tv:trending"],
-  max_pages: 1,
+  feeds: ["movie:new_releases", "movie:trending", "tv:recent_episodes", "tv:new_releases", "tv:trending"],
+  max_pages: 2,
   enrich_limit: 8,
   subtitle_languages: ["ar", "en"],
   subtitle_required: false,
@@ -11087,6 +11089,28 @@ function wnSafeUrl(raw, opts) {
   return u;
 }
 
+// ----------------------------------------------------------------------------- cron heartbeat
+// The statistics (ops compaction + live history), the Telegram request alerts and the automatic sync ALL run from the
+// Worker's Cron Trigger. If a redeploy drops the trigger they silently stop, so every tick leaves a heartbeat that the
+// app can show (summary.cron) instead of failing quietly.
+
+async function wnHeartbeat(env) {
+  const doc = await wnRead(env, WN_HEARTBEAT_FILE, { at: 0 });
+  if (Date.now() - (Number(doc.at) || 0) < 120000) return;
+  await wnMutate(env, WN_HEARTBEAT_FILE, { at: 0 }, (d) => {
+    d.at = Date.now();
+    d.runs = (Number(d.runs) || 0) + 1;
+    return { doc: d };
+  });
+}
+
+async function wnCronStatus(env) {
+  const doc = await wnRead(env, WN_HEARTBEAT_FILE, { at: 0 });
+  const at = Number(doc.at) || 0;
+  const age = at ? Math.round((Date.now() - at) / 1000) : -1;
+  return { last_seen_at: at ? new Date(at).toISOString() : "", age_seconds: age, healthy: at > 0 && age < 600 };
+}
+
 // ----------------------------------------------------------------------------- admin-private JSON files
 
 function wnBucket(env) {
@@ -11111,6 +11135,7 @@ function wnMergeConfig(raw) {
   if (!Array.isArray(cfg.feeds)) cfg.feeds = clone(WN_DEFAULT_CONFIG.feeds);
   cfg.feeds = cfg.feeds.filter((f) => WN_FEED_KEYS.includes(f));
   if (!Array.isArray(cfg.subtitle_languages) || !cfg.subtitle_languages.length) cfg.subtitle_languages = ["ar", "en"];
+  cfg.notify_telegram = cfg.notify_telegram !== false;
   cfg.interval_minutes = Math.min(10080, Math.max(30, numOf(cfg.interval_minutes) || 360));
   cfg.enrich_limit = Math.min(20, Math.max(0, Number.isFinite(Number(cfg.enrich_limit)) ? Number(cfg.enrich_limit) : 8));
   cfg.max_pages = Math.min(3, Math.max(1, numOf(cfg.max_pages) || 1));
@@ -11317,6 +11342,8 @@ async function wnFetchMeta(env, kind, tmdbId) {
     status: cleanString(ar.status || en.status),
     homepage: cleanString(ar.homepage || en.homepage),
   };
+  const col = ar.belongs_to_collection || en.belongs_to_collection;
+  meta.collection = col && col.id ? { id: Number(col.id), name: cleanString(col.name), poster: tmdbImage(col.poster_path, "w342"), backdrop: tmdbImage(col.backdrop_path, "w780") } : null;
   if (tv) {
     const rawSeasons = Array.isArray(ar.seasons) && ar.seasons.length ? ar.seasons : Array.isArray(en.seasons) ? en.seasons : [];
     meta.season_count = Number(ar.number_of_seasons || en.number_of_seasons) || 0;
@@ -12413,6 +12440,26 @@ async function handleWnFeed(request, env) {
   const lib = wnLibraryIndex(list);
   const idx = await wnRead(env, WN_INDEX_FILE, { items: {} });
 
+  if (feed === "collections") {
+    const groups = new Map();
+    for (const e of Object.values(idx.items || {})) {
+      const c = e.enrich && e.enrich.collection;
+      if (!c || !c.id) continue;
+      const g = groups.get(c.id) || { id: c.id, name: c.name, poster: c.poster, parts: 0, latest: "" };
+      g.parts++;
+      if (cleanString(e.release_date) > g.latest) g.latest = cleanString(e.release_date);
+      groups.set(c.id, g);
+    }
+    const all = Array.from(groups.values()).sort((a, b) => (a.latest < b.latest ? 1 : -1));
+    const slice = all.slice((f.page - 1) * WN_PAGE_SIZE, f.page * WN_PAGE_SIZE);
+    const cards = slice.map((g) => ({
+      key: "collection:" + g.id, type: "collection", tmdb_id: g.id, title: g.name, original_title: "", year: g.latest.slice(0, 4), release_date: g.latest, released: true,
+      poster: g.poster, backdrop: "", overview: g.parts + " جزء مكتشف من هذه السلسلة", rating: 0, vote_count: 0, popularity: 0, genres: [], genre_ids: [], language: "", countries: [],
+      imported: false, existing: null, video: { state: "unknown" }, subtitle: { state: "unknown" }, first_seen_at: "", parts_known: g.parts,
+    }));
+    const notes = all.length ? [] : ["لا توجد سلاسل بعد: تظهر السلاسل بعد المزامنة (تُكتشف من تفاصيل الأفلام المفحوصة)."];
+    return okResponse({ feed, page: f.page, total_pages: Math.max(1, Math.ceil(all.length / WN_PAGE_SIZE)), total_results: all.length, cards, source: "index", notes });
+  }
   if (WN_VIEW_KEYS.includes(feed)) {
     const rows = wnViewEntries(feed, idx, lib, f);
     const start = (f.page - 1) * WN_PAGE_SIZE;
@@ -12518,8 +12565,34 @@ function wnSummaryFrom(idx, lib, cfg) {
 }
 
 async function handleWnSummary(request, env) {
-  const [cfg, idx, list] = await Promise.all([wnConfig(env), wnRead(env, WN_INDEX_FILE, { items: {} }), readMoviesList(env)]);
-  return okResponse(wnSummaryFrom(idx, wnLibraryIndex(list), cfg));
+  const [cfg, idx, list, cron] = await Promise.all([wnConfig(env), wnRead(env, WN_INDEX_FILE, { items: {} }), readMoviesList(env), wnCronStatus(env)]);
+  return okResponse(Object.assign(wnSummaryFrom(idx, wnLibraryIndex(list), cfg), { cron }));
+}
+
+async function handleWnCron(request, env) {
+  return okResponse(await wnCronStatus(env));
+}
+
+/** A movie collection (saga): every part, with what is already in the library, ready for a bulk import. */
+async function handleWnCollection(request, env) {
+  wnRate("collection", 60);
+  const input = await readRequestData(request);
+  const id = wnTmdbId(input.id || input.collection_id);
+  const [ar, en] = await Promise.all([
+    wnTmdb(env, "/collection/" + id, { language: "ar-SA" }, { ttl: 1800, nullOn404: true }),
+    wnTmdb(env, "/collection/" + id, { language: "en-US" }, { ttl: 1800, nullOn404: true }),
+  ]);
+  if (!ar && !en) throw new AdminError("collection_not_found", "السلسلة غير موجودة في TMDB.", 404);
+  const [list, idx, genres] = [await readMoviesList(env), await wnRead(env, WN_INDEX_FILE, { items: {} }), await wnGenres(env, "movie")];
+  const lib = wnLibraryIndex(list);
+  const rows = (Array.isArray(ar && ar.parts) && ar.parts.length ? ar.parts : Array.isArray(en && en.parts) ? en.parts : []).slice().sort((a, b) => cleanString(a.release_date).localeCompare(cleanString(b.release_date)));
+  const enBy = new Map((Array.isArray(en && en.parts) ? en.parts : []).map((p) => [Number(p.id), p]));
+  const cards = rows.map((row) => wnCard(Object.assign({}, enBy.get(Number(row.id)) || {}, row, { title: cleanString(row.title) || cleanString((enBy.get(Number(row.id)) || {}).title) }), "movie", genres, lib, idx));
+  return okResponse({
+    id: Number(id), name: pickText(ar, en, "name"), overview: pickText(ar, en, "overview"), poster: tmdbImage(pickText(ar, en, "poster_path"), "w500"),
+    backdrop: tmdbImage(pickText(ar, en, "backdrop_path"), "w780"), parts: cards, total: cards.length,
+    released: cards.filter((c) => c.released).length, in_library: cards.filter((c) => c.imported).length,
+  });
 }
 
 function wnProviderStatus(env, cfg) {
@@ -12543,7 +12616,7 @@ function wnProviderStatus(env, cfg) {
 
 async function handleWnConfigGet(request, env) {
   const cfg = await wnConfig(env);
-  return okResponse({ config: cfg, providers: wnProviderStatus(env, cfg), feeds: WN_FEED_KEYS, views: WN_VIEW_KEYS });
+  return okResponse({ config: cfg, providers: wnProviderStatus(env, cfg), feeds: WN_FEED_KEYS, views: WN_VIEW_KEYS, cron: await wnCronStatus(env) });
 }
 
 async function handleWnConfigSave(request, env) {
@@ -12583,6 +12656,7 @@ async function handleWnConfigSave(request, env) {
     patch.subtitle_languages = input.subtitle_languages.map((l) => wnSubLang(l, false)).slice(0, 5);
   }
   if (input.subtitle_required !== undefined) patch.subtitle_required = truthy(input.subtitle_required);
+  if (input.notify_telegram !== undefined) patch.notify_telegram = truthy(input.notify_telegram);
   if (input.video_providers !== undefined) {
     if (!Array.isArray(input.video_providers) || !input.video_providers.length || input.video_providers.length > 5) {
       throw new AdminError("invalid_provider", "أضف من 1 إلى 5 مزوّدين.", 400);
@@ -12625,6 +12699,7 @@ async function handleWnDetails(request, env) {
     suggested_sections: suggestSections(registry, meta.genres.map((name) => ({ name, en: "" })), kind),
     existing_categories: wnExistingCategories(list),
     suggested_slug: suggestSlug(list, meta.original_title, meta.title, meta.year, tmdb, kind),
+    collection: meta.collection || null,
     providers: wnProviderStatus(env, cfg),
   });
   if (kind === "series") {
@@ -13388,6 +13463,7 @@ async function wnEnrichOne(env, cfg, entry, lib, list) {
   const nowIso = new Date().toISOString();
   const meta = await wnFetchMeta(env, entry.kind, tmdb);
   const enrich = { checked_at: nowIso };
+  if (entry.kind === "movie" && meta.collection) enrich.collection = { id: meta.collection.id, name: meta.collection.name, poster: meta.collection.poster };
   let target = { kind: "movie", tmdb, season: 0, episode: 0, released: meta.released };
   if (entry.kind === "series") {
     const le = meta.latest_episode;
@@ -13493,6 +13569,31 @@ function wnFoldCounters(run, c) {
   for (const e of c.errors || []) if (run.errors.length < 30) run.errors.push(e);
 }
 
+/** One Telegram message per sync that found new titles — arrives with the app closed. Never throws. */
+async function wnTelegramNew(env, newKeys) {
+  try {
+    const idx = await wnRead(env, WN_INDEX_FILE, { items: {} });
+    const rows = newKeys.map((k) => idx.items[k]).filter(Boolean).sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+    if (!rows.length) return "empty";
+    const icon = (e) => (e.kind === "series" ? "📺" : "🎬");
+    const vid = (e) => {
+      const s = wnVideoBrief(e).state;
+      return s === "ok" ? " ✅ فيديو متاح" : s === "unverified" ? " ⚠️ فيديو غير مُتحقَّق" : s === "missing" ? " ❌ بلا فيديو" : !e.released ? " ⏳ قريباً" : "";
+    };
+    const lines = ["🆕 <b>جديد في ما الجديد؟</b> — " + rows.length + " عنوان جديد"];
+    for (const e of rows.slice(0, 10)) {
+      lines.push("• " + icon(e) + " <b>" + reqEsc(e.title) + "</b>" + (e.year ? " (" + e.year + ")" : "") + (e.rating ? " ★" + e.rating : "") + vid(e));
+    }
+    if (rows.length > 10) lines.push("… و" + (rows.length - 10) + " غيرها");
+    lines.push("افتح تطبيق الإدارة ← ما الجديد؟ ثم اضغط البوستر لإضافته.");
+    const res = await reqTgSend(env, lines.join("\n"));
+    return res.ok ? "sent" : String(res.description || res.http || "failed");
+  } catch (error) {
+    updLog("whatsnew_telegram_failed", { message: String(error && error.message) });
+    return "failed";
+  }
+}
+
 async function wnSync(env, trigger, enrichLimit) {
   const started = Date.now();
   const at = new Date().toISOString();
@@ -13510,6 +13611,7 @@ async function wnSync(env, trigger, enrichLimit) {
     recent_episodes: 0, enriched: 0, videos_resolved: 0, videos_unverified: 0, videos_missing: 0, subtitles_available: 0, failed: 0, errors: [], ms: 0,
   };
   let success = false;
+  let freshKeys = [];
   try {
     try { tmdbCredentials(env); } catch { throw new AdminError("missing_tmdb_key", "لم يتم إعداد TMDB_API_KEY أو TMDB_READ_TOKEN في إعدادات الـ Worker.", 503); }
     const list = await readMoviesList(env);
@@ -13520,6 +13622,7 @@ async function wnSync(env, trigger, enrichLimit) {
     run.failed += errors.length;
     for (const e of errors) run.errors.push(e);
     const newKeys = await wnMergeIndex(env, collected, lib);
+    freshKeys = newKeys;
     run.new_items = newKeys.length;
     run.new_movies = newKeys.filter((k) => k.startsWith("movie:")).length;
     run.new_series = newKeys.filter((k) => k.startsWith("series:")).length;
@@ -13527,6 +13630,7 @@ async function wnSync(env, trigger, enrichLimit) {
     const limit = Math.min(20, Math.max(0, numOf(enrichLimit)));
     if (limit > 0 && collected.size) wnFoldCounters(run, await wnEnrichBatch(env, cfg, limit));
     await wnCleanParkedSubtitles(env);
+    if (trigger === "cron" && cfg.notify_telegram !== false && freshKeys.length) run.telegram = await wnTelegramNew(env, freshKeys);
     success = collected.size > 0 || errors.length === 0;
     run.status = errors.length && !collected.size ? "failed" : errors.length || run.errors.length ? "partial" : "ok";
   } catch (error) {
@@ -13554,6 +13658,7 @@ async function wnSync(env, trigger, enrichLimit) {
 
 /** Called by the Worker's every-minute cron. Cheap when auto-sync is off (one small R2 read). */
 async function wnCronTick(env) {
+  await wnHeartbeat(env).catch(() => {});
   const cfg = await wnConfig(env);
   if (!cfg.auto_sync) return;
   if (Date.now() - (Date.parse(cfg.last_started_at) || 0) < cfg.interval_minutes * 60000) return;
@@ -13631,6 +13736,8 @@ const WN_ROUTES = (() => {
     "POST /admin/discover/sync": A(handleWnSync),
     "POST /admin/discover/enrich": A(handleWnEnrich),
     "GET /admin/discover/history": A(handleWnHistory),
+    "GET /admin/discover/cron": A(handleWnCron),
+    "POST /admin/discover/collection": A(handleWnCollection),
   };
 })();
 

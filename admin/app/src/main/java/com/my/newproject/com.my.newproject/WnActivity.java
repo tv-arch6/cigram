@@ -135,9 +135,7 @@ public class WnActivity extends CgBase {
         CgUi.elevate(hero, 6);
         int p = CgUi.dp(this, 18);
         hero.setPadding(p, p, p, p);
-        TextView kicker = CgUi.text(this, "DISCOVER", 11.5f, CgCfg.CYAN, true);
-        CgUi.ltr(kicker);
-        kicker.setLetterSpacing(0.2f);
+        TextView kicker = CgUi.text(this, "اكتشف", 12.5f, CgCfg.CYAN, true);
         hero.addView(kicker);
         hero.addView(CgUi.text(this, "ما الجديد؟", 25, CgCfg.TEXT, true));
         TextView sub = CgUi.muted(this, "أفلام ومسلسلات وحلقات جديدة من TMDB. اختر عنواناً ليبحث التطبيق عن الفيديو والترجمة ويتحقق منهما قبل الإضافة.");
@@ -301,10 +299,11 @@ public class WnActivity extends CgBase {
         final String key = c.optString("key");
         return WnUi.posterCard(this, c, cardW, selected.containsKey(key), selectMode, new Runnable() {
             @Override public void run() {
-                if (selectMode) toggle(c); else WnDetailActivity.open(WnActivity.this, c);
+                if ("collection".equals(c.optString("type"))) WnCollectionActivity.open(WnActivity.this, c.optLong("tmdb_id"), c.optString("title"));
+                else if (selectMode) toggle(c); else WnDetailActivity.open(WnActivity.this, c);
             }
         }, new Runnable() {
-            @Override public void run() { toggle(c); }
+            @Override public void run() { if (!"collection".equals(c.optString("type"))) toggle(c); }
         });
     }
 
@@ -516,7 +515,7 @@ public class WnActivity extends CgBase {
                 });
             }
         });
-        box.addView(CgUi.labeled(this, "التصنيف (Genre)", genreBtn));
+        box.addView(CgUi.labeled(this, "التصنيف", genreBtn));
 
         final TextView langBtn = CgUi.smallButton(this, labelOf(LANGS, lang[0]), 1);
         langBtn.setOnClickListener(new View.OnClickListener() {

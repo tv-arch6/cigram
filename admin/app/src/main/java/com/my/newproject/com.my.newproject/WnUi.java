@@ -145,6 +145,7 @@ final class WnUi {
 
     static View posterCard(final Activity a, JSONObject c, int widthPx, boolean selected, boolean selectMode, final Runnable open, final Runnable toggle) {
         boolean series = "series".equals(c.optString("type"));
+        boolean coll = "collection".equals(c.optString("type"));
         LinearLayout card = CgUi.vbox(a);
         card.setBackground(CgUi.bg(a, GLASS, 16, selected ? CgCfg.ACCENT : CgUi.alpha(CgCfg.ACCENT, 0x33)));
         CgUi.elevate(card, selected ? 9 : 3);
@@ -168,13 +169,13 @@ final class WnUi {
         String rating = WnLogic.ratingText(c.optDouble("rating", 0));
         LinearLayout meta = CgUi.hbox(a);
         if (year.length() > 0) meta.addView(CgUi.text(a, year + "   ", 12, CgCfg.MUTED, true));
-        meta.addView(imdbRating(a, c.optDouble("rating", 0), 12));
+        if (!coll) meta.addView(imdbRating(a, c.optDouble("rating", 0), 12));
         over.addView(meta);
         box.addView(over, new FrameLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP, Gravity.BOTTOM));
 
         LinearLayout top = CgUi.hbox(a);
         top.setPadding(CgUi.dp(a, 8), CgUi.dp(a, 8), CgUi.dp(a, 8), 0);
-        top.addView(badge(a, WnLogic.typeLabel(c.optString("type")), series ? CgCfg.ACCENT_2 : CgCfg.ACCENT), new LinearLayout.LayoutParams(CgUi.WRAP, CgUi.WRAP));
+        top.addView(badge(a, WnLogic.typeLabel(c.optString("type")), coll ? CgCfg.ORANGE : series ? CgCfg.ACCENT_2 : CgCfg.ACCENT), new LinearLayout.LayoutParams(CgUi.WRAP, CgUi.WRAP));
         boolean imported = c.optBoolean("imported", false);
         if (imported) {
             TextView b = badge(a, "في المكتبة", CgCfg.GOOD);
@@ -238,6 +239,15 @@ final class WnUi {
             d.setGravity(Gravity.START);
             info.addView(d);
         }
+        if (coll) {
+            card.addView(info, new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP));
+            card.setClickable(true);
+            card.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v2) { if (open != null) open.run(); }
+            });
+            CgUi.pressScale(card);
+            return card;
+        }
         LinearLayout chips = CgUi.vbox(a);   // stacked: two status badges never fit side by side on a phone-width card
         chips.setPadding(0, CgUi.dp(a, 6), 0, 0);
         JSONObject v = c.optJSONObject("video");
@@ -249,7 +259,7 @@ final class WnUi {
         sl.topMargin = CgUi.dp(a, 4);
         chips.addView(badge(a, WnLogic.cardSubLabel(ss), WnLogic.cardSubColor(ss)), sl);
         info.addView(chips);
-        TextView id = CgUi.text(a, "TMDB " + c.optLong("tmdb_id"), 10.5f, CgCfg.FAINT, false);
+        TextView id = CgUi.text(a, "معرّف TMDB: " + c.optLong("tmdb_id"), 10.5f, CgCfg.FAINT, false);
         CgUi.ltr(id);
         id.setGravity(Gravity.START);
         id.setPadding(0, CgUi.dp(a, 4), 0, 0);

@@ -146,5 +146,11 @@ final class WnApi {
         return post("/admin/discover/enrich", b, 90000);
     }
 
+    static JSONObject collection(long id) throws CxApi.Failure {
+        JSONObject b = new JSONObject();
+        CxJ.put(b, "id", id);
+        return post("/admin/discover/collection", b, 45000);
+    }
+
     static JSONObject history() throws CxApi.Failure { return get("/admin/discover/history?limit=40", 20000); }
 }
