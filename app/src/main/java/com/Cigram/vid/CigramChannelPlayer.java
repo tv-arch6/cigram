@@ -38,6 +38,14 @@ import com.google.android.exoplayer2.ui.PlayerView;
  */
 final class CigramChannelPlayer {
 
+    /** What the picture is doing right now, for the "now playing" line of the page. */
+    static final int ST_IDLE = 0, ST_LOADING = 1, ST_PLAYING = 2, ST_PAUSED = 3, ST_ERROR = 4;
+
+    interface StatusListener {
+        /** Main thread; called only when the status or its message changed. */
+        void onStatus(int status, String message);
+    }
+
     interface Host {
         /** The full screen button: open the channel in the full player. */
         void onFullscreen();
@@ -55,6 +63,10 @@ final class CigramChannelPlayer {
     private final Activity a;
     private final FrameLayout stage;
     private final Host host;
+    private StatusListener statusListener;
+    private int reportedStatus = -1;
+    private String reportedMessage = "";
+    private TextView emptyHint;
 
     private PlayerView view;
     private ExoPlayer player;
@@ -117,6 +129,7 @@ final class CigramChannelPlayer {
         l1.topMargin = dp(10);
         empty.addView(t1, l1);
         TextView t2 = CigramUI.label(a, "ابدأ بباقة من القائمة في الأسفل", 12f, light ? 0xFF5F6B73 : MUTED, false);
+        emptyHint = t2;
         t2.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams l2 = new LinearLayout.LayoutParams(-2, -2);
         l2.topMargin = dp(3);
@@ -294,6 +307,42 @@ final class CigramChannelPlayer {
         return channel;
     }
 
+    /** Replaces the second line of the empty state (the old text names the package page). */
+    void setEmptyHint(String text) {
+        if (emptyHint != null && text != null) emptyHint.setText(text);
+    }
+
+    /** The page learns about loading / playing / paused / error without polling the player itself. */
+    void setStatusListener(StatusListener listener) {
+        statusListener = listener;
+        reportedStatus = -1;
+        report();
+    }
+
+    private void report() {
+        if (statusListener == null || destroyed) return;
+        int st;
+        String msg = "";
+        if (errorBox.getVisibility() == View.VISIBLE) {
+            st = ST_ERROR;
+            msg = errorText.getText() == null ? "" : errorText.getText().toString();
+        } else if (channel == null) {
+            st = ST_IDLE;
+        } else if (waitBox != null && waitBox.getVisibility() == View.VISIBLE) {
+            st = ST_LOADING;
+        } else if (player != null && lastPlaying) {
+            st = ST_PLAYING;
+        } else if (player != null && lastState == Player.STATE_READY) {
+            st = ST_PAUSED;
+        } else {
+            st = player == null ? ST_IDLE : ST_LOADING;
+        }
+        if (st == reportedStatus && msg.equals(reportedMessage)) return;
+        reportedStatus = st;
+        reportedMessage = msg;
+        statusListener.onStatus(st, msg);
+    }
+
     boolean isActive() {
         return channel != null;
     }
@@ -348,6 +397,7 @@ final class CigramChannelPlayer {
         hideError();
         showControls(false);
         empty.setVisibility(View.VISIBLE);
+        report();
     }
 
     /** The page left the screen: free the decoder, keep the channel so {@link #resume()} can play it again. */
@@ -521,6 +571,7 @@ final class CigramChannelPlayer {
                 playIcon.set(playing ? CigramHubUi.PAUSE : CigramHubUi.PLAY, Color.WHITE);
                 if (view != null) view.setKeepScreenOn(playing);
                 if (playing) scheduleHide();
+                report();
             }
         } catch (Throwable error) {
             Log.w(TAG, "watch failed", error);
@@ -604,16 +655,19 @@ final class CigramChannelPlayer {
         waitBox.setVisibility(on ? View.VISIBLE : View.GONE);
         status.setText(text);
         status.setVisibility(text.length() == 0 ? View.GONE : View.VISIBLE);
+        report();
     }
 
     private void showError(String text) {
         errorText.setText(text);
         errorBox.setVisibility(View.VISIBLE);
         showControls(false);
+        report();
     }
 
     private void hideError() {
         errorBox.setVisibility(View.GONE);
+        report();
     }
 
     // ================================================================== small builders

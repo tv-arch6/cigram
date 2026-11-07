@@ -143,8 +143,16 @@ public class ChannelsActivity extends AppCompatActivity {
 		binding.textview6.setTypeface(CigramTypefaces.get(getAssets(),CigramTypefaces.APP_FONT), 0);
 		// v10.63: الصفحة الجديدة للقنوات (CigramChannelHub). الكود القديم أدناه يعمل فقط إذا تعذّر بناؤها.
 		boolean cgChannelsHub = false;
-		try { cgChannelsHub = CigramChannelHub.install(ChannelsActivity.this); }
-		catch (Throwable cgHubError) { cgChannelsHub = false; }
+		// CIGRAM LIVE: phones and tablets get the one-page live experience; the TV keeps CigramChannelHub.
+		try { cgChannelsHub = CigramLiveHub.install(ChannelsActivity.this); }
+		catch (Throwable cgLiveError) {
+			android.util.Log.w("CigramLiveHub", "live page unavailable, using the previous channels page", cgLiveError);
+			cgChannelsHub = false;
+		}
+		if (!cgChannelsHub) {
+			try { cgChannelsHub = CigramChannelHub.install(ChannelsActivity.this); }
+			catch (Throwable cgHubError) { cgChannelsHub = false; }
+		}
 		if (!cgChannelsHub) {
 			// CIGRAM — ChannelsActivity: RTL + Sketchware channels + Admin channels.
 			// Keeps the original XML channels, aligns every row from the far right,

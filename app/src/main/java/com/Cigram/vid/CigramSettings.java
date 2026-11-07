@@ -50,6 +50,29 @@ public final class CigramSettings {
 
     private CigramSettings() { }
 
+    /** Intent extra of the shortcuts on the Account page: "edit_profile" or "logout" (see CigramAccountDash). */
+    static final String EXTRA_ACTION = "cigram_settings_action";
+
+    /**
+     * Runs the shortcut the page was opened for, once: the old (hidden) views own the edit-profile and sign-out flows,
+     * so the shortcut just presses them. The extra is removed so a recreation does not repeat the action.
+     */
+    static void runRequestedAction(final Activity a) {
+        if (a == null || a.getIntent() == null) return;
+        final String action = a.getIntent().getStringExtra(EXTRA_ACTION);
+        if (action == null) return;
+        a.getIntent().removeExtra(EXTRA_ACTION);
+        final String id = "edit_profile".equals(action) ? "textview_settings_edit_profile"
+                : "logout".equals(action) ? "textview_settings_logout" : null;
+        if (id == null) return;
+        View decor = a.getWindow().getDecorView();
+        decor.post(new Runnable() {
+            @Override public void run() {
+                if (!a.isFinishing()) clickOld(a, id);
+            }
+        });
+    }
+
     private static View byId(Activity a, String name) {
         int id = a.getResources().getIdentifier(name, "id", a.getPackageName());
         return id == 0 ? null : a.findViewById(id);

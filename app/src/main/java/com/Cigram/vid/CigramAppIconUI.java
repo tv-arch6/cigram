@@ -65,14 +65,15 @@ final class CigramAppIconUI {
         card.setTag(TAG);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        card.setBackground(box(0xFF0F2D3A, 20, CigramUI.STROKE, 1, a));
+        final CigramPalette pal = CigramPalette.of(a);
+        card.setBackground(box(pal.surface, 20, pal.stroke, 1, a));
         int pad = CigramUI.dp(a, 14);
         card.setPadding(pad, pad, pad, pad);
 
-        TextView title = CigramUI.label(a, "أيقونة التطبيق", 16f, 0xFFFFFFFF, true);
+        TextView title = CigramUI.label(a, "أيقونة التطبيق", 16f, pal.text, true);
         title.setGravity(Gravity.RIGHT);
         card.addView(title, new LinearLayout.LayoutParams(-1, -2));
-        TextView sub = CigramUI.label(a, plus ? "اختر شكل Cigram على شاشتك الرئيسية" : "الأيقونات المميزة حصرية لمشتركي Cigram Plus", 12f, CigramUI.MUTED, false);
+        TextView sub = CigramUI.label(a, plus ? "اختر شكل Cigram على شاشتك الرئيسية" : "الأيقونات المميزة حصرية لمشتركي Cigram Plus", 12f, pal.text3, false);
         sub.setGravity(Gravity.RIGHT);
         LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(-1, -2);
         sl.topMargin = CigramUI.dp(a, 2);
@@ -187,7 +188,8 @@ final class CigramAppIconUI {
         col.setContentDescription(v.name + (locked ? " — حصرية لمشتركي Plus" : ""));
 
         FrameLayout f = new FrameLayout(a);
-        f.setBackground(box(0x00000000, 18, picked ? GOLD : (isActive ? 0x88F5B83D : 0x22FFFFFF), picked ? 2 : 1, a));
+        final CigramPalette pal = CigramPalette.of(a);
+        f.setBackground(box(0x00000000, 18, picked ? GOLD : (isActive ? 0x88F5B83D : pal.hairline), picked ? 2 : 1, a));
         int p = CigramUI.dp(a, 3);
         f.setPadding(p, p, p, p);
         ImageView iv = new ImageView(a);
@@ -210,7 +212,7 @@ final class CigramAppIconUI {
             f.addView(badge, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
         }
         col.addView(f, new LinearLayout.LayoutParams(CigramUI.dp(a, 72), CigramUI.dp(a, 72)));
-        TextView n = CigramUI.label(a, v.name, 10.5f, locked ? CigramUI.MUTED : 0xFFFFFFFF, false);
+        TextView n = CigramUI.label(a, v.name, 10.5f, locked ? pal.text3 : pal.text, false);
         n.setGravity(Gravity.CENTER);
         n.setMaxLines(2);
         LinearLayout.LayoutParams nl = new LinearLayout.LayoutParams(-2, -2);
@@ -228,7 +230,8 @@ final class CigramAppIconUI {
             box.setOrientation(LinearLayout.VERTICAL);
             box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
             box.setGravity(Gravity.CENTER_HORIZONTAL);
-            box.setBackground(box(0xFF0F2D3A, 22, 0x66F5B83D, 1, a));
+            final CigramPalette pal = CigramPalette.of(a);
+            box.setBackground(box(pal.surface, 22, 0x66F5B83D, 1, a));
             int p = CigramUI.dp(a, 20);
             box.setPadding(p, p, p, p);
             TextView crown = CigramUI.label(a, "👑", 34f, 0xFFFFFFFF, false);
@@ -239,6 +242,7 @@ final class CigramAppIconUI {
             msg.setLineSpacing(0f, 1.2f);
             LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(-1, -2);
             ml.topMargin = CigramUI.dp(a, 8);
+            msg.setTextColor(pal.text);
             box.addView(msg, ml);
             if (CigramPlus.salesEnabled()) {
                 TextView go = CigramUI.label(a, "اشترك الآن", 14f, 0xFF1A1200, true);
@@ -252,7 +256,7 @@ final class CigramAppIconUI {
                 gl.topMargin = CigramUI.dp(a, 16);
                 box.addView(go, gl);
             }
-            TextView later = CigramUI.label(a, "ليس الآن", 12.5f, CigramUI.MUTED, false);
+            TextView later = CigramUI.label(a, "ليس الآن", 12.5f, pal.text3, false);
             later.setGravity(Gravity.CENTER);
             later.setPadding(0, CigramUI.dp(a, 10), 0, 0);
             later.setClickable(true);

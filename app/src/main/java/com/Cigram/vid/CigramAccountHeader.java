@@ -102,7 +102,7 @@ public final class CigramAccountHeader {
             if (existing != null) profile.removeView(existing);
             header = new Header(a);
             header.setTag(TAG_HEADER);
-            profile.addView(header, 0, new LinearLayout.LayoutParams(-1, CigramUI.dp(a, 250)));
+            profile.addView(header, 0, new LinearLayout.LayoutParams(-1, CigramUI.dp(a, 266)));
         }
         header.bindProfile(a);
         header.bindMedia(a);
@@ -202,7 +202,8 @@ public final class CigramAccountHeader {
             saved = Integer.valueOf(host.getPaddingTop());
             HOST_PAD_TOP.put(host, saved);
         }
-        int top = headerShown ? 0 : saved.intValue();
+        // a visitor sees the hero at the top: the layout file's 35 dp is more than the hero needs on a small phone
+        int top = headerShown ? 0 : Math.min(saved.intValue(), CigramUI.dp(a, 12));
         if (host.getPaddingTop() != top) {
             host.setPadding(host.getPaddingLeft(), top, host.getPaddingRight(), host.getPaddingBottom());
         }
@@ -235,6 +236,9 @@ public final class CigramAccountHeader {
         private String mediaKey = "";
         /** Phone header: the public id chip under the name (null on the TV panel). */
         private View idChip;
+        /** Phone header (CIGRAM ID): the e-mail under the name and the account status chip. */
+        private TextView phoneEmail;
+        private TextView statusChip;
 
         Header(final Activity a) {
             this(a, false);
@@ -365,11 +369,17 @@ public final class CigramAccountHeader {
             email = null;
             stats = null;
 
-            // light fade at the bottom only: the cover stays clear, the text sits on the page colour
+            // ---- CIGRAM ID phone header: a cover on top (fading into the page), the avatar overlapping its edge,
+            // and name / e-mail / status on the PAGE colour under the cover, so they read in both themes.
+            final CigramPalette pal = CigramPalette.of(a);
+            final int coverH = CigramUI.dp(a, 160);
+            backdrop.setLayoutParams(new LayoutParams(-1, coverH, Gravity.TOP));
+            video.setLayoutParams(new LayoutParams(-1, coverH, Gravity.TOP));
+
             View fade = new View(a);
             fade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{fadeEdge(a, 0x00), fadeEdge(a, 0x00), fadeEdge(a, 0x59), fadeEdge(a, 0xD9), CigramTheme.page(a)}));
-            addView(fade, new LayoutParams(-1, -1));
+                    new int[]{fadeEdge(a, 0x00), fadeEdge(a, 0x00), fadeEdge(a, 0x73), fadeEdge(a, 0xE6), CigramTheme.page(a)}));
+            addView(fade, new LayoutParams(-1, coverH, Gravity.TOP));
 
             TextView cover = CigramUI.label(a, "الغلاف", 12f, 0xFFFFFFFF, false);
             cover.setGravity(Gravity.CENTER);
@@ -389,49 +399,40 @@ public final class CigramAccountHeader {
             cl.setMargins(CigramUI.dp(a, 16), CigramUI.dp(a, 14), 0, 0);
             addView(cover, cl);
 
-            // bottom row, physical order (LTR): [texts] [avatar] → avatar on the right
-            LinearLayout row = new LinearLayout(a);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            int side = CigramUI.dp(a, 20);
-            row.setPadding(side, 0, side, CigramUI.dp(a, 16));
+            // the profile settings shortcut: top right of the cover, opens the same page as the «الإعدادات» row
+            FrameLayout gear = new FrameLayout(a);
+            GradientDrawable gearBg = new GradientDrawable();
+            gearBg.setShape(GradientDrawable.OVAL);
+            gearBg.setColor(0x73000000);
+            gearBg.setStroke(Math.max(1, CigramUI.dp(a, 1)), 0x4DFFFFFF);
+            gear.setBackground(gearBg);
+            gear.setClickable(true);
+            gear.setFocusable(true);
+            gear.setContentDescription("إعدادات الملف الشخصي");
+            gear.addView(new AdsIcons.Icon(a, AdsIcons.GEAR, 0xFFFFFFFF), new FrameLayout.LayoutParams(CigramUI.dp(a, 18), CigramUI.dp(a, 18), Gravity.CENTER));
+            gear.setOnClickListener(new OnClickListener() {
+                @Override public void onClick(View v) {
+                    View row = byId(a, "linear_account_settings");
+                    if (row != null) row.performClick();
+                }
+            });
+            LayoutParams gl = new LayoutParams(CigramUI.dp(a, 34), CigramUI.dp(a, 34), Gravity.TOP | Gravity.RIGHT);
+            gl.setMargins(0, CigramUI.dp(a, 12), CigramUI.dp(a, 16), 0);
+            addView(gear, gl);
 
-            LinearLayout texts = new LinearLayout(a);
-            texts.setOrientation(LinearLayout.VERTICAL);
-            texts.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-            float shadow = CigramUI.dp(a, 6);
-            name = CigramUI.label(a, "", 22f, 0xFFFFFFFF, true);
-            name.setSingleLine(true);
-            name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            name.setShadowLayer(shadow, 0, CigramUI.dp(a, 1), 0x99000000);
-            texts.addView(name, new LinearLayout.LayoutParams(-1, -2));
-            try {
-                idChip = CigramPublicId.chip(a);               // "C48213" + copy icon, right under the name
-                LinearLayout.LayoutParams il = new LinearLayout.LayoutParams(-2, -2);
-                il.topMargin = CigramUI.dp(a, 6);
-                texts.addView(idChip, il);
-            } catch (Throwable t) {
-                android.util.Log.w("CigramAccountHeader", "id chip failed", t);
-                idChip = null;
-            }
-            LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(0, -2, 1f);
-            tl.rightMargin = CigramUI.dp(a, 14);
-            row.addView(texts, tl);
-
-            // avatar: white 3dp ring around a round picture
+            // avatar: a ring in the page colour (it reads as a cut-out of the cover), overlapping the cover's lower edge
+            int ringSize = CigramUI.dp(a, 92);
             FrameLayout ring = new FrameLayout(a);
             GradientDrawable ringBg = new GradientDrawable();
             ringBg.setShape(GradientDrawable.OVAL);
-            ringBg.setColor(0xFFFFFFFF);
+            ringBg.setColor(pal.page);
             ring.setBackground(ringBg);
-            int border = CigramUI.dp(a, 3);
+            int border = CigramUI.dp(a, 4);
             ring.setPadding(border, border, border, border);
-                avatarRing = ring; plainRingBg = ringBg; plainRingPad = border;
-            ring.setElevation(CigramUI.dp(a, 8));   // v10.67: the photo floats above the cover (real shadow)
+            avatarRing = ring; plainRingBg = ringBg; plainRingPad = border;
             avatar = new ImageView(a);
             avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            avatar.setBackgroundColor(0xFF0B2936);
+            avatar.setBackgroundColor(pal.surfaceHi);
             avatar.setOutlineProvider(new ViewOutlineProvider() {
                 @Override public void getOutline(View view, Outline outline) {
                     outline.setOval(0, 0, view.getWidth(), view.getHeight());
@@ -440,10 +441,54 @@ public final class CigramAccountHeader {
             avatar.setClipToOutline(true);
             avatar.setContentDescription("الصورة الشخصية");
             ring.addView(avatar, new FrameLayout.LayoutParams(-1, -1));
-            int size = CigramUI.dp(a, 78);
-            row.addView(ring, new LinearLayout.LayoutParams(size, size));
+            LayoutParams rl = new LayoutParams(ringSize, ringSize, Gravity.TOP | Gravity.RIGHT);
+            rl.setMargins(0, coverH - CigramUI.dp(a, 40), CigramUI.dp(a, 18), 0);
+            addView(ring, rl);
 
-            addView(row, new LayoutParams(-1, -2, Gravity.BOTTOM));
+            // texts: right-aligned, to the left of the avatar, under the cover
+            LinearLayout texts = new LinearLayout(a);
+            texts.setOrientation(LinearLayout.VERTICAL);
+            texts.setGravity(Gravity.RIGHT | Gravity.TOP);
+            name = CigramUI.label(a, "", 21f, pal.text, true);
+            name.setSingleLine(true);
+            name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            name.setIncludeFontPadding(false);
+            texts.addView(name, new LinearLayout.LayoutParams(-1, -2));
+
+            phoneEmail = CigramUI.label(a, "", 13f, pal.text3, false);
+            phoneEmail.setSingleLine(true);
+            phoneEmail.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+            phoneEmail.setIncludeFontPadding(false);
+            phoneEmail.setTextDirection(View.TEXT_DIRECTION_LTR);   // an address is latin text
+            LinearLayout.LayoutParams el = new LinearLayout.LayoutParams(-1, -2);
+            el.topMargin = CigramUI.dp(a, 4);
+            texts.addView(phoneEmail, el);
+
+            LinearLayout chips = new LinearLayout(a);
+            chips.setOrientation(LinearLayout.HORIZONTAL);
+            chips.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+            chips.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+            statusChip = CigramUI.label(a, "", 11.5f, pal.text2, true);
+            statusChip.setGravity(Gravity.CENTER);
+            statusChip.setIncludeFontPadding(false);
+            statusChip.setPadding(CigramUI.dp(a, 10), 0, CigramUI.dp(a, 10), 0);
+            chips.addView(statusChip, new LinearLayout.LayoutParams(-2, CigramUI.dp(a, 26)));
+            try {
+                idChip = CigramPublicId.chip(a);               // "C48213" + copy icon
+                LinearLayout.LayoutParams il = new LinearLayout.LayoutParams(-2, -2);
+                il.rightMargin = CigramUI.dp(a, 8);
+                chips.addView(idChip, 0, il);
+            } catch (Throwable t) {
+                android.util.Log.w("CigramAccountHeader", "id chip failed", t);
+                idChip = null;
+            }
+            LinearLayout.LayoutParams chl = new LinearLayout.LayoutParams(-1, -2);
+            chl.topMargin = CigramUI.dp(a, 8);
+            texts.addView(chips, chl);
+
+            LayoutParams tl = new LayoutParams(-1, -2, Gravity.TOP);
+            tl.setMargins(CigramUI.dp(a, 20), coverH + CigramUI.dp(a, 10), CigramUI.dp(a, 18) + ringSize + CigramUI.dp(a, 14), 0);
+            addView(texts, tl);
         }
 
         void bindProfile(final Activity a) {
@@ -457,11 +502,29 @@ public final class CigramAccountHeader {
                 });
             }
             if (tv) bindTvExtras(a);
+            else bindPhoneExtras(a);
             applyFrame(a);
             copyAvatar(a);
             // the Logic loads the picture asynchronously: copy it again once it has arrived
             MAIN.postDelayed(new Runnable() { @Override public void run() { copyAvatar(a); } }, 600L);
             MAIN.postDelayed(new Runnable() { @Override public void run() { copyAvatar(a); } }, 1800L);
+        }
+
+        /** CIGRAM ID: the account e-mail and the status chip (Plus in champagne gold, otherwise a plain member). */
+        private void bindPhoneExtras(Activity a) {
+            if (phoneEmail == null || statusChip == null) return;
+            CigramPalette pal = CigramPalette.of(a);
+            String mail = "";
+            try { mail = CigramUserData.email(a); } catch (Throwable ignored) { }
+            mail = mail == null ? "" : mail.trim();
+            phoneEmail.setText(mail);
+            phoneEmail.setVisibility(mail.length() == 0 ? View.GONE : View.VISIBLE);
+            boolean plus = false;
+            try { plus = CigramPlus.isPlus(a); } catch (Throwable ignored) { }
+            statusChip.setText(plus ? "Cigram Plus" : "عضو في سيكرام");
+            statusChip.setTextColor(plus ? pal.gold : pal.text2);
+            statusChip.setBackground(CigramPalette.round(a, plus ? pal.goldSoft : pal.surfaceHi,
+                    plus ? CigramPalette.alpha(pal.gold, 0x66) : pal.stroke, 13));
         }
 
         /** Verification ring while Plus is active; the plain white ring otherwise. */

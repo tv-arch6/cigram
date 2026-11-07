@@ -2107,6 +2107,7 @@ public class SettingsActivity extends AppCompatActivity {
 		// CIGRAM v2.5: new settings page (profile card + grouped sections), built on top of the views above.
 		try {
 			CigramSettings.bind(SettingsActivity.this);
+			CigramSettings.runRequestedAction(SettingsActivity.this);   // the Account page's «تعديل الملف الشخصي» / «تسجيل الخروج»
 		} catch (Throwable cigramSettingsError) {
 			android.util.Log.w("CigramSettings", "bind failed", cigramSettingsError);
 		}

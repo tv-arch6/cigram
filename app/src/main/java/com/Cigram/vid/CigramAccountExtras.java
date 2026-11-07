@@ -141,16 +141,14 @@ public final class CigramAccountExtras {
     }
 
     private static LinearLayout.LayoutParams rowParams(Activity a) {
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, CigramUI.dp(a, 68));
-        lp.setMargins(CigramUI.dp(a, 14), CigramUI.dp(a, 4), CigramUI.dp(a, 14), CigramUI.dp(a, 5)); // v10.67: raised cards
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, CigramUI.dp(a, 62));
+        lp.setMargins(CigramUI.dp(a, 14), 0, CigramUI.dp(a, 14), 0);   // CIGRAM ID: flat rows of one group
         return lp;
     }
 
     private static void styleRow(Activity a, View row) {
         row.setBackground(CigramAccountUI.rowSurface(a));
-        row.setClipToOutline(true);
-        row.setElevation(CigramUI.dp(a, 2));
-        CigramDepth.attachPress(row);   // v10.67: the raised block sinks when pressed
+        row.setElevation(0f);
     }
 
     /** "ضع كود التفعيل": opens the Plus page with the keyboard on the code field. */

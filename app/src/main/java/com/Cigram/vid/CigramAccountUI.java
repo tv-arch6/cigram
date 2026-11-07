@@ -34,27 +34,16 @@ public final class CigramAccountUI {
     /** الصفوف التي أُعيد بناؤها سابقاً (حتى لا نكررها). */
     private static final WeakHashMap<View, Boolean> DONE = new WeakHashMap<View, Boolean>();
 
-    /** Solid black surface of every account row, with a hairline edge. */
-    private static final int ROW_BG = 0xFF000000;
-    private static final int ROW_STROKE = 0x1FFFFFFF;
-    /**
-     * v5.29: account rows use navy #0B2936. The surface is dark, so text, icons and
-     * arrows are white (black would be unreadable) and a light hairline separates the rows.
-     */
-    private static final int ROW_SURFACE = 0xFF0B2936;
-    private static final int ROW_LINE = 0x24FFFFFF;
-    private static final int ROW_INK = 0xFFFFFFFF;       // inside a coloured tile (always white)
-    private static final int ROW_INK_SOFT = 0xB3FFFFFF;
-    private static int ink(Context c) { return CigramTheme.isLight(c) ? 0xFF111418 : 0xFFFFFFFF; }
-    private static int inkSoft(Context c) { return CigramTheme.isLight(c) ? 0xFF5F6B73 : 0xB3FFFFFF; }
+    private static int ink(Context c) { return CigramPalette.of(c).text; }
+    private static int inkSoft(Context c) { return CigramPalette.of(c).text3; }
 
     /**
      * v5.29: every account row spans the full screen width — no side margins, no rounded
      * corners, no gap between rows; a hairline at the bottom separates stacked rows.
      */
     static android.graphics.drawable.Drawable rowSurface(Context c) {
-        // v10.67: a raised 3D block (side, face, gloss, rim) that sinks when pressed
-        return CigramGlass.ripple(c, CigramDepth.card(c), 18);
+        // CIGRAM ID: a flat row; CigramAccountDash gives it its real shape (first / middle / last of a group)
+        return CigramAccountDash.rowBackground(c, CigramPalette.of(c), 0);
     }
 
     /** Guest "تسجيل الدخول" button: white pill with black text (overrides the glass skin). */
@@ -116,9 +105,29 @@ public final class CigramAccountUI {
             host.removeView(help);
             host.addView(help, host.indexOfChild(update));
         }
-        CigramAccountHeader.titleAbove(a, byId(a, "linear_account_settings"), "الحساب", "account");
-        View supportFirst = help != null && help.getVisibility() == View.VISIBLE ? help : update;
-        CigramAccountHeader.titleAbove(a, supportFirst, "الدعم", "support");
+        CigramAccountDash.arrange(a, host);
+    }
+
+    /** Same face as the other rows for a row that was built elsewhere (widget); its click listener stays on the row. */
+    static void restyleRow(Activity a, View row, int icon, int accent, String desc) {
+        restyleExisting(a, row, icon, accent, desc);
+    }
+
+    /** Gives a row a new face with an explicit title / subtitle (the row keeps its own click listener). */
+    static void restyleRowAs(Activity a, View v, String title, String sub, int icon, int accent) {
+        if (!(v instanceof LinearLayout) || DONE.containsKey(v)) return;
+        rebuild(a, (LinearLayout) v, title, sub, icon, accent, false);
+        DONE.put(v, Boolean.TRUE);
+    }
+
+    /** A custom box (app icons, Plus) sits on the page with the same side margins as the rows. */
+    static void sideMargins(Context c, View v) {
+        ViewGroup.LayoutParams lp = v.getLayoutParams();
+        if (lp instanceof ViewGroup.MarginLayoutParams) {
+            ViewGroup.MarginLayoutParams m = (ViewGroup.MarginLayoutParams) lp;
+            m.setMargins(CigramUI.dp(c, 14), CigramUI.dp(c, 12), CigramUI.dp(c, 14), CigramUI.dp(c, 4));
+            v.setLayoutParams(m);
+        }
     }
 
     // ------------------------------------------------------------------ v5.1: لوحة الأرقام (Dashboard)
@@ -156,13 +165,14 @@ public final class CigramAccountUI {
         StatsStrip(Activity a) {
             super(a);
             act = a;
+            CigramPalette pal = CigramPalette.of(a);
             setOrientation(HORIZONTAL);
-            // v5.29: one segmented strip. Physical order left→right: [المفضلة] [لاحقاً] [شاهدت],
-            // so «شاهدت» is read first (right). values[] keeps the {seen, later, favorites} order.
+            // CIGRAM ID: ONE flat surface with three equal columns and hairlines between them.
+            // Physical order left→right: [المفضلة] [لاحقاً] [شاهدت], so «شاهدت» is read first (right).
+            // values[] keeps the {seen, later, favorites} order.
             setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
-            final LinearLayout[] boxes = new LinearLayout[3];
-            // v10.67: three separate raised tiles, each with its own accent glow on the face
-            final int[] accents = {CigramUI.TEAL, CigramUI.AMBER, CigramUI.RED};
+            setBackground(CigramPalette.round(a, pal.surface, pal.stroke, 16));
+            setPadding(0, CigramUI.dp(a, 12), 0, CigramUI.dp(a, 12));
             final String[] labels = {"شاهدت", "المشاهدة لاحقاً", "المفضلة"};
             View.OnClickListener open = new View.OnClickListener() {
                 @Override public void onClick(View v) {
@@ -172,47 +182,43 @@ public final class CigramAccountUI {
                     } catch (Throwable ignored) { }
                 }
             };
-            for (int i = 0; i < 3; i++) {
+            for (int slot = 0; slot < 3; slot++) {
+                final int i = 2 - slot;                       // physical slot 0 (left) shows favourites
+                if (slot > 0) {
+                    View line = new View(a);
+                    line.setBackgroundColor(pal.hairline);
+                    LinearLayout.LayoutParams ll = new LinearLayout.LayoutParams(Math.max(1, CigramUI.dp(a, 1)), CigramUI.dp(a, 30));
+                    ll.gravity = Gravity.CENTER_VERTICAL;
+                    addView(line, ll);
+                }
                 LinearLayout box = new LinearLayout(a);
                 box.setOrientation(VERTICAL);
                 box.setGravity(Gravity.CENTER);
-                box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-                box.setBackground(CigramGlass.ripple(a, CigramDepth.raised(a,
-                        CigramDepth.mix(0xFF174660, accents[i], 0.30f), CigramDepth.mix(0xFF0B2936, accents[i], 0.10f),
-                        16f, 4f), 16));
-                box.setPadding(0, 0, 0, CigramUI.dp(a, 4));
-                box.setClipToOutline(true);
-                box.setElevation(CigramUI.dp(a, 2));
-                CigramDepth.attachPress(box);
                 box.setClickable(true);
                 box.setFocusable(true);
                 box.setContentDescription(labels[i]);
                 box.setOnClickListener(open);
+                box.setBackground(new android.graphics.drawable.RippleDrawable(
+                        android.content.res.ColorStateList.valueOf(pal.ripple), null,
+                        CigramPalette.round(a, 0xFFFFFFFF, 0, 12)));
 
-                TextView v = CigramUI.label(a, "—", 22f, 0xFFFFFFFF, false);
-                v.setTypeface(CigramUI.font(a), Typeface.BOLD);
+                TextView v = CigramUI.label(a, "—", 21f, pal.text, true);
                 v.setGravity(Gravity.CENTER);
                 v.setSingleLine(true);
                 v.setIncludeFontPadding(false);
                 values[i] = v;
                 box.addView(v, new LinearLayout.LayoutParams(-2, -2));
 
-                TextView t = CigramUI.label(a, labels[i], 12f, 0xB3FFFFFF, false);
+                TextView t = CigramUI.label(a, labels[i], 11.5f, pal.text3, false);
                 t.setGravity(Gravity.CENTER);
                 t.setSingleLine(true);
                 t.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 t.setIncludeFontPadding(false);
                 t.setPadding(CigramUI.dp(a, 4), 0, CigramUI.dp(a, 4), 0);
                 LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(-2, -2);
-                tl.topMargin = CigramUI.dp(a, 4);
+                tl.topMargin = CigramUI.dp(a, 5);
                 box.addView(t, tl);
-                boxes[i] = box;
-            }
-            setClipChildren(false);
-            for (int i = 2; i >= 0; i--) {
-                LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(0, CigramUI.dp(a, 80), 1f);
-                if (i > 0) bl.rightMargin = CigramUI.dp(a, 10);   // physical gap between the tiles
-                addView(boxes[i], bl);
+                addView(box, new LinearLayout.LayoutParams(0, -2, 1f));
             }
         }
 
@@ -262,8 +268,7 @@ public final class CigramAccountUI {
             // arrange() قد يعيد تنسيق الخلفية والأبعاد؛ نعيد تطبيق شكلنا فقط دون إعادة بناء المحتوى
             applyRowParams(a, row);
             row.setBackground(rowSurface(a));
-            row.setClipToOutline(true);
-            row.setElevation(CigramUI.dp(a, 2));
+            row.setElevation(0f);
             return;
         }
         String title = null;
@@ -341,12 +346,11 @@ public final class CigramAccountUI {
 
     private static void applyRowParams(Context c, LinearLayout row) {
         ViewGroup.LayoutParams lp = row.getLayoutParams();
-        if (lp == null) lp = new LinearLayout.LayoutParams(-1, CigramUI.dp(c, 64));
-        lp.height = CigramUI.dp(c, 68);
+        if (lp == null) lp = new LinearLayout.LayoutParams(-1, CigramUI.dp(c, 62));
+        lp.height = CigramUI.dp(c, 62);
         lp.width = ViewGroup.LayoutParams.MATCH_PARENT;
         if (lp instanceof ViewGroup.MarginLayoutParams) {
-            ((ViewGroup.MarginLayoutParams) lp).setMargins(CigramUI.dp(c, 14), CigramUI.dp(c, 4),
-                    CigramUI.dp(c, 14), CigramUI.dp(c, 5));
+            ((ViewGroup.MarginLayoutParams) lp).setMargins(CigramUI.dp(c, 14), 0, CigramUI.dp(c, 14), 0);
         }
         row.setLayoutParams(lp);
     }
@@ -371,66 +375,7 @@ public final class CigramAccountUI {
         // نلتقط حدث الضغط الموجود على أي عنصر داخلي قبل حذف المحتوى، حتى لا تتعطّل الصفوف
         // التي يكون حدثها على TextView داخلي (مثل «المساعدة والدعم» الذي حدثه على النص «ads»).
         final View clickDelegate = row.hasOnClickListeners() ? null : findClickableDescendant(row);
-        row.removeAllViews();
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        // v4.4: explicit LTR + physical order [chevron][badge][texts][icon] → icon on the right,
-        // chevron on the left, in every RTL setting (the app has no supportsRtl).
-        row.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(CigramUI.dp(c, 14), 0, CigramUI.dp(c, 14), CigramUI.dp(c, 4));   // 4dp = block thickness
-        row.setMinimumHeight(CigramUI.dp(c, 68));
-        applyRowParams(c, row);
-        // the whole row (title, subtitle, arrow, icon) sits on ONE black surface; everything on it is white
-        row.setBackground(rowSurface(c));
-        row.setClipToOutline(true);
-        row.setElevation(CigramUI.dp(c, 2));
-        CigramDepth.attachPress(row);
-        row.setContentDescription(sub != null && sub.length() > 0 ? title + "، " + sub : title);
-
-        // سهم يتجه لليسار (اتجاه التقدّم في العربية) — physically the leftmost element
-        row.addView(new AdsIcons.Icon(c, AdsIcons.CHEVRON_LEFT, ink(c)), new LinearLayout.LayoutParams(CigramUI.dp(c, 20), CigramUI.dp(c, 20)));
-
-        if (badge) {
-            TextView b = CigramUI.label(c, "جديد", 11f, CigramUI.TEXT, true);
-            b.setGravity(Gravity.CENTER);
-            b.setPadding(CigramUI.dp(c, 9), CigramUI.dp(c, 3), CigramUI.dp(c, 9), CigramUI.dp(c, 3));
-            b.setBackground(CigramUI.round(CigramUI.RED, 10, c));
-            b.setContentDescription("جديد");
-            LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(-2, -2);
-            bl.leftMargin = CigramUI.dp(c, 8);
-            row.addView(b, bl);
-        }
-
-        // عنوان + وصف
-        LinearLayout col = new LinearLayout(c);
-        col.setOrientation(LinearLayout.VERTICAL);
-        col.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        col.setGravity(Gravity.CENTER_VERTICAL);
-        TextView t = CigramUI.label(c, title, 16.5f, ink(c), false);
-        t.setTypeface(CigramUI.font(c), Typeface.NORMAL);
-        t.setSingleLine(true);
-        t.setIncludeFontPadding(false);
-        col.addView(t, new LinearLayout.LayoutParams(-1, -2));
-        if (sub != null && sub.length() > 0) {
-            TextView s = CigramUI.label(c, sub, 12f, inkSoft(c), false);
-            s.setSingleLine(true);
-            s.setIncludeFontPadding(false);
-            LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(-1, -2);
-            sl.topMargin = CigramUI.dp(c, 3);
-            col.addView(s, sl);
-        }
-        LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(0, -2, 1f);
-        cl.leftMargin = CigramUI.dp(c, 8);
-        cl.rightMargin = CigramUI.dp(c, 12);
-        row.addView(col, cl);
-
-        // v10.67: the icon sits on its own raised "jewel" in the accent colour — physically the rightmost element
-        FrameLayout box = new FrameLayout(c);
-        box.setBackground(CigramDepth.jewel(c, accent));
-        box.setPadding(0, 0, 0, CigramUI.dp(c, 2));
-        box.addView(new AdsIcons.Icon(c, icon, ROW_INK), new FrameLayout.LayoutParams(CigramUI.dp(c, 22), CigramUI.dp(c, 22), Gravity.CENTER));
-        row.addView(box, new LinearLayout.LayoutParams(CigramUI.dp(c, 46), CigramUI.dp(c, 46)));
-
+        fillRow(c, row, title, sub, icon, accent, badge);
         // إعادة ربط حدث الضغط للصف إذا كان الحدث على عنصر داخلي حُذف للتو (إصلاح «المساعدة والدعم»).
         if (clickDelegate != null) {
             row.setClickable(true);
@@ -441,5 +386,66 @@ public final class CigramAccountUI {
                 }
             });
         }
+    }
+
+    /**
+     * CIGRAM ID row: [ chevron ] [ badge ] [ title / subtitle ] [ icon tile ] — a flat 62 dp line, no shadow.
+     * Physical order is fixed (LTR container) so the icon is always on the right and the chevron on the left, as the
+     * app has no layout-direction support. The subtitle view is kept in a tag so a row can change it later.
+     */
+    static void fillRow(Context c, LinearLayout row, String title, String sub, int icon, int accent, boolean badge) {
+        CigramPalette pal = CigramPalette.of(c);
+        row.removeAllViews();
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(CigramUI.dp(c, 14), 0, CigramUI.dp(c, 14), 0);
+        row.setMinimumHeight(CigramUI.dp(c, 62));
+        applyRowParams(c, row);
+        row.setBackground(rowSurface(c));
+        row.setElevation(0f);
+        row.setContentDescription(sub != null && sub.length() > 0 ? title + "، " + sub : title);
+
+        row.addView(new AdsIcons.Icon(c, AdsIcons.CHEVRON_LEFT, pal.text3),
+                new LinearLayout.LayoutParams(CigramUI.dp(c, 18), CigramUI.dp(c, 18)));
+
+        if (badge) {
+            TextView b = CigramUI.label(c, "جديد", 11f, pal.onBrand, true);
+            b.setGravity(Gravity.CENTER);
+            b.setPadding(CigramUI.dp(c, 9), CigramUI.dp(c, 3), CigramUI.dp(c, 9), CigramUI.dp(c, 3));
+            b.setBackground(CigramPalette.round(c, pal.brand, 0, 10));
+            b.setContentDescription("جديد");
+            LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(-2, -2);
+            bl.leftMargin = CigramUI.dp(c, 8);
+            row.addView(b, bl);
+        }
+
+        LinearLayout col = new LinearLayout(c);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
+        TextView t = CigramUI.label(c, title, 15.5f, pal.text, false);
+        t.setTypeface(CigramUI.font(c), Typeface.NORMAL);
+        t.setSingleLine(true);
+        t.setIncludeFontPadding(false);
+        col.addView(t, new LinearLayout.LayoutParams(-1, -2));
+        TextView s = CigramUI.label(c, sub == null ? "" : sub, 12f, pal.text3, false);
+        s.setSingleLine(true);
+        s.setIncludeFontPadding(false);
+        LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(-1, -2);
+        sl.topMargin = CigramUI.dp(c, 3);
+        col.addView(s, sl);
+        s.setVisibility(sub != null && sub.length() > 0 ? View.VISIBLE : View.GONE);
+        row.setTag(R.id.cg_row_subtitle, s);
+        LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(0, -2, 1f);
+        cl.leftMargin = CigramUI.dp(c, 8);
+        cl.rightMargin = CigramUI.dp(c, 12);
+        row.addView(col, cl);
+
+        // the icon tile: the accent as a soft tint (darker ink on the light page so it keeps its contrast)
+        int ink = pal.light ? CigramDepth.shade(accent, 0.82f) : accent;
+        FrameLayout box = new FrameLayout(c);
+        box.setBackground(CigramPalette.round(c, CigramPalette.alpha(accent, pal.light ? 0x1F : 0x2B), 0, 11));
+        box.addView(new AdsIcons.Icon(c, icon, ink), new FrameLayout.LayoutParams(CigramUI.dp(c, 20), CigramUI.dp(c, 20), Gravity.CENTER));
+        row.addView(box, new LinearLayout.LayoutParams(CigramUI.dp(c, 38), CigramUI.dp(c, 38)));
     }
 }

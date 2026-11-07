@@ -142,11 +142,48 @@ public final class CigramTheme {
 
     // ---------------------------------------------------------------- install + lifecycle
 
-    /** Once per process (CigramStage1InitProvider). Applies the Admin app's forced mode, if any. */
+    // ---------------------------------------------------------------- theme preference
+
+    public static final String MODE_SYSTEM = "system";
+    public static final String MODE_LIGHT = "light";
+    public static final String MODE_DARK = "dark";
+    private static final String PREF_FILE = "cigram_theme";
+    private static final String PREF_MODE = "mode";
+
+    /** The user's own choice (Account → المظهر): "system" (default), "light" or "dark". */
+    public static String userMode(Context context) {
+        try {
+            String m = context.getApplicationContext().getSharedPreferences(PREF_FILE, Context.MODE_PRIVATE)
+                    .getString(PREF_MODE, MODE_SYSTEM);
+            return MODE_LIGHT.equals(m) || MODE_DARK.equals(m) ? m : MODE_SYSTEM;
+        } catch (RuntimeException error) {
+            android.util.Log.w(TAG, "theme preference unreadable", error);
+            return MODE_SYSTEM;
+        }
+    }
+
+    /**
+     * The mode that is applied: a forced light / dark chosen by the user wins; "system" means "no choice made", so
+     * the Admin app's mode (default: follow the phone) applies.
+     */
+    static String effectiveMode(Context context) {
+        String user = userMode(context);
+        return MODE_SYSTEM.equals(user) ? CigramLayoutConfig.themeMode(context) : user;
+    }
+
+    /** Saves the user's choice and applies it now: open pages are recreated (cross-faded) in the new mode. */
+    public static void setUserMode(Context context, String mode) {
+        String wanted = MODE_LIGHT.equals(mode) || MODE_DARK.equals(mode) ? mode : MODE_SYSTEM;
+        context.getApplicationContext().getSharedPreferences(PREF_FILE, Context.MODE_PRIVATE)
+                .edit().putString(PREF_MODE, wanted).apply();
+        applyNightMode(effectiveMode(context));
+    }
+
+    /** Once per process (CigramStage1InitProvider). Applies the user's mode, else the Admin app's forced mode, if any. */
     public static void install(Application app) {
         if (installed || app == null) return;
         installed = true;
-        applyNightMode(CigramLayoutConfig.themeMode(app));
+        applyNightMode(effectiveMode(app));
     }
 
     /** "system" (default) | "light" | "dark": the Admin app may force one mode for everybody. */

@@ -267,7 +267,7 @@ final class CigramAccountDesign {
             TextView welcome = (TextView) welcomeView;
             TextView hint = (TextView) hintView;
 
-            box.setPadding(dp(a, 24), dp(a, 28), dp(a, 24), dp(a, 16));
+            box.setPadding(dp(a, 24), dp(a, 10), dp(a, 24), dp(a, 16));
             welcome.setText("أهلاً بك في سيكرام");
             welcome.setTextSize(25f);
             welcome.setTextColor(CigramTheme.text(a));
@@ -280,7 +280,7 @@ final class CigramAccountDesign {
             hint.setGravity(Gravity.CENTER);
 
             if (box.findViewWithTag(TAG_GUEST_EXTRAS) == null) {
-                View logo = logo(a, 92);
+                View logo = logo(a, 84);
                 box.addView(logo, 0, new LinearLayout.LayoutParams(-2, -2));
 
                 LinearLayout benefits = new LinearLayout(a);
@@ -292,14 +292,18 @@ final class CigramAccountDesign {
                 benefits.addView(benefit(a, BELL, "تنبيه بكل حلقة جديدة تتابعها"), new LinearLayout.LayoutParams(-1, -2));
                 box.addView(benefits, box.indexOfChild(open), new LinearLayout.LayoutParams(-1, -2));
 
+                // the second, separate action: an outlined pill next to the red «تسجيل الدخول»
                 TextView link = new TextView(a);
                 link.setTag(TAG_GUEST_LINK);
                 link.setText("ليس لديك حساب؟  أنشئ حساباً جديداً");
-                link.setTextSize(13.5f);
-                link.setTextColor(RED);
+                link.setTextSize(14f);
+                link.setTextColor(CigramPalette.of(a).light ? 0xFFC8140E : RED);
                 link.setTypeface(CigramUI.font(a), Typeface.BOLD);
                 link.setGravity(Gravity.CENTER);
-                link.setPadding(dp(a, 12), dp(a, 14), dp(a, 12), dp(a, 14));
+                link.setBackground(new android.graphics.drawable.RippleDrawable(
+                        ColorStateList.valueOf(CigramPalette.of(a).ripple), CigramPalette.round(a, 0, RED, 26),
+                        CigramPalette.round(a, 0xFFFFFFFF, 0, 26)));
+                link.setContentDescription("إنشاء حساب جديد");
                 link.setClickable(true);
                 link.setFocusable(true);
                 link.setOnClickListener(new View.OnClickListener() {
@@ -308,7 +312,11 @@ final class CigramAccountDesign {
                         CigramAuthPolish.showRegister(a);    // then the register tab
                     }
                 });
-                box.addView(link, new LinearLayout.LayoutParams(-1, -2));
+                LinearLayout.LayoutParams linkLp = new LinearLayout.LayoutParams(-1, dp(a, 52));
+                linkLp.topMargin = dp(a, 12);
+                linkLp.leftMargin = dp(a, 4);
+                linkLp.rightMargin = dp(a, 4);
+                box.addView(link, linkLp);
                 reveal(a, logo, welcome, hint, benefits, open, link);
             }
             primaryButton(a, open, 54, 4, 20);

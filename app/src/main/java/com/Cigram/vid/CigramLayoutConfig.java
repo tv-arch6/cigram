@@ -167,7 +167,8 @@ public final class CigramLayoutConfig {
                     final String newMode = themeMode(app);
                     MAIN.post(new Runnable() {
                         @Override public void run() {
-                            if (!oldMode.equals(newMode)) CigramTheme.applyNightMode(newMode);
+                            // the user's own light / dark choice (if any) still wins over what the Admin app forces
+                            if (!oldMode.equals(newMode)) CigramTheme.applyNightMode(CigramTheme.effectiveMode(app));
                             if (onChanged != null) onChanged.run();
                         }
                     });
