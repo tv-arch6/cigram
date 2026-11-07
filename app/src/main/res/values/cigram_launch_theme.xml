@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Launch theme for MainActivity. The first frame is the red / black page only: no square logo.
+         Android 11 and older show the window background (cigram_launch_bg: black with the maroon glow).
+         Android 12+ shows the system splash on the same dark colour with a transparent icon.
+         CigramSplash then draws the page again with the rounded app icon, for exactly two seconds,
+         and fades into Home. The provider swaps the window background to the plain dark colour once
+         the activity exists. -->
+    <style name="CigramLaunchTheme" parent="AppTheme">
+        <item name="android:windowBackground">@drawable/cigram_launch_bg</item>
+        <item name="android:colorBackground">#0A0608</item>
+        <item name="android:windowSplashScreenBackground">#0A0608</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@android:color/transparent</item>
+    </style>
+</resources>

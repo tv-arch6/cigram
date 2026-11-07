@@ -1,0 +1,20 @@
+<resources>
+	<color name="colorPrimary">#181818</color>
+	<color name="colorPrimaryDark">#030F16</color>
+	<color name="colorAccent">#9AA8B2</color>
+	<color name="colorControlHighlight">#FFFFFF</color>
+	<color name="colorControlNormal">#FFFFFF</color>
+
+	<!-- v10.70 theme tokens (LIGHT). values-night/colors.xml holds the same names for dark mode.
+	     The brand red never changes; only surfaces and text follow the system setting. -->
+	<color name="cg_brand">#E21B14</color>
+	<color name="cg_bg">#F4F5F7</color>
+	<color name="cg_bg_deep">#ECEEF1</color>
+	<color name="cg_surface">#FFFFFF</color>
+	<color name="cg_surface_hi">#F0F2F4</color>
+	<color name="cg_stroke">#DADFE3</color>
+	<color name="cg_text">#111418</color>
+	<color name="cg_text_2">#3C474E</color>
+	<color name="cg_text_3">#5F6B73</color>
+	<color name="cg_nav">#FFFFFF</color>
+</resources>
