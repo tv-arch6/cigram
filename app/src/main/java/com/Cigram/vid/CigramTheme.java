@@ -184,6 +184,24 @@ public final class CigramTheme {
         }
     }
 
+    /**
+     * Called when a page is destroyed. WATCHERS maps the page to a listener that captures the page itself, so a
+     * WeakHashMap alone can never release it; the entry (and the cached view colours) must be dropped explicitly.
+     */
+    public static void onDestroyed(Activity activity) {
+        if (activity == null) return;
+        ViewTreeObserver.OnGlobalLayoutListener listener = WATCHERS.remove(activity);
+        if (listener != null) {
+            try {
+                ViewTreeObserver observer = activity.getWindow().getDecorView().getViewTreeObserver();
+                if (observer.isAlive()) observer.removeOnGlobalLayoutListener(listener);
+            } catch (RuntimeException error) {
+                android.util.Log.w(TAG, "watcher cleanup", error);
+            }
+        }
+        SOLID.clear();
+    }
+
     /** Called after a page was created / brought back: window colours, live re-colouring, cross-fade. */
     public static void onResumed(final Activity activity) {
         if (activity == null) return;

@@ -112,6 +112,11 @@ public final class CigramChannels {
         View bannerPlay;
     }
 
+    /** The page's State holds its views (and so the page): it must be dropped when the page is destroyed. */
+    static void onDestroyed(Activity activity) {
+        synchronized (STATES) { STATES.remove(activity); }
+    }
+
     // ------------------------------------------------------------------ entry points
 
     public static void bind(Activity activity) {

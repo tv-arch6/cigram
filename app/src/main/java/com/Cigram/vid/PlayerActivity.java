@@ -105,6 +105,7 @@ public class PlayerActivity extends AppCompatActivity {
 		} catch (Throwable ignored) { }
 		try { if (cgOrientationRef != null) cgOrientationRef.stop(); } catch (Throwable ignored) { }
 		try { CigramSeekPreview.stop(); } catch (Throwable ignored) { }
+		CigramSeekPreview.release(this);   // the preview card is static: it must not keep this page alive
 		try { CigramSeekGuard.cancel(); } catch (Throwable ignored) { }
 		try { CigramAudioBoost.release(); } catch (Throwable ignored) { }
 		super.onDestroy();

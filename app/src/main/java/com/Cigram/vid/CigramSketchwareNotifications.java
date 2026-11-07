@@ -80,6 +80,11 @@ public final class CigramSketchwareNotifications {
     private static final Map<Activity, PageState> PAGE_STATES =
             new WeakHashMap<Activity, PageState>();
 
+    /** PageState keeps its Activity: a weak key cannot release it, so the entry is dropped when the page is destroyed. */
+    static void onDestroyed(Activity activity) {
+        synchronized (PAGE_STATES) { PAGE_STATES.remove(activity); }
+    }
+
     private static WeakReference<Activity> LAST_MAIN_ACTIVITY =
             new WeakReference<Activity>(null);
 

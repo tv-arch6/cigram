@@ -114,6 +114,24 @@ final class CigramSeekPreview {
         } catch (Throwable ignored) { }
     }
 
+    /** The player page is going away: drop every static reference to it and take the card out of its window. */
+    static void release(Activity a) {
+        if (a == null || activity != a) return;
+        GENERATION.incrementAndGet();
+        if (pending != null) MAIN.removeCallbacks(pending);
+        pending = null;
+        FrameLayout c = card;
+        card = null;
+        picture = null;
+        time = null;
+        bar = null;
+        activity = null;
+        if (c != null) {
+            c.animate().cancel();
+            if (c.getParent() instanceof ViewGroup) ((ViewGroup) c.getParent()).removeView(c);
+        }
+    }
+
     // ================================================================== source of the pictures
 
     private static void readSource(Object player) {

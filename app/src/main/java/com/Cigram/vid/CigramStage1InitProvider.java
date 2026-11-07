@@ -488,6 +488,12 @@ public final class CigramStage1InitProvider extends ContentProvider {
                             }
                             if (strictSection != null) strictSection.destroy();
                             CigramCastHome.unbind(activity);
+                            // Maps whose values reference the page itself would keep every destroyed page alive:
+                            synchronized (EPISODE_REFRESH) { EPISODE_REFRESH.remove(activity); }
+                            synchronized (DETAILS_FLIGHTS) { DETAILS_FLIGHTS.remove(activity); }
+                            CigramTheme.onDestroyed(activity);
+                            CigramChannels.onDestroyed(activity);
+                            CigramSketchwareNotifications.onDestroyed(activity);
                         }
                     }
             );
