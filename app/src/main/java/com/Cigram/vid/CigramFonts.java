@@ -61,24 +61,26 @@ public final class CigramFonts {
 
     // ---- الخطوط المدمجة -------------------------------------------------
 
-    /** المفتاح الافتراضي لخط الترجمة: خط التطبيق (بيروتي). */
-    static final String DEFAULT_KEY = "beiruti";
+    /** المفتاح الافتراضي لخط الترجمة (كما كان: مهنّد). */
+    static final String DEFAULT_KEY = "lmohanad";
 
-    /** {key, اسم العرض, مسار الملف}. كل ملف هنا موجود فعلاً في assets/fonts. */
+    /** {key, اسم العرض, مسار الملف}. كل ملف هنا موجود في assets/fonts؛ «بيروتي» هو خط واجهة التطبيق. */
     private static final String[][] BUILTIN = {
-            {DEFAULT_KEY, "بيروتي", CigramTypefaces.APP_FONT},
+            {"lmohanad", "مهنّد", "fonts/lmohanad.ttf"},
+            {"lmohanadbold", "مهنّد عريض", "fonts/lmohanadbold.ttf"},
+            {"lfont_com_alyamamabold", "اليمامة عريض", "fonts/lfont_com_alyamamabold.ttf"},
+            {"lfont_com_alyamamasemibold", "اليمامة نصف عريض", "fonts/lfont_com_alyamamasemibold.ttf"},
             {"lfont_com_nsd96generosityotf", "جينيروسِتي", "fonts/lfont_com_nsd96generosityotf.ttf"},
             {"amiri_regular", "أميري", "fonts/amiri_regular.ttf"},
             {"amiri_bold", "أميري عريض", "fonts/amiri_bold.ttf"},
+            {"cairo_regular", "القاهرة", "fonts/cairo_regular.ttf"},
             {"cairo_bold", "القاهرة عريض", "fonts/cairo_bold.ttf"},
             {"scheherazade_regular", "شهرزاد", "fonts/scheherazade_regular.ttf"},
-            {"scheherazade_bold", "شهرزاد عريض", "fonts/scheherazade_bold.ttf"}
+            {"scheherazade_bold", "شهرزاد عريض", "fonts/scheherazade_bold.ttf"},
+            {"beiruti", "بيروتي", CigramTypefaces.APP_FONT}
     };
 
-    /**
-     * مسار ملف الخط المدمج لمفتاح محفوظ. المفاتيح القديمة التي لم يعد ملفها موجوداً
-     * (مهنّد، اليمامة، القاهرة العادي) وأي مفتاح مجهول تعود إلى خط التطبيق بدل أن تسقط على خط النظام بصمت.
-     */
+    /** مفتاح صالح دائماً: المفتاح المجهول (أو القديم المحذوف) يعود إلى الخط الافتراضي. */
     private static String normalizeKey(String key) {
         if (key == null || key.length() == 0) return DEFAULT_KEY;
         if (key.startsWith("custom:")) return key;
@@ -86,11 +88,11 @@ public final class CigramFonts {
         return DEFAULT_KEY;
     }
 
+    /** مسار ملف الخط المدمج لمفتاح محفوظ (المفتاح المجهول يعطي مسار الخط الافتراضي بدل السقوط على خط النظام بصمت). */
     static String assetPathForKey(String key) {
-        if (key != null) {
-            for (String[] row : BUILTIN) if (row[0].equals(key)) return row[2];
-        }
-        return CigramTypefaces.APP_FONT;
+        String wanted = normalizeKey(key);
+        for (String[] row : BUILTIN) if (row[0].equals(wanted)) return row[2];
+        return "fonts/lmohanad.ttf";
     }
 
     // ---- قيم افتراضية ---------------------------------------------------
