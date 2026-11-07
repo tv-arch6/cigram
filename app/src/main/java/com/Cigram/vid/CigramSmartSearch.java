@@ -221,15 +221,44 @@ public final class CigramSmartSearch {
 
     // ------------------------------------------------------------------ text helpers (same folding as the search screen)
 
+    private static final java.util.regex.Pattern RX_MARKS = java.util.regex.Pattern.compile("\\p{M}+");
+    private static final java.util.regex.Pattern RX_NOT_WORD = java.util.regex.Pattern.compile("[^\\p{L}\\p{N}]+");
+    private static final java.util.regex.Pattern RX_SPACES = java.util.regex.Pattern.compile("\\s+");
+    /** Titles / categories / queries are folded again and again (every keystroke, every item): remember the short ones. */
+    private static final android.util.LruCache<String, String> FOLDED = new android.util.LruCache<String, String>(4096);
+    private static final int FOLD_CACHE_MAX_CHARS = 120;
+
+    /**
+     * The one text folding used by every search path (search screen, home filters, fuzzy fallback): case, diacritics,
+     * tatweel, alef / yeh / teh-marbuta / hamza forms, Arabic-Indic and Persian digits, punctuation. The patterns are
+     * compiled once (String.replaceAll compiled three of them on every call) and short results are cached.
+     */
     static String normalize(String s) {
-        if (s == null) return "";
-        return java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFKD)
-                .replaceAll("\\p{M}+", "").replace("ـ", "").toLowerCase(java.util.Locale.ROOT)
-                .replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا').replace('ٱ', 'ا')
-                .replace('ى', 'ي').replace('ة', 'ه').replace('ؤ', 'و').replace('ئ', 'ي')
-                .replace('٠', '0').replace('١', '1').replace('٢', '2').replace('٣', '3').replace('٤', '4')
-                .replace('٥', '5').replace('٦', '6').replace('٧', '7').replace('٨', '8').replace('٩', '9')
-                .replaceAll("[^\\p{L}\\p{N}]+", " ").trim().replaceAll("\\s+", " ");
+        if (s == null || s.length() == 0) return "";
+        final boolean cacheable = s.length() <= FOLD_CACHE_MAX_CHARS;
+        if (cacheable) {
+            String hit = FOLDED.get(s);
+            if (hit != null) return hit;
+        }
+        String t = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFKD);
+        t = RX_MARKS.matcher(t).replaceAll("").replace("ـ", "").toLowerCase(java.util.Locale.ROOT);
+        char[] c = t.toCharArray();
+        for (int i = 0; i < c.length; i++) {
+            switch (c[i]) {
+                case 'أ': case 'إ': case 'آ': case 'ٱ': c[i] = 'ا'; break;
+                case 'ى': case 'ئ': case 'ی': c[i] = 'ي'; break;     // alef maqsura, hamza-on-yeh, Persian yeh
+                case 'ة': c[i] = 'ه'; break;
+                case 'ؤ': c[i] = 'و'; break;
+                case 'ک': c[i] = 'ك'; break;                          // Persian keheh
+                default:
+                    if (c[i] >= '٠' && c[i] <= '٩') c[i] = (char) ('0' + (c[i] - '٠'));        // Arabic-Indic digits
+                    else if (c[i] >= '۰' && c[i] <= '۹') c[i] = (char) ('0' + (c[i] - '۰'));   // extended (Persian) digits
+            }
+        }
+        t = RX_NOT_WORD.matcher(new String(c)).replaceAll(" ").trim();
+        t = RX_SPACES.matcher(t).replaceAll(" ");
+        if (cacheable) FOLDED.put(s, t);
+        return t;
     }
 
     private static String[] tokens(String normalized) {

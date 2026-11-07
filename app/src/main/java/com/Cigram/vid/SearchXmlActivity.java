@@ -192,16 +192,7 @@ public class SearchXmlActivity extends AppCompatActivity {
 						}
 						return "";
 					}
-					String normalize(String s) {
-						if(s==null)return "";
-						return java.text.Normalizer.normalize(s,java.text.Normalizer.Form.NFKD)
-						.replaceAll("\\p{M}+","").replace("ـ","").toLowerCase(java.util.Locale.ROOT)
-						.replace('أ','ا').replace('إ','ا').replace('آ','ا').replace('ٱ','ا')
-						.replace('ى','ي').replace('ة','ه').replace('ؤ','و').replace('ئ','ي')
-						.replace('٠','0').replace('١','1').replace('٢','2').replace('٣','3').replace('٤','4')
-						.replace('٥','5').replace('٦','6').replace('٧','7').replace('٨','8').replace('٩','9')
-						.replaceAll("[^\\p{L}\\p{N}]+"," ").trim().replaceAll("\\s+"," ");
-					}
+					String normalize(String s) { return CigramSmartSearch.normalize(s); }
 					String type(org.json.JSONObject o,String inherited) {
 						String t=normalize(text(o,"type","content_type","media_type"));
 						if(t.equals("series")||t.equals("tv")||t.equals("show")||t.contains("مسلسل"))return "series";
@@ -598,16 +589,7 @@ public class SearchXmlActivity extends AppCompatActivity {
 				}
 				return "";
 			}
-			String normalize(String s) {
-				if(s==null)return "";
-				return java.text.Normalizer.normalize(s,java.text.Normalizer.Form.NFKD)
-				.replaceAll("\\p{M}+","").replace("ـ","").toLowerCase(java.util.Locale.ROOT)
-				.replace('أ','ا').replace('إ','ا').replace('آ','ا').replace('ٱ','ا')
-				.replace('ى','ي').replace('ة','ه').replace('ؤ','و').replace('ئ','ي')
-				.replace('٠','0').replace('١','1').replace('٢','2').replace('٣','3').replace('٤','4')
-				.replace('٥','5').replace('٦','6').replace('٧','7').replace('٨','8').replace('٩','9')
-				.replaceAll("[^\\p{L}\\p{N}]+"," ").trim().replaceAll("\\s+"," ");
-			}
+			String normalize(String s) { return CigramSmartSearch.normalize(s); }
 			String type(org.json.JSONObject o,String inherited) {
 				String t=normalize(text(o,"type","content_type","media_type"));
 				if(t.equals("series")||t.equals("tv")||t.equals("show")||t.contains("مسلسل"))return "series";
@@ -745,13 +727,23 @@ public class SearchXmlActivity extends AppCompatActivity {
 				}
 				return result;
 			}
-			boolean matches(org.json.JSONObject item,String query) {
-				String q=normalize(query);if(q.isEmpty())return true;
+			// The searchable text of a title never changes while the catalog snapshot lives, so it is folded once
+			// (it used to be rebuilt and re-folded for every item on every keystroke, twice).
+			final java.util.Map<org.json.JSONObject,String> cgHaystacks=java.util.Collections.synchronizedMap(new java.util.WeakHashMap<org.json.JSONObject,String>());
+			String haystackOf(org.json.JSONObject item) {
+				String haystack=cgHaystacks.get(item);
+				if(haystack!=null)return haystack;
 				StringBuilder searchable=new StringBuilder();
 				for(String key:new String[]{"title","series_title","original_title","original_name","title_ar","title_en","name","aliases","alternative_titles","alt_titles","category","genre","genres","year","description","overview","actors","cast","stars","director"})
 				searchable.append(' ').append(text(item,key));
 				searchable.append(type(item,"").equals("series")?" مسلسل مسلسلات series":" فيلم افلام movie");
-				String haystack=normalize(searchable.toString());
+				haystack=normalize(searchable.toString());
+				cgHaystacks.put(item,haystack);
+				return haystack;
+			}
+			boolean matches(org.json.JSONObject item,String query) {
+				String q=normalize(query);if(q.isEmpty())return true;
+				String haystack=haystackOf(item);
 				for(String token:q.split(" "))if(!haystack.contains(token))return false;
 				return true;
 			}
@@ -1245,11 +1237,12 @@ public class SearchXmlActivity extends AppCompatActivity {
 				final java.util.HashSet<String> cgDedupe=new java.util.HashSet<String>();
 				for(int i=0;i<items.length();i++) {
 					org.json.JSONObject item=items.optJSONObject(i); if(item==null)continue;
-					if(!query.isEmpty()&&cgCatalog.matches(item,query))anyQueryMatch=true;
+					final boolean cgMatch=cgCatalog.matches(item,query);   // true for an empty query
+					if(!query.isEmpty()&&cgMatch)anyQueryMatch=true;
 					if(!cgType[0].equals("all")&&!cgType[0].equals(cgCatalog.text(item,"type")))continue;
 					if(!CigramSearchFilter.yearMatches(year,cgCatalog.text(item,"year")))continue;
 					if(!category.equals("all")&&!cgCatalog.normalize(cgCatalog.text(item,"category")).contains(cgCatalog.normalize(category)))continue;
-					if(number(cgCatalog.text(item,"imdb"))<rating||!cgCatalog.matches(item,query))continue;
+					if(number(cgCatalog.text(item,"imdb"))<rating||!cgMatch)continue;
 					String cgDupKey=cgCatalog.text(item,"type")+"|"+cgCatalog.normalize(cgCatalog.text(item,"series_title","title"))+"|"+cgCatalog.text(item,"year");
 					if(!cgDedupe.add(cgDupKey))continue;
 					cgHits.add(item);
