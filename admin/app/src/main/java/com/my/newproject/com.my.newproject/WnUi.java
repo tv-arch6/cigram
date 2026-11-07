@@ -43,6 +43,59 @@ final class WnUi {
         return Math.max(CgUi.dp(a, 120), (px - pad - gap) / cols);
     }
 
+    // ------------------------------------------------------------------ brand images (assets/img)
+
+    private static final java.util.Map<String, android.graphics.Bitmap> LOGOS = new java.util.HashMap<>();
+
+    /** A bundled image (assets/img/<name>.png) at the given dp size; a missing asset yields an empty view. */
+    static ImageView logo(Context c, String name, float wDp, float hDp) {
+        ImageView iv = new ImageView(c);
+        iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        android.graphics.Bitmap bmp;
+        synchronized (LOGOS) {
+            bmp = LOGOS.get(name);
+            if (bmp == null) {
+                try {
+                    java.io.InputStream in = c.getApplicationContext().getAssets().open("img/" + name + ".png");
+                    bmp = android.graphics.BitmapFactory.decodeStream(in);
+                    in.close();
+                    if (bmp != null) LOGOS.put(name, bmp);
+                } catch (Exception ignored) { }
+            }
+        }
+        if (bmp != null) iv.setImageBitmap(bmp);
+        iv.setLayoutParams(new LinearLayout.LayoutParams(CgUi.dp(c, wDp), CgUi.dp(c, hDp)));
+        return iv;
+    }
+
+    /** IMDb logo + the rating, e.g. [IMDb] 7.8 */
+    static LinearLayout imdbRating(Context c, double rating, float sp) {
+        LinearLayout r = CgUi.hbox(c);
+        ImageView logo = logo(c, "wn_imdb", 30, 13);
+        logo.setBackground(CgUi.bg(c, 0xFF000000, 3, 0));
+        r.addView(logo);
+        TextView t = CgUi.text(c, " " + WnLogic.ratingText(rating), sp, CgCfg.WARN, true);
+        r.addView(t, new LinearLayout.LayoutParams(CgUi.WRAP, CgUi.WRAP));
+        return r;
+    }
+
+    /** True for a title the discovery index first saw within the last 7 days. */
+    static boolean isFresh(JSONObject c) {
+        String iso = c.optString("first_seen_at");
+        if (iso.length() == 0) return false;
+        long t = CgUi.parseIso(iso);
+        return t > 0 && System.currentTimeMillis() - t < 7L * 86400000L;
+    }
+
+    /** The red «جديد» image on a light pill (readable on any poster). */
+    static View newBadge(Context c) {
+        FrameLayout f = new FrameLayout(c);
+        f.setBackground(CgUi.bg(c, 0xEEFFFFFF, 6, 0));
+        f.setPadding(CgUi.dp(c, 5), CgUi.dp(c, 2), CgUi.dp(c, 5), CgUi.dp(c, 2));
+        f.addView(logo(c, "wn_new", 30, 11));
+        return f;
+    }
+
     // ------------------------------------------------------------------ small pieces
 
     static TextView badge(Context c, String text, int color) {
@@ -113,7 +166,9 @@ final class WnUi {
         over.addView(title);
         String year = c.optString("year");
         String rating = WnLogic.ratingText(c.optDouble("rating", 0));
-        TextView meta = CgUi.text(a, (year.length() > 0 ? year + "  ·  " : "") + "★ " + rating, 12, CgCfg.WARN, true);
+        LinearLayout meta = CgUi.hbox(a);
+        if (year.length() > 0) meta.addView(CgUi.text(a, year + "   ", 12, CgCfg.MUTED, true));
+        meta.addView(imdbRating(a, c.optDouble("rating", 0), 12));
         over.addView(meta);
         box.addView(over, new FrameLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP, Gravity.BOTTOM));
 
@@ -126,6 +181,10 @@ final class WnUi {
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(CgUi.WRAP, CgUi.WRAP);
             lp.setMarginStart(CgUi.dp(a, 5));
             top.addView(b, lp);
+        } else if (isFresh(c)) {
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(CgUi.WRAP, CgUi.WRAP);
+            lp.setMarginStart(CgUi.dp(a, 5));
+            top.addView(newBadge(a), lp);
         } else if (!c.optBoolean("released", true)) {
             TextView b = badge(a, "قريباً", CgCfg.GRAY);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(CgUi.WRAP, CgUi.WRAP);

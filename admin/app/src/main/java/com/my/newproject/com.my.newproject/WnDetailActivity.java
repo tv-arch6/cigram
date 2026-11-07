@@ -240,7 +240,7 @@ public class WnDetailActivity extends CgBase {
         badges.addView(WnUi.badge(this, WnLogic.typeLabel(type), series ? CgCfg.ACCENT_2 : CgCfg.ACCENT), new LinearLayout.LayoutParams(CgUi.WRAP, CgUi.WRAP));
         LinearLayout.LayoutParams l2 = new LinearLayout.LayoutParams(CgUi.WRAP, CgUi.WRAP);
         l2.setMarginStart(CgUi.dp(this, 5));
-        badges.addView(WnUi.badge(this, "★ " + WnLogic.ratingText(det.optDouble("rating", 0)), CgCfg.WARN), l2);
+        badges.addView(WnUi.imdbRating(this, det.optDouble("rating", 0), 13), l2);
         if (det.optString("year").length() > 0) {
             LinearLayout.LayoutParams l3 = new LinearLayout.LayoutParams(CgUi.WRAP, CgUi.WRAP);
             l3.setMarginStart(CgUi.dp(this, 5));

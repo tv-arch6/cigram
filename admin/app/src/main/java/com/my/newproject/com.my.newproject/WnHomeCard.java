@@ -37,7 +37,12 @@ final class WnHomeCard {
         CgUi.ltr(kicker);
         kicker.setLetterSpacing(0.2f);
         titles.addView(kicker);
-        titles.addView(CgUi.text(host, "ما الجديد؟", 22, CgCfg.TEXT, true));
+        LinearLayout nameRow = CgUi.hbox(host);
+        nameRow.addView(CgUi.text(host, "ما الجديد؟", 22, CgCfg.TEXT, true));
+        LinearLayout.LayoutParams nl = new LinearLayout.LayoutParams(CgUi.WRAP, CgUi.WRAP);
+        nl.setMarginStart(CgUi.dp(host, 8));
+        nameRow.addView(WnUi.newBadge(host), nl);
+        titles.addView(nameRow);
         titles.addView(CgUi.muted(host, "اكتشف المحتوى الجديد وأضفه تلقائياً"));
         head.addView(titles, new LinearLayout.LayoutParams(0, CgUi.WRAP, 1f));
         ImageView icon = new ImageView(host);
