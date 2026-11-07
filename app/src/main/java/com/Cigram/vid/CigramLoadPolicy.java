@@ -1,5 +1,6 @@
 package com.Cigram.vid;
 
+import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.upstream.DefaultLoadErrorHandlingPolicy;
 import com.google.android.exoplayer2.upstream.HttpDataSource;
 
@@ -20,7 +21,25 @@ final class CigramLoadPolicy extends DefaultLoadErrorHandlingPolicy {
     /** About 100 s: the server may need that long to prepare a part of the film nobody has asked for yet. */
     private static final int EMBED_RETRIES = 100;
 
+    /** Host of the failed request, or null when it cannot be told. */
+    private static String hostOf(LoadErrorInfo info) {
+        try {
+            if (info.loadEventInfo != null && info.loadEventInfo.dataSpec != null && info.loadEventInfo.dataSpec.uri != null) {
+                return info.loadEventInfo.dataSpec.uri.getHost();
+            }
+        } catch (RuntimeException ignored) { }
+        return null;
+    }
+
     @Override public long getRetryDelayMsFor(LoadErrorInfo info) {
+        // The long patience below is for embed hosts only. getMinimumLoadableRetryCount() cannot see the host, so
+        // once any embed host had been seen it allowed ~100 retries for EVERY stream: a dead direct link kept the
+        // spinner for minutes. Everything that is not an embed host now stops after the stock number of tries.
+        int dataType = info.mediaLoadData != null ? info.mediaLoadData.dataType : C.DATA_TYPE_MEDIA;
+        if (info.errorCount > super.getMinimumLoadableRetryCount(dataType)
+                && !CigramEmbedResolver.isSeenHost(hostOf(info))) {
+            return C.TIME_UNSET;   // give up: the player reports the error instead of buffering forever
+        }
         try {
             if (info.exception instanceof HttpDataSource.InvalidResponseCodeException) {
                 HttpDataSource.InvalidResponseCodeException h = (HttpDataSource.InvalidResponseCodeException) info.exception;

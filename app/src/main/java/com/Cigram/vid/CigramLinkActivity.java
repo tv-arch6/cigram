@@ -54,6 +54,12 @@ public class CigramLinkActivity extends Activity {
         overridePendingTransition(0, 0);
     }
 
+    @Override
+    protected void onDestroy() {
+        main.removeCallbacksAndMessages(null);   // the catalog-wait retries must not outlive the page
+        super.onDestroy();
+    }
+
     private void openHome() {
         try {
             Intent i = getPackageManager().getLaunchIntentForPackage(getPackageName());
