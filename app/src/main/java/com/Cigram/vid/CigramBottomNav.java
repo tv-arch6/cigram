@@ -64,6 +64,26 @@ public final class CigramBottomNav {
     private CigramBottomNav() {
     }
 
+    /**
+     * Height of the strip the tab bar occupies at the bottom of the page (bar + the gap above the system bar), or 0 when
+     * the page shows no bar. A full-page overlay (for example the offline / retry panel) leaves this strip free, so the
+     * tabs stay usable instead of trapping the user on the page with only the Back button.
+     */
+    static int reservedBottom(Activity activity) {
+        try {
+            if (!hasBar(activity) || CigramTvMode.isTv(activity)) return 0;
+            View root = activity.findViewById(android.R.id.content);
+            View bar = root == null ? null : root.findViewWithTag(BAR_TAG);
+            if (bar == null || bar.getVisibility() == View.GONE
+                    || !(bar.getLayoutParams() instanceof FrameLayout.LayoutParams)) return 0;
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) bar.getLayoutParams();
+            return Math.max(0, lp.height) + Math.max(0, lp.bottomMargin);
+        } catch (RuntimeException error) {
+            Log.w(TAG, "reservedBottom failed", error);
+            return 0;
+        }
+    }
+
     static boolean hasBar(Activity activity) {
         if (activity == null || activity.isFinishing()) return false;
         String name = activity.getClass().getSimpleName();

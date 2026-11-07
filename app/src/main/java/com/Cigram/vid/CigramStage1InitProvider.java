@@ -12892,10 +12892,13 @@ public final class CigramStage1InitProvider extends ContentProvider {
                 Gravity.CENTER
         );
         overlay.addView(panel, panelLp);
-        root.addView(overlay, new FrameLayout.LayoutParams(
+        FrameLayout.LayoutParams overlayLp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
-        ));
+        );
+        // keep the tab bar reachable: this panel is clickable and used to sit on top of it
+        overlayLp.bottomMargin = CigramBottomNav.reservedBottom(activity);
+        root.addView(overlay, overlayLp);
     }
 
     private static void showLoadingMessage(Activity activity, String tag, String message) {

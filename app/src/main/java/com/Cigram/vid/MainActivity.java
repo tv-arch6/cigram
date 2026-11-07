@@ -2850,9 +2850,13 @@ public class MainActivity extends AppCompatActivity {
 					
 					messageBox.setPadding(dp16, dp20, dp16, dp20);
 					
+					// The row sits in a horizontal scroller, which measures its children without a width limit: the
+					// sentence was measured as ONE line but laid out narrower, so its second line was cut off. A fixed
+					// width (screen width minus the page margins) makes the measure and the layout agree.
 					failedMovies.addView(
 					messageBox,
-					new android.widget.LinearLayout.LayoutParams(-1, -2)
+					new android.widget.LinearLayout.LayoutParams(
+					Math.max(dp16 * 10, getResources().getDisplayMetrics().widthPixels - dp16 * 2), -2)
 					);
 					
 					// final يحل خطأ البناء عند استخدام status داخل زر المحاولة.
