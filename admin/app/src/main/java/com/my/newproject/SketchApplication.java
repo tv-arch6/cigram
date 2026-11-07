@@ -7,6 +7,7 @@ public class SketchApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        CgCfg.loadToken(this);   // the admin token typed once in the app (see TokenGate)
         // Last line of defence: an exception thrown on a worker thread (network, upload, parsing) must not kill the whole app.
         final Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
         Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {

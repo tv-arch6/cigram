@@ -8,11 +8,7 @@ public final class CigramAdminAuthProvider extends android.content.ContentProvid
      * It injects the same admin token used by the existing protected admin routes
      * into every RequestNetwork instance after an Activity is created/resumed.
      */
-    /**
-     * Injected at BUILD time (never committed): env CIGRAM_ADMIN_TOKEN or `adminToken` in admin-secrets.properties.
-     * See admin-secrets.properties.example. An empty value makes every admin call answer 401 with a clear message.
-     */
-    static final String ADMIN_TOKEN = BuildConfig.ADMIN_TOKEN;
+    // The token itself is entered once inside the app and read from CgCfg.TOKEN (never stored in the source).
     private static final String HEADER_AUTH = "Authorization";
     private static final String HEADER_TOKEN = "X-Admin-Token";
 
@@ -175,8 +171,8 @@ public final class CigramAdminAuthProvider extends android.content.ContentProvid
                 scan = scan.getSuperclass();
             }
 
-            headers.put(HEADER_AUTH, "Bearer " + ADMIN_TOKEN);
-            headers.put(HEADER_TOKEN, ADMIN_TOKEN);
+            headers.put(HEADER_AUTH, "Bearer " + CgCfg.TOKEN);
+            headers.put(HEADER_TOKEN, CgCfg.TOKEN);
 
             java.lang.reflect.Method target = null;
 

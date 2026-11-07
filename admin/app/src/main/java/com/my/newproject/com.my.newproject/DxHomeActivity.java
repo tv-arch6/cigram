@@ -66,6 +66,9 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
         live = new NxLive(this);
         live.setListener(this);
         build();
+        bar.action("الرمز", new Runnable() {
+            @Override public void run() { TokenGate.ask(DxHomeActivity.this, new Runnable() { @Override public void run() { reloadContent(); } }); }
+        });
         bar.action("بحث", new Runnable() {
             @Override public void run() { DxPanels.openContent(DxHomeActivity.this, null, -1); }
         });
@@ -79,6 +82,7 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
     protected void onResume() {
         super.onResume();
         resumed = true;
+        TokenGate.ensure(this, new Runnable() { @Override public void run() { reloadContent(); } });
         if (whatsNew != null) whatsNew.refresh();               // one cheap read of the cached summary
         if (live != null) live.start();
         if (contentBuilt && CgData.loaded()) showContent();     // counts may have changed after an edit

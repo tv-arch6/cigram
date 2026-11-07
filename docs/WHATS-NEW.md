@@ -101,9 +101,8 @@ New R2 objects (no schema change to `movies.json`): `_admin_private/whatsnew/con
 `imports.json`, `subs/<token>.srt|json` (parked subtitles, purged after 24 h). With `ADMIN_BUCKET` bound the
 `_admin_private/` prefix is dropped.
 
-**Android build:** the admin token is no longer in source (the repo is public). Set `CIGRAM_ADMIN_TOKEN` in the environment
-or `adminToken=` in the git-ignored `admin/admin-secrets.properties` (see `admin-secrets.properties.example`); it is
-injected as `BuildConfig.ADMIN_TOKEN`. It must equal the Worker's `ADMIN_TOKEN`.
+**Android token:** the admin token is not in the source (the repo is public). The app asks for it once on the home screen
+(button «الرمز» to change it later) and keeps it only in the phone's private preferences. It must equal the Worker's `ADMIN_TOKEN`.
 
 ## Deploying the Worker
 

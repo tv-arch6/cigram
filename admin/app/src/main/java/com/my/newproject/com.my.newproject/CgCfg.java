@@ -2,7 +2,8 @@ package com.my.newproject;
 
 /**
  * CIGRAM ADMIN v3 - central configuration.
- * The admin token lives in ONE place only: CigramAdminAuthProvider.ADMIN_TOKEN.
+ * The admin token is never in the source (the repo is public). The admin types it once in the app; it is kept in this
+ * phone's private preferences (allowBackup=false) and read into {@link #TOKEN} when the app starts.
  */
 final class CgCfg {
 
@@ -12,7 +13,29 @@ final class CgCfg {
     static final String R2 = "https://pub-eabe41d14a0644e5800344c99ef4d971.r2.dev";
     static final String CHANNELS_API = "https://sigram-channels-api.wwq-mixtv.workers.dev";
     static final String METADATA_API = "https://cigram-metadata-api.wwq-mixtv.workers.dev";
-    static final String TOKEN = CigramAdminAuthProvider.ADMIN_TOKEN;
+    /** Set by {@link #loadToken}; empty until the admin has entered it. */
+    static volatile String TOKEN = "";
+
+    private static final String TOKEN_KEY = "admin_token";
+
+    static void loadToken(android.content.Context c) {
+        try {
+            TOKEN = c.getApplicationContext().getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE).getString(TOKEN_KEY, "").trim();
+        } catch (Exception e) {
+            TOKEN = "";
+        }
+    }
+
+    static void saveToken(android.content.Context c, String token) {
+        TOKEN = token == null ? "" : token.trim();
+        try {
+            c.getApplicationContext().getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE).edit().putString(TOKEN_KEY, TOKEN).apply();
+        } catch (Exception ignored) { }
+    }
+
+    static boolean hasToken() {
+        return TOKEN != null && TOKEN.length() > 0;
+    }
 
     static final String PREFS = "cigram_admin_v2";
 
