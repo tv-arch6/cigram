@@ -41,6 +41,12 @@ android {
         viewBinding = true
         buildConfig = true
     }
+
+    testOptions {
+        // WnPipelineTest starts the REAL Worker (worker/dist) on a local port with `node worker/test/serve.mjs`;
+        // it is skipped automatically when node or the built Worker is missing.
+        unitTests.all { it.systemProperty("repo.root", rootProject.projectDir.parentFile.absolutePath) }
+    }
 }
 
 dependencies {
@@ -49,4 +55,8 @@ dependencies {
     implementation("com.google.code.gson:gson:2.11.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("androidx.databinding:viewbinding:8.2.0")
+
+    testImplementation("junit:junit:4.13.2")
+    // android.jar stubs org.json for unit tests; the real implementation is needed by WnLogicTest / WnPipelineTest
+    testImplementation("org.json:json:20240303")
 }

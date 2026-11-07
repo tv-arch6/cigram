@@ -21,6 +21,7 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
     private DxLive liveUi;
     private TextView status;
     private LinearLayout contentBox;
+    private WnHomeCard whatsNew;
     private TextView lastUpdated;
     private boolean contentBuilt;
     private boolean resumed;
@@ -78,6 +79,7 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
     protected void onResume() {
         super.onResume();
         resumed = true;
+        if (whatsNew != null) whatsNew.refresh();               // one cheap read of the cached summary
         if (live != null) live.start();
         if (contentBuilt && CgData.loaded()) showContent();     // counts may have changed after an edit
         ui().removeCallbacks(autoRefresh);
@@ -118,6 +120,10 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
         hero.addView(hello, new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP));
         hero.setLayoutParams(CgUi.lp(this, CgUi.MATCH, CgUi.WRAP, 2, 2, 2, 14));
         c.addView(hero);
+
+        // «ما الجديد؟»: cached discovery numbers (never calls TMDB) + the way into the discovery center
+        whatsNew = new WnHomeCard(this);
+        c.addView(whatsNew.view);
 
         // live board: active / watching / registered ticking every second + the sliding chart
         liveUi = new DxLive(this);

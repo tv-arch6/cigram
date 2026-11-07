@@ -119,6 +119,7 @@ public class DxSectionActivity extends CgBase {
     private void fillActions(LinearLayout box) {
         final Activity a = this;
         if ("content".equals(key)) {
+            box.addView(DxUi.item(this, CgIcons.STAR, "ما الجديد؟", "اكتشف الجديد وأضفه تلقائياً مع الفيديو والترجمة", "جديد", NxUi.PINK, go(WnActivity.class)));
             box.addView(DxUi.item(this, CgIcons.FILM, "إضافة فيلم", "ابحث بالاسم وأضف الفيلم برابطه أو من جوالك", "", NxUi.BLUE, go(NxMovieActivity.class)));
             box.addView(DxUi.item(this, CgIcons.TV, "إضافة مسلسل", "مسلسل جديد بمواسمه وحلقاته", "", NxUi.VIOLET, go(NxSeriesActivity.class)));
             box.addView(DxUi.item(this, CgIcons.PLUS, "إضافة حلقة", "حلقة جديدة لمسلسل موجود", "", NxUi.TEAL, new Runnable() {

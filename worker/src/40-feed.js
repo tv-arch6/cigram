@@ -539,7 +539,7 @@ async function handleWnVideo(request, env) {
       const base = { provider: "n/a", name: "—", kind: "embed", url: "" };
       return { kind: "episode", season: t.season, episode: t.episode, tmdb_id: String(tmdb), sources: [wnFinishSource(base, "unavailable", [wnCheck("tmdb", "الحلقة في TMDB", false, "الحلقة غير موجودة في هذا الموسم")])], best: "", fallbacks: [], status: "unavailable", name: "" };
     }
-    const r = await wnResolveTarget(env, cfg, t, { customUrl: customUrl || "" });
+    const r = await wnResolveTarget(env, cfg, t, { customUrl: customUrl || "", fresh: truthy(input.refresh) });
     r.name = t.name || "";
     return r;
   });

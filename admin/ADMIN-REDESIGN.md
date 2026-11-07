@@ -83,3 +83,8 @@ All add / edit / upload / ads / ops / update screens.
 - RequestNetworkController: removed trust-all TLS / always-true hostname verifier (admin token could be intercepted).
 - SeriesImportActivity: uses CgCfg.API / CgCfg.TOKEN (single source of truth, no duplicated secret).
 - DxHomeActivity: auto-refresh no longer keeps re-posting while the screen is paused; header badge shows "تعذر الاتصال" when the live feed has never connected.
+
+## v3.3 — «ما الجديد؟» (What's New) discovery & import
+- New: `WnActivity` (discovery center), `WnDetailActivity`, `WnBulkActivity`, `WnHistoryActivity`, `WnHomeCard` (dashboard card), `WnApi`, `WnPipeline`, `WnLogic`, `WnUi`; 4 manifest entries; a card in `DxHomeActivity` and a row in «المحتوى».
+- Backend: additive section in the `cigram-admin-api` Worker (`/admin/discover/*`) — see `../docs/WHATS-NEW.md`.
+- Security: the hard-coded admin token was removed from `CigramAdminAuthProvider`; set `CIGRAM_ADMIN_TOKEN` or `admin-secrets.properties` when building.

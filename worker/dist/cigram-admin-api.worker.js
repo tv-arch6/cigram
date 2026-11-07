@@ -11661,7 +11661,7 @@ async function wnProbeHls(base, checks) {
 const WN_PROBE_CACHE = new Map();
 
 /** Probes ONE url for ONE target and returns a source record (signed token only when the result is importable). */
-async function wnProbeSource(env, provider, url, target, hintKind) {
+async function wnProbeSource(env, provider, url, target, hintKind, fresh) {
   const checks = [];
   const base = { provider: provider.id, name: provider.name, kind: wnDetectKind(url, hintKind || provider.kind), url };
   try {
@@ -11682,7 +11682,7 @@ async function wnProbeSource(env, provider, url, target, hintKind) {
     checks.push(wnCheck("episode_match", "مطابقة الموسم/الحلقة", true, "S" + wnPad2(target.season) + "E" + wnPad2(target.episode)));
   }
 
-  const cached = WN_PROBE_CACHE.get(url);
+  const cached = fresh ? null : WN_PROBE_CACHE.get(url); // "re-check" skips the 5-minute probe cache
   let source;
   if (cached && cached.exp > Date.now()) {
     source = Object.assign({}, cached.source, { checks: checks.concat(cached.source.checks.filter((c) => !["url_safe", "episode_match"].includes(c.id))), cached: true });
@@ -11725,10 +11725,10 @@ async function wnResolveTarget(env, cfg, target, opts) {
     const jobs = [];
     for (const p of providers) {
       const url = wnProviderUrl(p, target);
-      if (url) jobs.push(wnProbeSource(env, p, url, target, p.kind));
+      if (url) jobs.push(wnProbeSource(env, p, url, target, p.kind, o.fresh));
     }
     if (o.customUrl) {
-      jobs.push(wnProbeSource(env, { id: "custom", name: "رابط يدوي", kind: "embed" }, cleanString(o.customUrl), target, ""));
+      jobs.push(wnProbeSource(env, { id: "custom", name: "رابط يدوي", kind: "embed" }, cleanString(o.customUrl), target, "", o.fresh));
     }
     out.sources = await Promise.all(jobs);
     if (!out.sources.length) {
@@ -12688,7 +12688,7 @@ async function handleWnVideo(request, env) {
       const base = { provider: "n/a", name: "—", kind: "embed", url: "" };
       return { kind: "episode", season: t.season, episode: t.episode, tmdb_id: String(tmdb), sources: [wnFinishSource(base, "unavailable", [wnCheck("tmdb", "الحلقة في TMDB", false, "الحلقة غير موجودة في هذا الموسم")])], best: "", fallbacks: [], status: "unavailable", name: "" };
     }
-    const r = await wnResolveTarget(env, cfg, t, { customUrl: customUrl || "" });
+    const r = await wnResolveTarget(env, cfg, t, { customUrl: customUrl || "", fresh: truthy(input.refresh) });
     r.name = t.name || "";
     return r;
   });

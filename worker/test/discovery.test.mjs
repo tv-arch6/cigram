@@ -207,6 +207,18 @@ describe("6-7 video sources: find + validate (four honest levels)", () => {
     assert.equal(slow.sources[0].token, undefined);
   });
 
+  it("probe results are cached for 5 minutes; a re-check (refresh) probes again and sees the change", async () => {
+    let status = 200;
+    const t = await setup({ vidbolt: () => ({ status }) });
+    const v1 = (await t.post("/admin/discover/video", { type: "movie", tmdb_id: 1001 })).data.targets[0].sources[0];
+    assert.equal(v1.verdict, "embed_reachable");
+    status = 404;
+    const cached = (await t.post("/admin/discover/video", { type: "movie", tmdb_id: 1001 })).data.targets[0].sources[0];
+    assert.equal(cached.verdict, "embed_reachable", "served from the short cache");
+    const fresh = (await t.post("/admin/discover/video", { type: "movie", tmdb_id: 1001, refresh: true })).data.targets[0].sources[0];
+    assert.equal(fresh.verdict, "unavailable", "refresh bypasses the cache");
+  });
+
   it("an unreleased title is never probed and never gets a token", async () => {
     const t = await setup();
     const r = await t.post("/admin/discover/video", { type: "movie", tmdb_id: 1003 });
