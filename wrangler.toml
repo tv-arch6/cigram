@@ -1,0 +1,10 @@
+# نشر موقع سيكرام على Cloudflare Pages (رفع ثابت بدون بناء).
+# استعمال:  npx wrangler pages deploy . --project-name cigram-web
+# أو من اللوحة:  Workers & Pages > Create > Pages > Upload assets  (ارفع محتوى هذا المجلد كما هو).
+#
+# هذا الملف للموقع الثابت فقط. خوادم Workers (الإدارة/الحسابات/Plus/القنوات/البروكسي)
+# مشاريع منفصلة لها روابطها في js/config.js، ولا تُنشر من هنا.
+
+name = "cigram-web"
+compatibility_date = "2026-11-08"
+pages_build_output_dir = "."
