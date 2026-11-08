@@ -1,0 +1,99 @@
+<LinearLayout
+	xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
+	xmlns:tools="http://schemas.android.com/tools"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:orientation="vertical">
+	<LinearLayout
+		android:id="@+id/linear_ads_root"
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:background="#0B1F2A"
+		android:orientation="vertical">
+		<LinearLayout
+			android:id="@+id/linear_ads_toolbar"
+			android:layout_width="match_parent"
+			android:layout_height="56dp"
+			android:paddingLeft="12dp"
+			android:paddingRight="12dp"
+			android:background="#0B2A38"
+			android:gravity="right|center_vertical"
+			android:orientation="horizontal">
+			<TextView
+				android:id="@+id/textview_ads_title"
+				android:layout_width="0dp"
+				android:layout_height="wrap_content"
+				android:padding="8dp"
+				android:background="@android:color/transparent"
+				android:gravity="right|center_vertical"
+				android:text="المساعدة والدعم"
+				android:textSize="20sp"
+				android:textColor="#FFFFFF"
+				android:layout_weight="1" />
+			<ImageView
+				android:id="@+id/img_ads_back"
+				android:layout_width="40dp"
+				android:layout_height="40dp"
+				android:padding="8dp"
+				android:src="@drawable/rrt"
+				android:scaleType="centerInside"
+				android:layout_gravity="right|center_vertical" />
+		</LinearLayout>
+		<TextView
+			android:id="@+id/textview_ads_heading"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:padding="8dp"
+			android:gravity="right"
+			android:text="دعم تطبيق سيكرام"
+			android:textSize="23sp"
+			android:textColor="#FFFFFF" />
+		<TextView
+			android:id="@+id/textview_ads_description"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginBottom="20dp"
+			android:padding="8dp"
+			android:gravity="right"
+			android:text="يمكنك دعم استمرار التطبيق بمشاهدة إعلان باختيارك."
+			android:textSize="14sp"
+			android:textColor="#FFFFFF" />
+		<LinearLayout
+			android:id="@+id/linear_ads_card"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginTop="18dp"
+			android:background="#0B2936"
+			android:orientation="vertical">
+			<TextView
+				android:id="@+id/textview_ads_watch_title"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:padding="5dp"
+				android:background="@android:color/transparent"
+				android:gravity="right"
+				android:text="شاهد إعلان لدعمنا"
+				android:textSize="18sp"
+				android:textColor="#FFFFFF" />
+			<TextView
+				android:id="@+id/textview_ads_watch_info"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:padding="8dp"
+				android:gravity="right"
+				android:text="مشاهدة الإعلان اختيارية وتساعدنا على استمرار تطوير التطبيق."
+				android:textSize="13sp"
+				android:textColor="#91A1A9" />
+			<Button
+				android:id="@+id/button_ads_watch"
+				android:layout_width="match_parent"
+				android:layout_height="52dp"
+				android:padding="5dp"
+				android:background="#FFFFFF"
+				android:text="أضغط للتهيئة"
+				android:textSize="16sp"
+				android:textColor="#000000" />
+		</LinearLayout>
+	</LinearLayout>
+</LinearLayout>

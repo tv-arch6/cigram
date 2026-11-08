@@ -1,0 +1,319 @@
+
+<manifest
+	xmlns:android="http://schemas.android.com/apk/res/android"
+	package="com.my.newproject">
+	<uses-permission android:name="android.permission.INTERNET" />
+	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+	<uses-permission android:name="android.permission.WAKE_LOCK" />
+	<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+	<uses-permission android:name="android.permission.RECORD_AUDIO" />
+	<application
+		android:allowBackup="false"
+		android:icon="@mipmap/ic_launcher"
+		android:label="@string/app_name"
+		android:name=".SketchApplication"
+		android:requestLegacyExternalStorage="true"
+		android:usesCleartextTraffic="true"
+		android:theme="@style/AppTheme">
+		<activity
+			android:name="com.my.newproject.DxHomeActivity"
+			android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
+			android:screenOrientation="portrait"
+			android:theme="@android:style/Theme.Material.NoActionBar"
+			android:exported="true">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+				<category android:name="android.intent.category.LAUNCHER" />
+			</intent-filter>
+		</activity>
+		<activity
+			android:name="com.my.newproject.ExternalLinksActivity"
+			android:configChanges="orientation|screenSize|keyboardHidden"
+			android:theme="@android:style/Theme.Material.NoActionBar"
+			android:windowSoftInputMode="adjustResize"
+			android:exported="false" />
+		<activity
+			android:name="com.my.newproject.DxSectionActivity"
+			android:configChanges="orientation|screenSize|keyboardHidden"
+			android:theme="@android:style/Theme.Material.NoActionBar"
+			android:exported="false" />
+		<activity
+			android:name=".SeriesImportActivity"
+			android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
+			android:hardwareAccelerated="true"
+			android:supportsPictureInPicture="true"
+			android:screenOrientation="portrait"
+			android:windowSoftInputMode="stateHidden" />
+		<provider
+			android:name="androidx.startup.InitializationProvider"
+			android:authorities="com.my.newproject.androidx-startup"
+			android:exported="false">
+			<meta-data
+				android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+				android:value="androidx.startup" />
+			<meta-data
+				android:name="androidx.emoji2.text.EmojiCompatInitializer"
+				android:value="androidx.startup" />
+		</provider>
+		<uses-library
+			android:name="org.apache.http.legacy"
+			android:required="false" />
+
+<provider
+    android:name="com.my.newproject.CigramAdminAuthProvider"
+    android:authorities="com.my.newproject.cigram.admin.auth"
+    android:exported="false"
+    android:initOrder="100" />
+<activity
+    android:name="com.my.newproject.CgContentActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CgSeriesActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CgItemActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CgPlayerActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CgSectionsActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CgHomeOrderActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CgFeaturedActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CgMergeActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CgChannelsActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CgMaintenanceActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CgAnnouncementsActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CgHealthActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CgHistoryActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CxMovieActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CxSeriesAddActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CxEpisodeActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CxSeasonActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.QuickAddActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CxSubsActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CxSeasonUploadActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CxCarouselActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CxCarouselEditActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CxChannelActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CxSuccessActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CxDraftsActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CgUpdateActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CgMediaUploadActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CgUploadsActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<service
+    android:name="com.my.newproject.CgUploadService"
+    android:exported="false"
+    android:foregroundServiceType="dataSync" />
+<activity android:name="com.my.newproject.AdInboxActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
+<activity android:name="com.my.newproject.AdChatActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|keyboard|uiMode" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
+<activity android:name="com.my.newproject.AdCampaignsActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
+<activity android:name="com.my.newproject.AdCampaignActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
+<activity android:name="com.my.newproject.AdAdvertisersActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
+<activity android:name="com.my.newproject.AdAdvertiserActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
+<activity android:name="com.my.newproject.AdSettingsActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
+<activity android:name="com.my.newproject.AdReportsActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" />
+<activity android:name="com.my.newproject.PlusCodesActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
+<activity android:name="com.my.newproject.OpsErrorsActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
+<activity android:name="com.my.newproject.OpsStatsActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
+<activity android:name="com.my.newproject.OpsAdsActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
+<activity android:name="com.my.newproject.OpsAdCheckActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
+<activity android:name="com.my.newproject.OpsAdMapActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.NxMovieActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.NxSeriesActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.NxChannelActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.NxNotifyActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.NxRequestsActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+
+<!-- ما الجديد؟ (What's New) — discovery center, detail/import, bulk import, history + settings -->
+<activity
+    android:name="com.my.newproject.WnActivity"
+    android:exported="false"
+    android:configChanges="keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.WnDetailActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.WnBulkActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.WnCollectionActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar" />
+<activity
+    android:name="com.my.newproject.WnHistoryActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+
+	</application>
+</manifest>

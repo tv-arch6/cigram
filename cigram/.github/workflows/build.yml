@@ -1,0 +1,57 @@
+# Cloud build for Cigram (use when the phone/CodeAssist build gets stuck in R8).
+# Put this file in your project repo at  .github/workflows/build.yml  (the project root = the folder that holds settings.gradle.kts),
+# add the 4 secrets below, then: GitHub -> Actions -> "Build Cigram" -> Run workflow.
+#
+# Secrets (Repo -> Settings -> Secrets and variables -> Actions):
+#   KEYSTORE_B64      your .jks file as base64  (Linux/Termux:  base64 -w0 cigram-upload.jks)
+#   KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
+# Output: Actions run -> Artifacts -> cigram-build (APK for sharing, AAB for Google Play).
+name: Build Cigram
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install SDK 36
+        run: yes | sdkmanager "platforms;android-36" "build-tools;36.0.0" >/dev/null
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/cigram.jks"
+          echo "CIGRAM_STORE_FILE=$RUNNER_TEMP/cigram.jks" >> "$GITHUB_ENV"
+          echo "CIGRAM_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+          echo "CIGRAM_KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> "$GITHUB_ENV"
+          echo "CIGRAM_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> "$GITHUB_ENV"
+
+      # R8 (shrink + obfuscate) is switched on only here, in the cloud, where it has the memory and threads it needs.
+      - name: Enable R8 for this build
+        run: sed -i 's/isMinifyEnabled = false/isMinifyEnabled = true/; s/isShrinkResources = false/isShrinkResources = true/' app/build.gradle.kts
+
+      - name: Build (APK to share + AAB for Play)
+        run: gradle --no-daemon :app:assembleDirectRelease :app:bundlePlayRelease
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cigram-build
+          path: |
+            app/build/outputs/apk/direct/release/*.apk
+            app/build/outputs/bundle/playRelease/*.aab
+            app/build/outputs/mapping/**/mapping.txt
