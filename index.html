@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>سيكرام</title>
   <meta name="description" content="شاهد الأفلام والمسلسلات والقنوات المباشرة من أي متصفح: لابتوب، حاسوب أو آيفون.">
-  <meta name="theme-color" content="#00121A">
+  <meta name="theme-color" content="#0E0E10">
   <meta name="color-scheme" content="dark light">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/favicon-64.png" type="image/png">
@@ -34,7 +34,7 @@
       try { var l = JSON.parse(localStorage.getItem('cigram_home_layout') || '{}'); if (l && l.theme && /^(light|dark)$/.test(l.theme.mode)) mode = l.theme.mode; } catch (e) {}
       var light = mode === 'light' || (mode === 'system' && window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches);
       r.setAttribute('data-theme', light ? 'light' : 'dark');
-      var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', light ? '#F4F5F7' : '#00121A');
+      var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', light ? '#F4F5F7' : '#0E0E10');
     })();
   </script>
   <script>

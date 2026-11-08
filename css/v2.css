@@ -8,30 +8,30 @@
 
 /* ------------------------------------------------------------------ tokens */
 :root, html[data-theme='dark'] {
-  --bg: #00121a;
-  --surface: #0b2733;
-  --raised: #0f2f3c;
+  --bg: #0e0e10;
+  --surface: #1b1b1f;
+  --raised: #222226;
   --line: rgba(255, 255, 255, 0.12);
-  --stroke: #1f4553;
+  --stroke: #34343a;
   --text: #ffffff;
-  --text-2: #c3cdd2;
-  --text-3: #8796a0;
+  --text-2: #c7c7cc;
+  --text-3: #8e8e94;
   --on-accent: #ffffff;
   --accent: #e21b14;
   --accent-hi: #ff4038;
   --chip-on-bg: #ffffff;
-  --chip-on-fg: #00121a;
-  --glass: rgba(0, 18, 26, 0.78);
-  --shade-rgb: 0, 18, 26;
+  --chip-on-fg: #0e0e10;
+  --glass: rgba(14, 14, 16, 0.78);
+  --shade-rgb: 14, 14, 16;
   --card-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
-  --nav-bg: #00121a;
+  --nav-bg: #0e0e10;
   --nav-line: rgba(255, 255, 255, 0.14);
   --nav-icon: #ffffff;
   --hover: rgba(255, 255, 255, 0.08);
-  --ch-card: #0b2733;
-  --ch-soft: #0f2f3c;
-  --ch-stroke: #1f4553;
-  --ch-muted: #8796a0;
+  --ch-card: #1b1b1f;
+  --ch-soft: #222226;
+  --ch-stroke: #34343a;
+  --ch-muted: #8e8e94;
   color-scheme: dark;
 }
 html[data-theme='light'] {
@@ -435,7 +435,7 @@ body.watching { background: #000; }
 
 /* إعدادات المشاهدة (لوحة من الأسفل في الهاتف، وجانبية في الحاسوب) */
 .p-sheet { position: absolute; inset: 0; z-index: 8; display: flex; align-items: flex-end; justify-content: center; background: rgba(0, 0, 0, 0.42); }
-.ps-card { width: min(520px, 100%); max-height: 86%; overflow: auto; overscroll-behavior: contain; padding: 8px 16px calc(16px + env(safe-area-inset-bottom)); border-radius: 18px 18px 0 0; background: #0b2733; color: #fff; box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5); animation: sheet-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.ps-card { width: min(520px, 100%); max-height: 86%; overflow: auto; overscroll-behavior: contain; padding: 8px 16px calc(16px + env(safe-area-inset-bottom)); border-radius: 18px 18px 0 0; background: #1b1b1f; color: #fff; box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5); animation: sheet-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 @keyframes sheet-up { from { transform: translateY(40px); opacity: 0; } }
 .ps-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 52px; }
 .ps-head strong { font-size: 17px; flex: 1; }

@@ -1,11 +1,11 @@
 // الوضع الفاتح والداكن مثل التطبيق (v10.70): يتبع إعداد الجهاز، إلا إذا فرض تطبيق الإدارة وضعاً واحداً
-// (/home-layout → theme.mode). الألوان نفسها: الصفحة #F4F5F7 / #00121A، البطاقات #FFFFFF / #0B2733، الأحمر #E21B14.
+// (/home-layout → theme.mode). الألوان نفسها: الصفحة #F4F5F7 / #0E0E10، البطاقات #FFFFFF / #1B1B1F، الأحمر #E21B14.
 // السطر الأول في index.html يضبط الوضع قبل أول رسم (بدون وميض)، وهذا الملف يتابع التغييرات بعد ذلك.
 import * as layout from './layout.js';
 
 const root = document.documentElement;
 const media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
-const PAGE = { light: '#F4F5F7', dark: '#00121A' };
+const PAGE = { light: '#F4F5F7', dark: '#0E0E10' };
 
 export function resolved() {
   const mode = layout.themeMode();
