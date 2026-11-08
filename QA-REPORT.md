@@ -13,9 +13,9 @@ CONNECT), so no test could load the live catalogue, log in, play a real title, s
 | Original main app `assemblePlayDebug` (baseline, untouched sources) | ✅ passed |
 | Original admin `assembleDebug` (baseline) | ✅ passed |
 | Main `assemblePlayDebug` after every change set | ✅ passed (javac: 0 errors) |
-| Main `assemblePlayRelease` · `assembleDirectRelease` · `bundlePlayRelease` (incl. lint-vital) | RESULT_MAIN_RELEASE |
-| Admin `assembleDebug` · `assembleRelease` | RESULT_ADMIN_RELEASE |
-| Admin unit tests (`WnLogicTest`, `WnPipelineTest`) | RESULT_ADMIN_TESTS |
+| Main `assemblePlayRelease` · `assembleDirectRelease` · `bundlePlayRelease` (incl. lint-vital) | ✅ passed (lint-vital included; first attempts hit Maven Central HTTP 429 rate limits, retried) |
+| Admin `assembleDebug` · `assembleRelease` | ✅ passed |
+| Admin unit tests (`WnLogicTest`, `WnPipelineTest`) | ✅ 15 passed, 0 failed (1 test is marked skipped in the source itself) |
 
 Release APKs are unsigned here (no keystore in the archives); both projects now sign automatically when
 `keystore.properties` or the `CIGRAM_*` variables are present.
@@ -25,12 +25,16 @@ Release APKs are unsigned here (no keystore in the archives); both projects now 
 |---|---|---|
 | Problem No. 1 | System splash attributes before / after (Android 12 `StartingSurfaceDrawer` log) | ✅ before `color ff0a0608 icon ColorDrawable` (empty) → after `color ff0e0e10 icon BitmapDrawable` (logo) |
 | Problem No. 1 | Home after cold start (offline): overlay gone, charcoal page, new header logo | ✅ |
+| Problem No. 1 | Cold start from a launcher icon (icon splash) | ⚠️ not observable: the emulator launcher could not be driven reliably; shell launches get Android's icon-less splash by design (`useEmptySplashScreen:true`), so the icon was verified through the system splash attributes above |
 | Home | Section headers without red bars, «المزيد» without `‹` | ✅ (screenshot) |
 | About | Page, RTL order, founder portrait (tilted, 20 % corners, dark square behind), version footer | ✅ (screenshots) |
 | Terms | Page, sections, version | ✅ (screenshot) |
 | TV | Forced TV mode: TV edition starts, rail on the right, D-pad navigation down the rail, Settings panel opens, focus ring visible, rail scrolls with focus | ✅ (screenshots, after fixing the rail overflow found in this test) |
 | Admin | Starts, new palette, token dialog; error card explains the blocked backend | ✅ (screenshot) |
-| targetSdk 36 | Android 15 emulator: RESULT_API35 |
+| targetSdk 36 | Android 15 emulator: platform page (About) — content first ran under the status bar (`fitsSystemWindows` ignored under enforced edge-to-edge) | ❌ found → fixed |
+| targetSdk 36 | Android 15 emulator: AppCompat page — AppCompat's sub-decor consumed the insets before `android:id/content` | ❌ found → fixed (listener on the decor's content-holding child) |
+| targetSdk 36 | Android 15 emulator after the fix: About content 33 → 1074 px, Settings content 33 → 1074 px on a 1140 px screen (status bar 33, navigation bar 66) | ✅ |
+| targetSdk 36 | Release variants built with lint-vital at targetSdk 36 | ✅ |
 
 ## Not tested (needs the backend, a real device, or both)
 - Catalogue rendering with real posters, scrolling performance, watermark on real posters.
@@ -41,6 +45,7 @@ Release APKs are unsigned here (no keystore in the archives); both projects now 
 - Chat: text, voice, image, video up to 1 GB, resume after failure (server limit unknown).
 - Advertising: AdMob fill / no-fill fallback, popup, splash ad timing, impressions / clicks.
 - Admin: content CRUD, uploads, campaigns, inbox notifications (job scheduled; needs the backend to return threads).
+- Emulator note: under software emulation Android sometimes kills a cold start for "failed to complete startup" (86 % CPU); this is the emulator, not an app crash (no exception in the log).
 - Real Android TV hardware, overscan, 4K panels, remotes with long-press; tablets; light-mode on every page.
 
 ## Device / backend dependencies and risks
@@ -50,3 +55,5 @@ Release APKs are unsigned here (no keystore in the archives); both projects now 
   the title / type label.
 - targetSdk 36 on devices with Android 15/16: covered by the edge-to-edge shim and back opt-out; pages that draw their own
   full-screen UI keep their behaviour. A complete pass on a physical Android 15/16 phone is still required before release.
+
+Screenshots of the emulator checks are in `qa-screens/` of the repository branch.

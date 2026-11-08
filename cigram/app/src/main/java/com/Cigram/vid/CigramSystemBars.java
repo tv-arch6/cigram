@@ -36,26 +36,29 @@ final class CigramSystemBars {
             if (!name.startsWith("com.Cigram.vid.")) return;   // AdMob / other library screens handle themselves
             String simple = a.getClass().getSimpleName();
             for (String s : OWN_INSETS) if (s.equals(simple)) return;
-            View content = a.findViewById(android.R.id.content);
+            final View content = a.findViewById(android.R.id.content);
             if (content == null || content.getTag(R.id.cg_insets_fitted) == FITTED) return;
+            View decor = a.getWindow() == null ? null : a.getWindow().getDecorView();
+            if (decor == null) return;
+            // The view that receives the insets first: the decor's direct child that holds the content. On an
+            // AppCompat page the insets never reach android:id/content (AppCompat's sub-decor, a fitsSystemWindows
+            // FitWindowsLinearLayout, consumes them on the way), so the listener sits above it. Seen on the
+            // Android 15 emulator; on a platform page this child simply passes them through.
+            View host = content;
+            while (host.getParent() instanceof View && host.getParent() != decor) host = (View) host.getParent();
             content.setTag(R.id.cg_insets_fitted, FITTED);
-            // An explicit listener (fitsSystemWindows alone is not honoured once Android 15 enforces edge-to-edge):
-            // the page sits between the status bar (and cutout) and the navigation bar or the keyboard, exactly
-            // like the classic window, and the insets are consumed so no inner view pads them a second time.
-            content.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+            host.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
                 @Override public android.view.WindowInsets onApplyWindowInsets(View v, android.view.WindowInsets insets) {
-                    // the ROOT insets: AppCompat's sub-decor consumes the status-bar inset before it reaches the
-                    // content view (seen on the Android 15 emulator), the root ones are complete
-                    android.view.WindowInsets root = v.getRootWindowInsets();
-                    android.view.WindowInsets src = root != null ? root : insets;
-                    android.graphics.Insets bars = src.getInsets(android.view.WindowInsets.Type.systemBars()
+                    android.graphics.Insets bars = insets.getInsets(android.view.WindowInsets.Type.systemBars()
                             | android.view.WindowInsets.Type.displayCutout());
-                    android.graphics.Insets ime = src.getInsets(android.view.WindowInsets.Type.ime());
-                    v.setPadding(bars.left, bars.top, bars.right, Math.max(bars.bottom, ime.bottom));
+                    android.graphics.Insets ime = insets.getInsets(android.view.WindowInsets.Type.ime());
+                    // the page sits between the status bar (and cutout) and the navigation bar or the keyboard,
+                    // exactly like the classic window; consumed so no inner view pads them a second time
+                    content.setPadding(bars.left, bars.top, bars.right, Math.max(bars.bottom, ime.bottom));
                     return android.view.WindowInsets.CONSUMED;
                 }
             });
-            content.requestApplyInsets();
+            host.requestApplyInsets();
         } catch (Throwable error) {
             android.util.Log.w("CigramSystemBars", "fit failed", error);
         }
