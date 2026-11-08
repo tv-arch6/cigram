@@ -20,6 +20,11 @@ import java.util.Locale;
 /**
  * Optional subtitle upload (.srt / .vtt, small). The text is converted to UTF-8 here (BOM removed,
  * Windows-1256 Arabic files recognised) and sent in one request. Separate from the video upload.
+ *
+ * 18.2 (CigramSubtitleHub): the file is parsed and checked BEFORE it is sent — structure, timing, overlaps, reading
+ * speed, Arabic share, encoding — and the admin sees a preview with the result. What is uploaded is the normalized
+ * file: UTF-8 without BOM, three millisecond digits (ExoPlayer reads ",5" as 5 ms), same format (SRT stays SRT, VTT
+ * stays VTT, detected from the content) and exactly the original cue times.
  */
 final class CgSubtitleUpload {
 
@@ -62,7 +67,23 @@ final class CgSubtitleUpload {
                     });
                     return;
                 }
-                send(a, kind, slug, name, season, episode, "", data, onUrl);
+                final Checked chk = check(name, data);
+                post(a, new Runnable() {
+                    @Override
+                    public void run() {
+                        confirmChecked(a, chk, new Runnable() {
+                            @Override
+                            public void run() {
+                                new Thread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        send(a, kind, slug, chk.fileName, season, episode, "", chk.bytes, onUrl);
+                                    }
+                                }).start();
+                            }
+                        });
+                    }
+                });
             }
         }).start();
     }
@@ -130,6 +151,85 @@ final class CgSubtitleUpload {
         });
     }
 
+    // ---------------------------------------------------------------------- 18.2 validation
+
+    /** A file after CigramSubtitleHub: normalized bytes, the name with the real extension, the report. */
+    static final class Checked {
+        byte[] bytes;
+        String fileName;
+        com.Cigram.subhub.SubDocument doc;
+        com.Cigram.subhub.SubQa.Report report;
+        boolean blocking;
+        String reason = "";
+    }
+
+    static Checked check(String name, byte[] utf8) {
+        Checked c = new Checked();
+        try {
+            com.Cigram.subhub.SubDocument d = com.Cigram.subhub.SubCodec.read(utf8);
+            c.doc = d;
+            c.report = com.Cigram.subhub.SubQa.analyze(d, new com.Cigram.subhub.SubQa.Options());
+            String base = name.replaceAll("(?i)\\.(srt|vtt)$", "");
+            String ext = d.format == com.Cigram.subhub.SubDocument.Format.VTT ? "vtt" : "srt";
+            c.fileName = base + "." + ext;
+            c.bytes = com.Cigram.subhub.SubCodec.writeBytes(d, d.format);
+            if (d.isEmpty()) { c.blocking = true; c.reason = "الملف لا يحتوي أي مقطع ترجمة صالح."; }
+            else if (c.report.count("INVALID_TIMING") > d.size() / 10) { c.blocking = true; c.reason = "أكثر من 10% من المقاطع توقيتها غير صالح."; }
+        } catch (Throwable e) {
+            c.blocking = true;
+            c.reason = e.getMessage() == null ? "تعذر قراءة الملف." : e.getMessage();
+            c.fileName = name;
+            c.bytes = utf8;
+        }
+        return c;
+    }
+
+    /** The preview the admin sees before anything is uploaded. */
+    static void confirmChecked(Activity a, Checked c, final Runnable upload) {
+        if (c.blocking) {
+            CgUi.info(a, "الملف مرفوض", c.reason);
+            return;
+        }
+        StringBuilder m = new StringBuilder();
+        m.append(c.report.summary()).append("\n");
+        m.append("الصيغة: ").append(c.doc.format).append(" · الترميز الأصلي: ").append(c.doc.encoding).append("\n");
+        m.append(String.format(Locale.US, "نسبة العربية: %.0f%%", c.report.arabicShare * 100)).append("\n\n");
+        int n = 0;
+        for (com.Cigram.subhub.SubQa.Issue i : c.report.issues) {
+            if (i.severity == com.Cigram.subhub.SubQa.Severity.INFO) continue;
+            if (n++ >= 6) break;
+            m.append("• ").append(i.cue > 0 ? "#" + i.cue + " " : "").append(i.message).append("\n");
+        }
+        for (String w : c.doc.warnings) { if (n++ >= 9) break; m.append("• ").append(w).append("\n"); }
+        m.append("\nأول المقاطع:\n");
+        for (int k = 0; k < Math.min(3, c.doc.size()); k++) {
+            com.Cigram.subhub.SubCue q = c.doc.cues.get(k);
+            m.append(com.Cigram.subhub.SubCodec.stamp(q.startMs, ',')).append("  ").append(q.plainText().replace('\n', ' ')).append("\n");
+        }
+        m.append("\nيُرفع الملف بترميز UTF-8 وبنفس توقيت كل مقطع.");
+        boolean notArabic = c.report.count("NOT_ARABIC") > 0;
+        CgUi.confirm(a, notArabic ? "تنبيه: الملف ليس عربياً" : "معاينة ملف الترجمة", m.toString(), notArabic ? "رفع رغم ذلك" : "رفع", notArabic, upload);
+    }
+
+    /** Raw bytes of a picked file (size-limited), without any conversion. */
+    static byte[] readRaw(Activity a, Uri uri) throws Exception {
+        InputStream in = a.getContentResolver().openInputStream(uri);
+        if (in == null) throw new Exception("تعذر فتح الملف.");
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try {
+            byte[] buf = new byte[16384];
+            int n;
+            while ((n = in.read(buf)) != -1) {
+                out.write(buf, 0, n);
+                if (out.size() > MAX) throw new Exception("الملف كبير جداً (الحد 5 ميغابايت).");
+            }
+        } finally {
+            in.close();
+        }
+        if (out.size() == 0) throw new Exception("الملف فارغ.");
+        return out.toByteArray();
+    }
+
     // ---------------------------------------------------------------------- helpers
 
     private static void post(Activity a, Runnable r) {
@@ -159,7 +259,17 @@ final class CgSubtitleUpload {
         return name;
     }
 
+    /** UTF-8 bytes of a picked subtitle; 18.2: normalized by CigramSubtitleHub when it parses (else the decoded text). */
     static byte[] readUtf8(Activity a, Uri uri) throws Exception {
+        byte[] decoded = readUtf8Plain(a, uri);
+        try {
+            com.Cigram.subhub.SubDocument d = com.Cigram.subhub.SubCodec.read(decoded);
+            if (!d.isEmpty()) return com.Cigram.subhub.SubCodec.writeBytes(d, d.format);
+        } catch (Throwable ignored) { }
+        return decoded;
+    }
+
+    private static byte[] readUtf8Plain(Activity a, Uri uri) throws Exception {
         ContentResolver cr = a.getContentResolver();
         InputStream in = cr.openInputStream(uri);
         if (in == null) throw new Exception("تعذر فتح ملف الترجمة.");

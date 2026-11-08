@@ -245,6 +245,11 @@
     android:name="com.my.newproject.CgUploadService"
     android:exported="false"
     android:foregroundServiceType="dataSync" />
+<!-- 18.2 Arabic Subtitle Center (CigramSubtitleHub) -->
+<activity android:name="com.my.newproject.SubCenterActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
+<activity android:name="com.my.newproject.SubJobActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
+<activity android:name="com.my.newproject.CgSeasonSubsActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
+<service android:name="com.my.newproject.SubCenterService" android:exported="false" android:foregroundServiceType="dataSync" />
 <activity android:name="com.my.newproject.AdInboxActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
 <activity android:name="com.my.newproject.AdChatActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|keyboard|uiMode" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
 <activity android:name="com.my.newproject.AdCampaignsActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />

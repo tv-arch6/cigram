@@ -140,7 +140,9 @@ public class DxSectionActivity extends CgBase {
             box.addView(DxUi.item(this, CgIcons.DRAFT, "المسودات", "ما بدأت به ولم تكمله", drafts > 0 ? String.valueOf(drafts) : "", CgCfg.WARN, new Runnable() {
                 @Override public void run() { CxNav.drafts(a); }
             }));
+            box.addView(DxUi.item(this, CgIcons.FILE, "مركز الترجمة العربية", "كل العناوين بلا ترجمة: بحث جماعي، مراجعة، اعتماد ونشر", "جديد", NxUi.TEAL, go(SubCenterActivity.class)));
             box.addView(DxUi.item(this, CgIcons.FILE, "الترجمة", "رفع ملفات الترجمة وربطها", "", CgCfg.ACCENT, go(CxSubsActivity.class)));
+            box.addView(DxUi.item(this, CgIcons.FOLDER, "ترجمات موسم كامل", "حزمة ZIP أو عدة ملفات تُطابق بالحلقات", "", NxUi.VIOLET, go(CgSeasonSubsActivity.class)));
             box.addView(DxUi.item(this, CgIcons.CLIP, "الرفع والتحميلات", "متابعة الملفات الجارية والفاشلة", "", CgCfg.ACCENT, go(CgUploadsActivity.class)));
             box.addView(DxUi.item(this, CgIcons.COPY, "دمج العناوين", "ضم المكرر في عنوان واحد", "", CgCfg.GRAY, go(CgMergeActivity.class)));
         } else if ("channels".equals(key)) {

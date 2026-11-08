@@ -737,22 +737,27 @@ public class CgPlayerActivity extends CgBase {
             status.setTextColor(CgCfg.BAD);
         }
 
-        if (sub.length() > 0) {
-            CgHttp.async(this, new CgHttp.Work<String>() {
+        final String subFile = getIntent().getStringExtra("subtitle_file");
+        if (sub.length() > 0 || (subFile != null && subFile.length() > 0)) {
+            // 18.2: the same parser and timeline as the Cigram app (CigramSubtitleHub), so the preview shows exactly
+            // what viewers will see; a not-yet-published file of the Arabic Subtitle Center is read from this phone.
+            CgHttp.async(this, new CgHttp.Work<com.Cigram.subhub.SubDocument>() {
                 @Override
-                public String run() throws Exception {
-                    CgHttp.Res r = CgHttp.call("GET", sub, null, false, 15000, null);
-                    if (r.error != null) throw r.error;
-                    if (r.code < 200 || r.code >= 300) throw new Exception("HTTP " + r.code);
-                    return r.body;
+                public com.Cigram.subhub.SubDocument run() throws Exception {
+                    byte[] raw;
+                    if (subFile != null && subFile.length() > 0) {
+                        raw = SubCenterStore.getText(CgPlayerActivity.this, subFile);
+                        if (raw == null) throw new Exception("الملف المحلي غير موجود");
+                    } else {
+                        raw = CgSeasonSubsActivity.download(sub);
+                    }
+                    return com.Cigram.subhub.SubCodec.read(raw);
                 }
-            }, new CgHttp.Done<String>() {
+            }, new CgHttp.Done<com.Cigram.subhub.SubDocument>() {
                 @Override
-                public void ok(String text) {
-                    cueTimes.clear();
-                    cueTexts.clear();
-                    parseSrt(text, cueTimes, cueTexts);
-                    line(previewHolder, "تم تحميل الترجمة: " + cueTexts.size() + " سطراً.", cueTexts.isEmpty() ? CgCfg.BAD : CgCfg.GOOD);
+                public void ok(com.Cigram.subhub.SubDocument doc) {
+                    timeline = new com.Cigram.subhub.SubSync.Timeline(doc);
+                    line(previewHolder, "تم تحميل الترجمة: " + doc.size() + " مقطعاً (" + doc.format + "، " + doc.encoding + ").", doc.isEmpty() ? CgCfg.BAD : CgCfg.GOOD);
                     startTicker();
                 }
 
@@ -766,6 +771,8 @@ public class CgPlayerActivity extends CgBase {
         }
     }
 
+    private com.Cigram.subhub.SubSync.Timeline timeline;
+
     private void startTicker() {
         ticker = new Runnable() {
             @Override
@@ -773,22 +780,20 @@ public class CgPlayerActivity extends CgBase {
                 if (!alive() || videoView == null) return;
                 try {
                     long pos = videoView.getCurrentPosition();
-                    String show = "";
-                    for (int i = 0; i < cueTimes.size(); i++) {
-                        long[] t = cueTimes.get(i);
-                        if (pos >= t[0] && pos <= t[1]) {
-                            show = cueTexts.get(i);
-                            break;
-                        }
+                    java.util.List<com.Cigram.subhub.SubCue> on = timeline == null ? java.util.Collections.<com.Cigram.subhub.SubCue>emptyList() : timeline.activeAt(pos, 0);
+                    StringBuilder show = new StringBuilder();
+                    for (com.Cigram.subhub.SubCue c : on) {
+                        if (show.length() > 0) show.append('\n');
+                        show.append(c.plainText().trim());
                     }
                     if (show.length() == 0) {
                         overlay.setVisibility(View.GONE);
                     } else {
-                        overlay.setText(show);
+                        overlay.setText(show.toString());
                         overlay.setVisibility(View.VISIBLE);
                     }
                 } catch (Exception ignored) { }
-                ui().postDelayed(this, 250);
+                ui().postDelayed(this, 40);
             }
         };
         ui().post(ticker);
