@@ -110,6 +110,25 @@ final class CigramTvKeys {
         } catch (Throwable ignored) { }
     }
 
+    /** Uptime of the last seek made by a HELD key; see {@link #seekAllowed}. */
+    private static long lastHeldSeekAt;
+    /** A held arrow / rewind / forward key seeks at most this often (one step = the user's seek interval). */
+    private static final long HELD_SEEK_GAP_MS = 280L;
+
+    /**
+     * 2026: a remote repeats a held key ~20 times a second; every repeat used to seek one more step, so holding →
+     * for a second jumped minutes ahead. The first press always seeks once; a held key then seeks at a steady,
+     * readable pace.
+     */
+    private static boolean seekAllowed(KeyEvent e) {
+        if (e.getAction() != KeyEvent.ACTION_DOWN) return false;
+        long now = android.os.SystemClock.uptimeMillis();
+        if (e.getRepeatCount() == 0) { lastHeldSeekAt = now; return true; }
+        if (now - lastHeldSeekAt < HELD_SEEK_GAP_MS) return false;
+        lastHeldSeekAt = now;
+        return true;
+    }
+
     private static boolean handle(Activity a, PlayerHost h, KeyEvent e) {
         int c = e.getKeyCode();
         boolean down = e.getAction() == KeyEvent.ACTION_DOWN;
@@ -129,10 +148,10 @@ final class CigramTvKeys {
                 if (first) { if (h.isPlaying()) h.playPause(); h.showControls(); }
                 return true;
             case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD:
-                if (down) h.forward();
+                if (seekAllowed(e)) h.forward();
                 return true;
             case KeyEvent.KEYCODE_MEDIA_REWIND:
-                if (down) h.rewind();
+                if (seekAllowed(e)) h.rewind();
                 return true;
             case KeyEvent.KEYCODE_MEDIA_NEXT:
             case KeyEvent.KEYCODE_CHANNEL_UP:
@@ -149,11 +168,11 @@ final class CigramTvKeys {
         boolean visible = h.controlsVisible();
         if (!visible) {
             if (c == KeyEvent.KEYCODE_DPAD_LEFT) {
-                if (down) h.rewind();
+                if (seekAllowed(e)) h.rewind();
                 return true;
             }
             if (c == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                if (down) h.forward();
+                if (seekAllowed(e)) h.forward();
                 return true;
             }
             if (CigramTvFocus.isConfirm(c) && promptFocused(a)) return false;   // «تخطي المقدمة», «شاهد الآن»

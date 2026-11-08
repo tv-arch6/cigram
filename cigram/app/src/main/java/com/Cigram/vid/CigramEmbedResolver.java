@@ -1190,11 +1190,8 @@ public final class CigramEmbedResolver {
 
     /** Plain-language Arabic explanation of a resolver failure (the raw code is still shown beside it). */
     public static String friendly(String reason) {
-        String problem = webViewProblem();
-        if (problem.length() > 0) return problem + ". هذا المصدر يحتاج متصفحاً حديثاً لاستخراج الفيديو.";
-        if ("timeout".equals(reason)) return "تأخر المصدر في الرد. قد يكون متوقفاً مؤقتاً أو الاتصال بطيء.";
-        if (reason != null && reason.startsWith("webview")) return "تعذر تشغيل محرك المتصفح المخفي على هذا الجهاز.";
-        return "لم يرجع المصدر رابط فيديو قابلاً للتشغيل.";
+        // 2026: same categories and wording as the player (CigramPlaybackError)
+        return CigramPlaybackError.message(CigramPlaybackError.fromResolverReason(null, reason));
     }
 
     private static final Object LOG_LOCK = new Object();

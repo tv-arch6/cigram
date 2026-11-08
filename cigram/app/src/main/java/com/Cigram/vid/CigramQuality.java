@@ -43,9 +43,18 @@ import java.util.regex.Pattern;
 public final class CigramQuality {
 
     /** Heights offered in the app settings («الجودة المفضلة»); 0 = automatic / original. */
-    public static final int[] PRESETS = {0, 2160, 1440, 1080, 720, 480};
+    public static final int[] PRESETS = {0, 2160, 1440, 1080, 720};
 
-    private static final int[] LADDER = {2160, 1440, 1080, 720, 480};
+    /** 2026: the app names only four qualities (720p, 1080p, 2K, 4K); anything smaller is never offered by name. */
+    private static final int[] LADDER = {2160, 1440, 1080, 720};
+
+    /** Smallest height that has one of the four official labels. */
+    public static final int MIN_LABELLED = 720;
+
+    /** True when a real track / copy of this size may appear in a quality menu. */
+    public static boolean offered(int height, int width) {
+        return classify(height, width) >= MIN_LABELLED;
+    }
     private static final int TIMEOUT_MS = 4000;
 
     /** One playable copy of the film. */
@@ -79,8 +88,9 @@ public final class CigramQuality {
         int h = classify(height, width);
         if (h >= 2160) return "4K";
         if (h >= 1440) return "2K";
-        if (h > 0) return h + "p";
-        return "الأصلية";
+        if (h >= 1080) return "1080p";
+        if (h >= 720) return "720p";
+        return "الأصلية";   // below 720p: no quality name is claimed, it is just the file as it is
     }
 
     public static String label(int height) {
@@ -97,10 +107,9 @@ public final class CigramQuality {
         return h > 0 ? "SD" : "";
     }
 
-    /** «4K · Ultra HD» */
+    /** 2026: menus show only 720p / 1080p / 2K / 4K (no extra marketing badge next to them). */
     public static String fullLabel(int height, int width) {
-        String b = badge(height, width);
-        return label(height, width) + (b.length() == 0 ? "" : " · " + b);
+        return label(height, width);
     }
 
     /** Settings page wording for a preferred height. */

@@ -510,7 +510,11 @@ final class CigramChannelPlayer {
         if (destroyed || player == null) return;
         if (retries >= 4) {
             setWaiting(false, "");
-            showError("تعذر تشغيل القناة حالياً");
+            // 2026: the real reason (offline / server / expired link / unsupported ...), not a generic sentence
+            int kind = lastError == null ? CigramPlaybackError.UNKNOWN
+                    : CigramPlaybackError.classify(view == null ? null : view.getContext(), lastError);
+            showError(kind == CigramPlaybackError.UNKNOWN ? "تعذر تشغيل القناة حالياً"
+                    : CigramPlaybackError.message(kind));
             return;
         }
         retries++;
@@ -544,6 +548,11 @@ final class CigramChannelPlayer {
                     showError("هذه القناة مشفّرة (DRM) ولا تعمل إلا داخل تطبيق مالكها");
                 } else if (CigramStreams.isTypeError(error) && nextType()) {
                     // handled: the same link is being opened as another type
+                } else if (CigramPlaybackError.classify(view == null ? null : view.getContext(), error)
+                        == CigramPlaybackError.UNSUPPORTED_FORMAT) {
+                    // retrying cannot help a stream this device cannot decode: say so at once
+                    setWaiting(false, "");
+                    showError(CigramPlaybackError.message(CigramPlaybackError.UNSUPPORTED_FORMAT));
                 } else {
                     retry();
                 }

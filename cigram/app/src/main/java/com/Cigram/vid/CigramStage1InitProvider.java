@@ -11258,40 +11258,9 @@ public final class CigramStage1InitProvider extends ContentProvider {
         }
 
         private String playerErrorMessage(Object error) {
-            if (!isOnline(activity)) return "انقطع الاتصال بالإنترنت";
-
-            String text = String.valueOf(error);
-            Throwable cause = null;
-            try {
-                if (error instanceof Throwable) cause = ((Throwable) error).getCause();
-            } catch (Throwable ignored) { android.util.Log.w("CigramInjected", "playerErrorMessage", ignored); }
-
-            String causeText = cause == null ? "" : cause.getClass().getName() + " " + cause.getMessage();
-            String all = (text + " " + causeText).toLowerCase(java.util.Locale.US);
-
-            if (all.contains("timeout") || all.contains("timed out")) {
-                return "انتهت مهلة الاتصال بالفيديو";
-            }
-            String reason = "";
-            try {
-                if (error instanceof com.google.android.exoplayer2.PlaybackException) {
-                    com.google.android.exoplayer2.PlaybackException pe = (com.google.android.exoplayer2.PlaybackException) error;
-                    reason = "\n(" + pe.getErrorCodeName();
-                    Throwable c = pe.getCause();
-                    if (c instanceof com.google.android.exoplayer2.upstream.HttpDataSource.InvalidResponseCodeException) {
-                        com.google.android.exoplayer2.upstream.HttpDataSource.InvalidResponseCodeException h =
-                                (com.google.android.exoplayer2.upstream.HttpDataSource.InvalidResponseCodeException) c;
-                        reason += " • HTTP " + h.responseCode;
-                        try { reason += " • " + h.dataSpec.uri.getHost(); } catch (Throwable ignored) { }
-                    }
-                    reason += ")";
-                }
-            } catch (Throwable ignored) { }
-            if (all.matches(".*(^|[^0-9])5[0-9][0-9]([^0-9]|$).*")
-                    || all.contains("response code: 5")) {
-                return "حدث خطأ من سيرفر الفيديو" + reason;
-            }
-            return "تعذر تشغيل الفيديو" + reason;
+            // 2026: the real reason (unsupported format / missing / expired / timeout / server / offline ...),
+            // decided in one place; "no internet" only for a network error while the device is really offline
+            return CigramPlaybackError.describe(activity, error);
         }
 
         private void showPlayerError(String message) {

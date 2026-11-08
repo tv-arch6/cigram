@@ -4215,9 +4215,9 @@ public class PlayerActivity extends AppCompatActivity {
 								labels.add("تلقائي · موصى به (حسب سرعة الإنترنت)");tracks.add(new int[]{-1,-1,-1});urls.add(null);heights.add(0);
 								java.util.HashSet<String> seen=new java.util.HashSet<String>();
 								boolean cgLockedAny=false; for(int[] f:found){
+									if(!CigramQuality.offered(f[3],f[4]))continue;   // 2026: only 720p / 1080p / 2K / 4K are named
 									if(!CigramPlus.isPlus(PlayerActivity.this)&&CigramQuality.classify(f[3],f[4])>=1080){cgLockedAny=true;continue;} String l=CigramQuality.fullLabel(f[3],f[4]);
 									if(!seen.add(l))continue;   // نفس الدقة بمعدل بت أقل لا تُعرض مرتين
-									if(f[5]>0)l+=" · "+String.format(java.util.Locale.US,"%.1f Mbps",f[5]/1000000f);
 									labels.add(l);tracks.add(new int[]{f[0],f[1],f[2]});urls.add(null);heights.add(f[3]);
 								} if(cgLockedAny){labels.add("🔒 1080p – 4K · ضمن Plus");tracks.add(new int[]{-2,-2,-2});urls.add(null);heights.add(-1);}
 								int selected=0;
@@ -4232,7 +4232,7 @@ public class PlayerActivity extends AppCompatActivity {
 						labels.add("الأصلية"+(cgOrigH>0||cgOrigW>0?" · "+CigramQuality.fullLabel(cgOrigH,cgOrigW):""));
 						tracks.add(null);urls.add(origin);heights.add(0);
 						boolean cgLocked2=false,cgLowerCopy=false; if(copies!=null)for(CigramQuality.Variant v:copies){
-							if(originClass>0&&v.height>=originClass)continue; if(v.height<1080)cgLowerCopy=true; if(!CigramPlus.isPlus(PlayerActivity.this)&&v.height>=1080){cgLocked2=true;continue;}   // لا نعرض دقة أعلى من الأصل أو مساوية له
+							if(originClass>0&&v.height>=originClass)continue; if(!CigramQuality.offered(v.height,0))continue; if(v.height<1080)cgLowerCopy=true; if(!CigramPlus.isPlus(PlayerActivity.this)&&v.height>=1080){cgLocked2=true;continue;}   // لا نعرض دقة أعلى من الأصل أو مساوية له
 							labels.add(CigramQuality.fullLabel(v.height,0));tracks.add(null);urls.add(v.url);heights.add(v.height);
 						} if(!CigramPlus.isPlus(PlayerActivity.this)&&originClass>=1080&&cgLowerCopy){labels.set(0,"🔒 "+labels.get(0));heights.set(0,Integer.valueOf(-1));} if(cgLocked2){labels.add("🔒 1080p – 4K · ضمن Plus");tracks.add(null);urls.add(null);heights.add(-1);}
 						int selected=0;

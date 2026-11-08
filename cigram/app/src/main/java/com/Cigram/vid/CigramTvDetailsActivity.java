@@ -283,32 +283,25 @@ public final class CigramTvDetailsActivity extends Activity implements CigramTvH
         }
     }
 
+    /** 2026: ONE main action on the TV details page, always «شاهد الآن»; the line under it says what will play. */
     private String primaryLabel() {
-        if (series && target >= 0) {
-            int n = numberOf(episodes.get(target));
-            if (mode == MODE_RESUME) return "تابع الحلقة " + n;
-            if (mode == MODE_NEXT) return "شاهد الحلقة " + n;
-            if (mode == MODE_AGAIN) return "أعد المشاهدة";
-            return "ابدأ المشاهدة";
-        }
-        if (mode == MODE_RESUME) return "تابع المشاهدة";
-        if (mode == MODE_AGAIN) return "أعد المشاهدة";
         return "شاهد الآن";
     }
 
     private String primarySub() {
+        StringBuilder sb = new StringBuilder();
+        if (series && target >= 0) sb.append("الحلقة ").append(numberOf(episodes.get(target)));
         if (mode == MODE_RESUME && resumeLeftMs > 0L) {
             long minutes = Math.max(1L, Math.round(resumeLeftMs / 60000.0));
-            return "متبقّي " + minutes + " دقيقة";
-        }
-        if (series && target >= 0) {
-            if (mode == MODE_NEXT) return "الحلقة التالية";
-            if (mode == MODE_AGAIN) return "أنهيت كل الحلقات";
-            if (mode == MODE_START) return "الحلقة " + numberOf(episodes.get(target));
+            if (sb.length() > 0) sb.append(" · ");
+            sb.append("تكملة · متبقّي ").append(minutes).append(" دقيقة");
+        } else if (series && target >= 0 && mode == MODE_NEXT) {
+            sb.append(" · الحلقة التالية");
         } else if (mode == MODE_AGAIN) {
-            return "شاهدته من قبل";
+            if (sb.length() > 0) sb.append(" · ");
+            sb.append(series ? "أنهيت كل الحلقات" : "شاهدته من قبل");
         }
-        return "";
+        return sb.toString();
     }
 
     // ------------------------------------------------------------------ building the page
@@ -323,11 +316,29 @@ public final class CigramTvDetailsActivity extends Activity implements CigramTvH
         return t;
     }
 
+    /**
+     * A row whose children flow from right to left in the order they are added. The app does not declare
+     * android:supportsRtl, so setLayoutDirection(RTL) alone is ignored by Android and the rows used to start on the
+     * LEFT; this row inserts every appended child at the front (and mirrors its side margins) instead.
+     */
     private LinearLayout rtlRow() {
-        LinearLayout row = new LinearLayout(this);
+        LinearLayout row = new LinearLayout(this) {
+            @Override public void addView(View child, int index, android.view.ViewGroup.LayoutParams params) {
+                if (index < 0) {
+                    index = 0;
+                    if (params instanceof android.view.ViewGroup.MarginLayoutParams) {
+                        android.view.ViewGroup.MarginLayoutParams m = (android.view.ViewGroup.MarginLayoutParams) params;
+                        int l = m.leftMargin;
+                        m.leftMargin = m.rightMargin;
+                        m.rightMargin = l;
+                    }
+                }
+                super.addView(child, index, params);
+            }
+        };
         row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);   // children flow right to left, in the order added
-        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+        row.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
         return row;
     }
 
@@ -547,22 +558,12 @@ public final class CigramTvDetailsActivity extends Activity implements CigramTvH
         primaryButton = primaryButton();
         row.addView(primaryButton, new LinearLayout.LayoutParams(-2, dp(52)));
 
-        if (mode == MODE_RESUME || mode == MODE_AGAIN) {
-            row.addView(ghostButton("من البداية", new Runnable() {
-                @Override public void run() { play(true); }
-            }), ghostLp());
-        }
-
+        // 2026: no competing watch buttons («من البداية» / «مشاهدة جماعية» are gone from the TV page). Starting over
+        // is a LONG press on «شاهد الآن» (see primaryButton); «قائمتي» stays because it does not play anything.
         listButton = ghostButton(inList() ? "في قائمتي" : "إضافة إلى قائمتي", new Runnable() {
             @Override public void run() { toggleList(); }
         });
         row.addView(listButton, ghostLp());
-
-        if (togetherAvailable()) {
-            row.addView(ghostButton("مشاهدة جماعية", new Runnable() {
-                @Override public void run() { watchTogether(); }
-            }), ghostLp());
-        }
         return row;
     }
 
@@ -599,6 +600,16 @@ public final class CigramTvDetailsActivity extends Activity implements CigramTvH
         makeFocusable(box, new Runnable() {
             @Override public void run() { play(false); }
         });
+        if (mode == MODE_RESUME || mode == MODE_AGAIN) {
+            box.setContentDescription("شاهد الآن. اضغط مطولاً للمشاهدة من البداية");
+            box.setOnLongClickListener(new View.OnLongClickListener() {
+                @Override public boolean onLongClick(View v) {
+                    Toast.makeText(CigramTvDetailsActivity.this, "التشغيل من البداية", Toast.LENGTH_SHORT).show();
+                    play(true);
+                    return true;
+                }
+            });
+        }
         return box;
     }
 
@@ -642,7 +653,24 @@ public final class CigramTvDetailsActivity extends Activity implements CigramTvH
 
     // ---- playing (the same path as the phone details page)
 
+    private long lastEpisodeAt;
+
+    private long lastPlayAt;
+
     private void play(boolean startOver) {
+        // one press = one launch: a held OK key or a quick double press never opens the player twice
+        long now = android.os.SystemClock.uptimeMillis();
+        if (now - lastPlayAt < 1500L) return;
+        lastPlayAt = now;
+        // validate the real source first: a missing or malformed link is explained here, not after a player opens
+        String url = readyUrl();
+        int bad = url.length() == 0 ? CigramPlaybackError.MISSING_STREAM : CigramPlaybackError.validateUrl(url);
+        if (bad != CigramPlaybackError.UNKNOWN) {
+            lastPlayAt = 0L;
+            setReady("تعذّر", AMBER, CigramPlaybackError.message(bad), "", false);
+            Toast.makeText(this, CigramPlaybackError.message(bad), Toast.LENGTH_LONG).show();
+            return;
+        }
         needsRefresh = true;
         if (startOver) CigramStage1InitProvider.cigramStartOverOnce();
         if (series && target >= 0) {
@@ -666,6 +694,10 @@ public final class CigramTvDetailsActivity extends Activity implements CigramTvH
     }
 
     private void playEpisode(final JSONObject episode) {
+        // the episode card that was pressed is exactly the one that plays
+        long now = android.os.SystemClock.uptimeMillis();
+        if (now - lastEpisodeAt < 1500L) return;
+        lastEpisodeAt = now;
         needsRefresh = true;
         final JSONObject parent = item;
         final Activity self = this;
