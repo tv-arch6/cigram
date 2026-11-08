@@ -30,7 +30,7 @@ final class CigramSubtitleDelayPanel {
 
     private CigramSubtitleDelayPanel() {}
 
-    private static final int BG = 0xF20E0E10;
+    private static final int BG = 0xFF0E0E10;
     private static final int CARD = 0xFF1A1A1E;
     private static final int TEXT = 0xFFFFFFFF;
     private static final int MUTED = 0xFFA1A1AA;

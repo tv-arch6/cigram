@@ -4418,8 +4418,11 @@ public class PlayerActivity extends AppCompatActivity {
 						}
 						@Override public String pick(int which){
 							if(which==0){
-								try{sheet.dismiss();}catch(Throwable ignored){}
-								uiHandler.postDelayed(new java.lang.Runnable(){@Override public void run(){CigramSubtitleDelayPanel.show(PlayerActivity.this,cgSubEngine[0]);}},260L);
+								// dismiss AFTER the sheet finished handling this tap (closeChoices runs right after pick)
+								uiHandler.postDelayed(new java.lang.Runnable(){@Override public void run(){
+									try{sheet.dismiss();}catch(Throwable ignored){}
+									uiHandler.postDelayed(new java.lang.Runnable(){@Override public void run(){CigramSubtitleDelayPanel.show(PlayerActivity.this,cgSubEngine[0]);}},300L);
+								}},120L);
 								return null;
 							}
 							cgSubEngine[0].setDelayMs(cgDelayValues[which]);

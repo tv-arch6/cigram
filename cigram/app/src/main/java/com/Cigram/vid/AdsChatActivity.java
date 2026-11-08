@@ -357,6 +357,9 @@ public class AdsChatActivity extends Activity {
         input.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { if (emojiPanel != null) emojiPanel.setVisibility(View.GONE); }
         });
+        input.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override public void onFocusChange(View v, boolean has) { if (has && emojiPanel != null) emojiPanel.setVisibility(View.GONE); }
+        });
         input.setMaxLines(5);
         input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         input.setMinHeight(AdsUi.dp(this, 48));
@@ -1247,6 +1250,7 @@ public class AdsChatActivity extends Activity {
         boolean show = emojiPanel.getVisibility() != View.VISIBLE;
         emojiPanel.setVisibility(show ? View.VISIBLE : View.GONE);
         if (show) {
+            input.clearFocus();
             try {
                 android.view.inputmethod.InputMethodManager im = (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
                 if (im != null) im.hideSoftInputFromWindow(input.getWindowToken(), 0);
@@ -1499,8 +1503,8 @@ public class AdsChatActivity extends Activity {
         LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(-2, -2);
         bl.gravity = mine ? Gravity.RIGHT : Gravity.LEFT;
         bubble.setMinimumWidth(AdsUi.dp(c, 72));
-        FrameLayout cap = new FrameLayout(c);
-        cap.addView(bubble, new FrameLayout.LayoutParams(-2, -2));
+        // 18.2 fix: the bubble used to be added to a throw-away FrameLayout first, so wrapMax() threw
+        // "The specified child already has a parent" and the screen crashed as soon as any message was drawn.
         root.addView(wrapMax(bubble, mine), bl);
     }
 
