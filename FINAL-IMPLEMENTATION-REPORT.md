@@ -243,7 +243,28 @@ admin Developer Inbox with real threads; translation providers (none implemented
 real TV / tablet / physical phone; casting.
 
 ## 7. Builds
-(see the build table below)
+Final clean builds from commit `8fdc59f` (`gradle clean …`, Gradle 8.14.3, AGP 8.13.0, JDK 17, compileSdk 36). All exited 0.
+Release outputs are **unsigned** (no keystore is in the project or the archives; sign with the production key).
+
+| App | Task | Output | Size (bytes) |
+|---|---|---|---|
+| Main (`cigram/`) | `testPlayDebugUnitTest` | `SubHubTest` 24 / 24 | — |
+| | `assemblePlayDebug` | `app-play-debug.apk` | 20,958,205 |
+| | `assemblePlayRelease` | `app-play-release-unsigned.apk` | 17,757,597 |
+| | `assembleDirectDebug` | `app-direct-debug.apk` | 20,959,521 |
+| | `assembleDirectRelease` | `app-direct-release-unsigned.apk` | 17,758,353 |
+| | `bundlePlayRelease` | `app-play-release.aab` | 16,652,317 |
+| Admin (`admin/`) | `testDebugUnitTest` | `SubHubTest` 24 / 24 · `AdminSubHubTest` 12 / 12 · `WnLogicTest` 15 / 15 · `WnPipelineTest` 1 skipped (by its own source) | — |
+| | `assembleDebug` | `app-debug.apk` | 8,120,543 |
+| | `assembleRelease` | `app-release-unsigned.apk` | 6,579,428 |
+| | `bundleRelease` | `app-release.aab` | 5,984,905 |
+
+Pre-existing build fix: release variants of the main app failed at `mergeDex` in the supplied project
+(`androidx.viewbinding.ViewBinding` defined twice); the duplicate stub was removed (see the main app notes).
+
+Archive check: both archives are rebuilt from the git tree (tracked files only: no `build/`, no `local.properties`, no
+keystore), tested with `unzip -t`, extracted into new empty directories and built there on their own; the result and the
+archive sizes are in **§9** of the copy of this report delivered next to the archives.
 
 ## 8. Outstanding backend / owner actions
 1. Review and deploy `docs/backend` patches (ads-api, admin-api); set `DEV_NAME`, `DEV_AVATAR`, optional `DEVELOPERS`.
