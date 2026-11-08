@@ -151,6 +151,7 @@ dates use Arabic month names. Verified visually on the emulator (§6).
 | Item | Where |
 |---|---|
 | No secrets in APKs / sources | Verified: no API keys added; admin token stays user-entered; provider keys only as Worker secrets |
+| Archive secret scan (private keys, `sk-` / `ghp_` / `xox` / AWS / Google key patterns, keystores) | Only match: the Firebase **client** config key in `CigramFcm.java`, present unchanged since the supplied source. It is a public app identifier by Firebase design, not a server secret; restricting it to the app package + signing SHA-1 in the Google Cloud console is recommended (§8) |
 | Server-derived identity, no client user id trusted | Pre-existing ChatHub design, kept; tested locally |
 | RBAC | Backend patch (owner / support) |
 | Input / file validation, size limits, safe archive extraction | Subtitle 8 MB (app) / 5 MB (admin pick) / 40 MB ZIP, entry / ratio limits, only .srt/.vtt, in-memory extraction |
@@ -274,3 +275,4 @@ archive sizes are in **§9** of the copy of this report delivered next to the ar
 4. Verify TMDB commercial licensing and attribution.
 5. Run the live checks listed in §6c on a real device with real accounts.
 6. Sign release builds with the production keystore (not in the archives).
+7. Optional hardening: restrict the Firebase client API key (pre-existing in `CigramFcm.java`) to package `com.Cigram.vid` + the release SHA-1.
