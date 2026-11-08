@@ -16,6 +16,10 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 /**
+ * NOTE: the app does not declare android:supportsRtl, so View layout / text direction attributes are ignored by
+ * Android. Rows are therefore built in PHYSICAL order (LTR containers, right-hand items added last) and every Arabic
+ * text starts with a right-to-left mark so a paragraph that begins with a Latin word (e.g. "Cigram") still runs RTL.
+ *
  * Shared scaffold of the 2026 text pages (About, Terms): the account page's four-stage gradient, an RTL top bar with
  * the back button on the right (pointing right, i.e. "back" in Arabic), and one readable column (max 720 dp, centred
  * on tablets and TVs). Everything follows {@link CigramPalette}, so Light / Dark are both handled.
@@ -40,10 +44,10 @@ final class CigramPageKit {
         frame.setOrientation(LinearLayout.VERTICAL);
         root.addView(frame, new FrameLayout.LayoutParams(-1, -1));
 
-        // ---- top bar: [back →] [title] in RTL (the back button sits on the right edge)
+        // ---- top bar, physical order left → right: [title, right-aligned][back →] (back on the right edge)
         LinearLayout bar = new LinearLayout(a);
         bar.setOrientation(LinearLayout.HORIZONTAL);
-        bar.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        bar.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setPadding(dp(8), dp(6), dp(8), dp(6));
         FrameLayout backBox = new FrameLayout(a);
@@ -61,12 +65,12 @@ final class CigramPageKit {
         backBox.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { CigramPageKit.this.a.finish(); }
         });
-        bar.addView(backBox, new LinearLayout.LayoutParams(dp(48), dp(48)));
         back = backBox;
-        TextView t = CigramUI.label(a, title, 18f, pal.text, true);
+        TextView t = CigramUI.label(a, rtl(title), 18f, pal.text, true);
         t.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
         t.setPadding(dp(6), 0, dp(6), 0);
         bar.addView(t, new LinearLayout.LayoutParams(0, -2, 1f));
+        bar.addView(backBox, new LinearLayout.LayoutParams(dp(48), dp(48)));
         frame.addView(bar, new LinearLayout.LayoutParams(-1, -2));
 
         scroll = new ScrollView(a);
@@ -107,8 +111,13 @@ final class CigramPageKit {
 
     int dp(float v) { return CigramUI.dp(a, v); }
 
+    /** Right-to-left mark in front of a text so its paragraph direction is RTL whatever its first word. */
+    static String rtl(String s) {
+        return s == null ? "" : (s.startsWith("\u200F") ? s : "\u200F" + s);
+    }
+
     TextView heading(String text) {
-        TextView t = CigramUI.label(a, text, 19f, pal.text, true);
+        TextView t = CigramUI.label(a, rtl(text), 19f, pal.text, true);
         t.setGravity(Gravity.RIGHT);
         t.setTextDirection(View.TEXT_DIRECTION_RTL);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
@@ -119,7 +128,7 @@ final class CigramPageKit {
     }
 
     TextView paragraph(String text) {
-        TextView t = CigramUI.label(a, text, 15f, pal.text2, false);
+        TextView t = CigramUI.label(a, rtl(text), 15f, pal.text2, false);
         t.setGravity(Gravity.RIGHT);
         t.setTextDirection(View.TEXT_DIRECTION_RTL);
         t.setLineSpacing(dp(4), 1f);
@@ -142,23 +151,23 @@ final class CigramPageKit {
     }
 
     void item(LinearLayout card, int icon, String title, String text, boolean last) {
+        // physical order left → right: [texts, right-aligned][icon]
         LinearLayout row = new LinearLayout(a);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        row.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         row.setPadding(0, dp(12), 0, dp(12));
         row.setFocusable(true);   // TV: the remote walks through the list
         FrameLayout ic = new FrameLayout(a);
         ic.addView(new AdsIcons.Icon(a, icon, pal.text), new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER));
         LinearLayout.LayoutParams il = new LinearLayout.LayoutParams(dp(30), dp(30));
         il.topMargin = dp(1);
-        row.addView(ic, il);
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
-        TextView t = CigramUI.label(a, title, 15.5f, pal.text, true);
+        TextView t = CigramUI.label(a, rtl(title), 15.5f, pal.text, true);
         t.setGravity(Gravity.RIGHT);
         col.addView(t, new LinearLayout.LayoutParams(-1, -2));
         if (text != null && text.length() > 0) {
-            TextView s = CigramUI.label(a, text, 13.5f, pal.text3, false);
+            TextView s = CigramUI.label(a, rtl(text), 13.5f, pal.text3, false);
             s.setGravity(Gravity.RIGHT);
             s.setLineSpacing(dp(2), 1f);
             LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(-1, -2);
@@ -166,14 +175,15 @@ final class CigramPageKit {
             col.addView(s, sl);
         }
         LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(0, -2, 1f);
-        cl.setMarginStart(dp(12));
+        cl.rightMargin = dp(12);
         row.addView(col, cl);
+        row.addView(ic, il);
         card.addView(row, new LinearLayout.LayoutParams(-1, -2));
         if (!last) {
             View line = new View(a);
             line.setBackgroundColor(pal.hairline);
             LinearLayout.LayoutParams ll = new LinearLayout.LayoutParams(-1, Math.max(1, dp(1) / 2 + 1));
-            ll.setMarginStart(dp(42));
+            ll.rightMargin = dp(42);
             card.addView(line, ll);
         }
     }

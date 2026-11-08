@@ -62,17 +62,24 @@ final class CigramTerms {
             CheckBox box = new CheckBox(a);
             box.setTag(TAG_BOX);
             box.setChecked(false);
-            box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-            box.setTextDirection(View.TEXT_DIRECTION_RTL);
+            // the app has no RTL support switched on, so the tick box is moved to the RIGHT of the text by hand
+            try {
+                android.content.res.TypedArray ta = a.obtainStyledAttributes(new int[]{android.R.attr.listChoiceIndicatorMultiple});
+                android.graphics.drawable.Drawable tick = ta.getDrawable(0);
+                ta.recycle();
+                if (tick != null) {
+                    box.setButtonDrawable(null);
+                    tick.setTintList(android.content.res.ColorStateList.valueOf(pal.text));
+                    box.setCompoundDrawablesWithIntrinsicBounds(null, null, tick, null);
+                    box.setCompoundDrawablePadding(CigramUI.dp(a, 10));
+                }
+            } catch (Throwable ignored) { }
             box.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
             box.setTextColor(pal.text2);
             box.setTextSize(13.5f);
             box.setTypeface(CigramUI.font(a));
             box.setMinHeight(CigramUI.dp(a, 48));
-            try {
-                box.setButtonTintList(android.content.res.ColorStateList.valueOf(pal.text));
-            } catch (Throwable ignored) { }
-            String before = "أوافق على ";
+            String before = "\u200Fأوافق على ";
             String link = "الشروط والأحكام";
             SpannableString text = new SpannableString(before + link);
             final int linkColor = pal.light ? 0xFF111114 : Color.WHITE;
