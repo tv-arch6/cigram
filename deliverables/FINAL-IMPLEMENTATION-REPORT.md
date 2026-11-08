@@ -151,6 +151,7 @@ dates use Arabic month names. Verified visually on the emulator (§6).
 | Item | Where |
 |---|---|
 | No secrets in APKs / sources | Verified: no API keys added; admin token stays user-entered; provider keys only as Worker secrets |
+| Archive secret scan (private keys, `sk-` / `ghp_` / `xox` / AWS / Google key patterns, keystores) | Only match: the Firebase **client** config key in `CigramFcm.java`, present unchanged since the supplied source. It is a public app identifier by Firebase design, not a server secret; restricting it to the app package + signing SHA-1 in the Google Cloud console is recommended (§8) |
 | Server-derived identity, no client user id trusted | Pre-existing ChatHub design, kept; tested locally |
 | RBAC | Backend patch (owner / support) |
 | Input / file validation, size limits, safe archive extraction | Subtitle 8 MB (app) / 5 MB (admin pick) / 40 MB ZIP, entry / ratio limits, only .srt/.vtt, in-memory extraction |
@@ -184,10 +185,87 @@ No SQL database is involved. All changes are additive and backwards compatible; 
   encrypted payload `dev`, key `admin_last_active`. Old threads/messages without them keep working.
 
 ## 6. Tests executed
-(see sections 6a–6c)
+
+### 6a. Automated (all passed)
+| Suite | Where | Result |
+|---|---|---|
+| `SubHubTest` (CigramSubtitleHub: ExoPlayer misparse reproduction, centiseconds, `.` in SRT, 4-digit fractions, frames refused, round trip, missing blank lines, VTT header / settings / ids / NOTE / STYLE / X-TIMESTAMP-MAP, SRT↔VTT, content sniffing, Windows-1256, BOM, UTF-16 with / without BOM, two mojibake kinds, delay sign and single application, overlapping and long cues, invalid / blank cues, shift clamp / drop, frame-rate stretch, translation keeps timing, drift detection, restore source timing, merged translations refused, missing / untranslated cues, overlap / short / CPS / line length, Arabic punctuation and RTL fixes, not-Arabic, encoding damage, clean pass) | main `testPlayDebugUnitTest` and admin `testDebugUnitTest` (identical file) | 24 / 24 in each app |
+| `AdminSubHubTest` (episode names incl. Arabic digits, matching / ambiguity / wrong season / unmatched / double episode, manual correction + conflict, safe ZIP: traversal / macOS / non-subtitle / nested, zip bomb, state machine, duplicates, batch pagination + restart from JSON + retry after backoff, 429 pause, cancel, backoff values, quota per day, cost estimate) | admin | 12 / 12 |
+| `WnLogicTest` (existing, chip list updated for 23 chips) / `WnPipelineTest` | admin | 15 / 15 · 1 skipped by its own source (as before) |
+| `ads_support_test.mjs` — real patched cigram-ads-api in Node with in-memory Durable Object storage | docs/backend | 11 / 11 (same suite on the unpatched live worker: 3 / 11, documenting today's behaviour) |
+| `admin_subhub_test.mjs` — real patched cigram-admin-api with in-memory R2, stubbed TMDB / SubDL | docs/backend | 14 / 14 |
+
+### 6b. Emulator (Android 12 / API 31 x86_64, software CPU, no network, labelled local fixtures)
+Fixtures: a 60 s test video with a burned-in clock, an Arabic SRT saved as **Windows-1256** containing a centisecond
+cue (`00:00:02,5`), a `.`-separated SRT cue, an italic Arabic + English cue and a `{\an8}` cue starting at `12,50`.
+| Check | Result |
+|---|---|
+| Windows-1256 Arabic decoded and shown | ✅ (`01_…png`) |
+| Cue `00:00:02,5 → 00:00:05,0` on screen at video 03.960 (ExoPlayer alone would use 2.005 → 5.000) | ✅ |
+| `.`-separated SRT cue (dropped by ExoPlayer) shown at 07.480 | ✅ |
+| Mixed Arabic / English italic cue at 09.400 and 11.440, English not reversed | ✅ (`01_`, `02_`) |
+| `{\an8}` cue at the top, start `12,50` = 12.5 s, on screen at 16.120 | ✅ (`02_`) |
+| One frame at 05.560 (cue 2 starts 05.500) still empty | ⚠️ frame-callback latency of the software emulator (tens of ms); not reproducible as a timing error in unit tests |
+| Gear sheet «توقيت الترجمة» presets + explanation | ✅ (`03_`) |
+| Fine-tune panel: delay value, meaning, nearest cue vs. playing time, ±0.1/0.5/1 s, reset | ✅ (`04_`) |
+| +0.5 s applied instantly: preview 12.500 → 13.000; saved as `delay:<sha1(url)>=500` in `subtitle_settings` | ✅ (`05_`) |
+| Settings sheet stayed visible behind the panel | ❌ found → fixed (dismiss after the sheet's own tap handling; opaque panel). Re-check on the emulator was blocked by the app's existing offline overlay (the emulator has no internet) |
+| Private Support screen: black design, developer identity, watermark, composer, offline banner | ✅ (`06_`) |
+| Emoji panel with 4 tabs, insertion at the cursor | ✅ (`07_`) |
+| Sending a message → **crash** «The specified child already has a parent» in `AdsChatActivity.buildRow` | ❌ found → fixed. The bug is in the supplied source: every bubble render crashed |
+| ANR dialogs (System UI, phone, Cigram) | Emulator CPU starvation; the Cigram trace shows the pre-existing `CigramStage1InitProvider$PlayerMonitor.stage4PatchVisibleSpeedRow` text layout on the main thread, not 18.2 code |
+| Private Support in the phone's **Light** mode: bubbles turned white with white text (the app's `CigramUI.round` / `CigramGlass` recolour dark colours in Light mode) | ❌ found → fixed (`CigramSupport.round`, fixed support colours); re-checked ✅ (`08_`) |
+| Message sent without network stays in the conversation as «بانتظار الاتصال — سيُرسل تلقائياً» (queued, never shown as sent) | ✅ (`08_`); the automatic resend itself needs the live server (§6c) |
+| Admin «مركز الترجمة العربية»: counters, filters, categories, job list from a seeded queue | ✅ (`09_`, `10_`) |
+| Admin job screen: identity, state, QA report, cue-by-cue preview against the source timing | ✅ (`11_`, `12_`); identity rows were displayed in reversed order (mixed RTL / LTR) → fixed, re-checked ✅ |
+| Admin «ترجمات موسم كامل» with a real ZIP (S01E01, S01E02 ×2, S01E03, S02E01, a file without a number): E01 / E03 matched, both E02 files held back as «أكثر من ملف لنفس الحلقة», S02E01 «موسم آخر», the unnumbered file «بلا رقم حلقة»; upload button counts only the 2 matched files | ✅ (`13_`, `14_`). The upload itself was **not pressed** (it writes to the live R2 catalogue) |
+
+Screenshots (emulator, 1080×2280) — `docs/screenshots-18.2/` inside both archives, `qa-screens/18.2/` in the repository:
+| File | Shows |
+|---|---|
+| `01_player_subtitle_timing_cp1256_dot_mixed.png` | Windows-1256 Arabic cue on time; `.`-separated cue shown |
+| `02_player_subtitle_mixed_and_top_position.png` | Arabic + English italic cue; `{\an8}` cue at the top |
+| `03_player_gear_subtitle_timing_presets.png` | Gear sheet «توقيت الترجمة» presets |
+| `04_player_delay_panel_zero.png` / `05_player_delay_panel_plus_0_5s.png` | Fine-tune panel at 0 and after +0.5 s |
+| `06_private_support_chat.png` / `07_private_support_emoji_panel.png` | Private Support screen, emoji panel |
+| `08_private_support_queued_offline_message.png` | Offline message kept queued (Light-mode fix visible) |
+| `09_admin_subtitle_center.png` / `10_admin_subtitle_center_jobs.png` | Admin Arabic Subtitle Center, job list |
+| `11_admin_job_review.png` / `12_admin_job_qa_cue_preview.png` | Job identity / state / QA report / cue preview |
+| `13_admin_season_zip_matching.png` / `14_admin_season_zip_unmatched.png` | Full-season ZIP: matched, duplicate, other season, no number |
+
+Not captured: Developer Inbox and Discovery («ما الجديد؟») screens — both load their content from the live Workers,
+which this environment cannot reach, so a screenshot would only show the network error.
+
+### 6c. Not tested live (needs real backend / credentials / devices)
+Login; live catalogue; real movies / series / episodes playback and episode selection; subtitle URLs from R2;
+subtitle switching between titles; all Worker calls (search, fetch, upload, publish, discovery feeds, decisions,
+chat send / WebSocket / receipts / uploads of photo / video / voice, notifications from the server, push);
+admin Developer Inbox with real threads; translation providers (none implemented); the 3,800-title batch;
+real TV / tablet / physical phone; casting.
 
 ## 7. Builds
-(see section 7)
+Final clean builds from commit `8fdc59f` (`gradle clean …`, Gradle 8.14.3, AGP 8.13.0, JDK 17, compileSdk 36). All exited 0.
+Release outputs are **unsigned** (no keystore is in the project or the archives; sign with the production key).
+
+| App | Task | Output | Size (bytes) |
+|---|---|---|---|
+| Main (`cigram/`) | `testPlayDebugUnitTest` | `SubHubTest` 24 / 24 | — |
+| | `assemblePlayDebug` | `app-play-debug.apk` | 20,958,205 |
+| | `assemblePlayRelease` | `app-play-release-unsigned.apk` | 17,757,597 |
+| | `assembleDirectDebug` | `app-direct-debug.apk` | 20,959,521 |
+| | `assembleDirectRelease` | `app-direct-release-unsigned.apk` | 17,758,353 |
+| | `bundlePlayRelease` | `app-play-release.aab` | 16,652,317 |
+| Admin (`admin/`) | `testDebugUnitTest` | `SubHubTest` 24 / 24 · `AdminSubHubTest` 12 / 12 · `WnLogicTest` 15 / 15 · `WnPipelineTest` 1 skipped (by its own source) | — |
+| | `assembleDebug` | `app-debug.apk` | 8,120,543 |
+| | `assembleRelease` | `app-release-unsigned.apk` | 6,579,428 |
+| | `bundleRelease` | `app-release.aab` | 5,984,905 |
+
+Pre-existing build fix: release variants of the main app failed at `mergeDex` in the supplied project
+(`androidx.viewbinding.ViewBinding` defined twice); the duplicate stub was removed (see the main app notes).
+
+Archive check: both archives are rebuilt from the git tree (tracked files only: no `build/`, no `local.properties`, no
+keystore), tested with `unzip -t`, extracted into new empty directories and built there on their own; the result and the
+archive sizes are in **§9** of the copy of this report delivered next to the archives.
 
 ## 8. Outstanding backend / owner actions
 1. Review and deploy `docs/backend` patches (ads-api, admin-api); set `DEV_NAME`, `DEV_AVATAR`, optional `DEVELOPERS`.
@@ -197,3 +275,28 @@ No SQL database is involved. All changes are additive and backwards compatible; 
 4. Verify TMDB commercial licensing and attribution.
 5. Run the live checks listed in §6c on a real device with real accounts.
 6. Sign release builds with the production keystore (not in the archives).
+7. Optional hardening: restrict the Firebase client API key (pre-existing in `CigramFcm.java`) to package `com.Cigram.vid` + the release SHA-1.
+
+---
+
+## 9. Archives (verified)
+| File | Path | Size (bytes) | Entries | SHA-256 |
+|---|---|---|---|---|
+| HASAN.ZIP (main app, folder `cigram/`) | `deliverables/HASAN.ZIP` | 10,198,276 | 500 | `69bb1fe0884fb55817899fac118d43fe92cc7977cd80fa61b51c5e5a2c72d819` |
+| ADMIN.ZIP (admin app, folder `admin/`) | `deliverables/ADMIN.ZIP` | 3,999,783 | 270 | `b0328a46a32fa11d32cc20149c2b205d1cdb80eba1e5a2bff3083c466d3bcfbf` |
+| This report | `deliverables/FINAL-IMPLEMENTATION-REPORT.md` | — | — | — |
+
+Each archive holds the project source (tracked files only), `docs/backend` (Worker patches + Node tests),
+`docs/screenshots-18.2/` and a copy of this report (that copy ends at §8; this §9 exists only here, because it describes
+the archives themselves). No `build/` output, no `local.properties`, no keystore, no private key (scan in Phase 10).
+
+Verification done here:
+1. `unzip -t` — no errors in either archive.
+2. Each archive extracted into a new empty directory; only `local.properties` (`sdk.dir`) added, as any machine needs.
+3. Built there on their own with Gradle 8.14.3 (the included wrapper pins 8.13 and downloads it on first use):
+   main `testPlayDebugUnitTest assemblePlayDebug assemblePlayRelease` → exit 0, `SubHubTest` 24 / 24,
+   APK sizes identical to the repository build; admin `testDebugUnitTest assembleDebug assembleRelease` → exit 0,
+   24 / 24 · 12 / 12 · 15 / 15 · 1 skipped (pre-existing).
+4. The archives were then re-packed only to include the final report text; a recursive diff of the re-extracted trees
+   against the built ones shows the report file as the only difference.
+5. The uploaded `cigram.zip` / `admin.zip` were never modified; the repository's first commit holds them byte-for-byte.

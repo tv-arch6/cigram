@@ -276,3 +276,27 @@ archive sizes are in **§9** of the copy of this report delivered next to the ar
 5. Run the live checks listed in §6c on a real device with real accounts.
 6. Sign release builds with the production keystore (not in the archives).
 7. Optional hardening: restrict the Firebase client API key (pre-existing in `CigramFcm.java`) to package `com.Cigram.vid` + the release SHA-1.
+
+---
+
+## 9. Archives (verified)
+| File | Path | Size (bytes) | Entries | SHA-256 |
+|---|---|---|---|---|
+| HASAN.ZIP (main app, folder `cigram/`) | `deliverables/HASAN.ZIP` | 10,198,276 | 500 | `69bb1fe0884fb55817899fac118d43fe92cc7977cd80fa61b51c5e5a2c72d819` |
+| ADMIN.ZIP (admin app, folder `admin/`) | `deliverables/ADMIN.ZIP` | 3,999,783 | 270 | `b0328a46a32fa11d32cc20149c2b205d1cdb80eba1e5a2bff3083c466d3bcfbf` |
+| This report | `deliverables/FINAL-IMPLEMENTATION-REPORT.md` | — | — | — |
+
+Each archive holds the project source (tracked files only), `docs/backend` (Worker patches + Node tests),
+`docs/screenshots-18.2/` and a copy of this report (that copy ends at §8; this §9 exists only here, because it describes
+the archives themselves). No `build/` output, no `local.properties`, no keystore, no private key (scan in Phase 10).
+
+Verification done here:
+1. `unzip -t` — no errors in either archive.
+2. Each archive extracted into a new empty directory; only `local.properties` (`sdk.dir`) added, as any machine needs.
+3. Built there on their own with Gradle 8.14.3 (the included wrapper pins 8.13 and downloads it on first use):
+   main `testPlayDebugUnitTest assemblePlayDebug assemblePlayRelease` → exit 0, `SubHubTest` 24 / 24,
+   APK sizes identical to the repository build; admin `testDebugUnitTest assembleDebug assembleRelease` → exit 0,
+   24 / 24 · 12 / 12 · 15 / 15 · 1 skipped (pre-existing).
+4. The archives were then re-packed only to include the final report text; a recursive diff of the re-extracted trees
+   against the built ones shows the report file as the only difference.
+5. The uploaded `cigram.zip` / `admin.zip` were never modified; the repository's first commit holds them byte-for-byte.
