@@ -1212,6 +1212,7 @@ public class WnDetailActivity extends CgBase {
         opts.addView(qb.scroll, CgUi.lp(this, CgUi.MATCH, CgUi.WRAP, -12, 0, -12, 0));
         opts.setLayoutParams(CgUi.lp(this, CgUi.MATCH, CgUi.WRAP, 0, 0, 0, 10));
         actionBox.addView(opts);
+        actionBox.addView(decisionBox());
         importBtn = CgUi.button(this, "إضافة إلى Cigram", 0);
         importBtn.setTextSize(16);
         importBtn.setMinHeight(CgUi.dp(this, 58));
@@ -1221,6 +1222,60 @@ public class WnDetailActivity extends CgBase {
         actionBox.addView(importBtn, new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP));
         actionBox.addView(CgUi.space(this, 20));
         updateImportButton();
+    }
+
+    // ------------------------------------------------------------------ 18.2 management decision
+
+    private TextView decisionLine;
+
+    private View decisionBox() {
+        LinearLayout box = WnUi.glass(this);
+        box.addView(CgUi.text(this, "قرار الإدارة", 14.5f, CgCfg.TEXT, true));
+        decisionLine = CgUi.muted(this, "");
+        box.addView(decisionLine);
+        LinearLayout row = CgUi.hbox(this);
+        String[][] acts = {{WnDecisions.REVIEW, "للمراجعة"}, {WnDecisions.APPROVED, "موافقة"}, {WnDecisions.REJECTED, "رفض"}};
+        for (final String[] a : acts) {
+            TextView b = CgUi.smallButton(this, a[1], WnDecisions.REJECTED.equals(a[0]) ? 2 : 1);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { decide(a[0]); }
+            });
+            row.addView(b, CgUi.lpWeight(this, 1f, 2, 6, 2, 0));
+        }
+        box.addView(row);
+        box.setLayoutParams(CgUi.lp(this, CgUi.MATCH, CgUi.WRAP, 0, 0, 0, 10));
+        refreshDecision();
+        return box;
+    }
+
+    private JSONObject decisionCard() {
+        JSONObject c = card == null ? new JSONObject() : card;
+        try {
+            if (det != null) {
+                if (!c.has("title")) c.put("title", det.optString("title"));
+                if (!c.has("poster")) c.put("poster", det.optString("poster"));
+            }
+        } catch (Throwable ignored) { }
+        return c;
+    }
+
+    private void refreshDecision() {
+        if (decisionLine == null) return;
+        String d = WnDecisions.of(this, decisionCard().optString("key"));
+        decisionLine.setText(d.length() == 0 ? "لم يُتخذ قرار بعد. الاستيراد يتطلب «موافقة» صريحة." : "الحالة: " + WnDecisions.label(d)
+                + (WnDecisions.APPROVED.equals(d) && report != null && "missing_video".equals(report.optString("state")) ? " — بانتظار فيديو صالح (مسودة، لا يُنشر)" : ""));
+    }
+
+    private void decide(final String d) {
+        if (WnDecisions.REJECTED.equals(d)) {
+            CgUi.input(this, "سبب الرفض (اختياري)", "مثال: غير مناسب، مكرر، جودة ضعيفة", "", false, new CgUi.Callback<String>() {
+                @Override public void run(String v) { WnDecisions.set(WnDetailActivity.this, decisionCard(), d, v.trim()); refreshDecision(); }
+            });
+            return;
+        }
+        WnDecisions.set(this, decisionCard(), d, "");
+        refreshDecision();
+        CgUi.toast(this, WnDecisions.label(d) + ".");
     }
 
     private boolean importable() {
@@ -1235,6 +1290,15 @@ public class WnDetailActivity extends CgBase {
 
     private void onImportClicked() {
         if (importing) return;
+        // 18.2: management approval is mandatory and explicit
+        String dec = WnDecisions.of(this, decisionCard().optString("key"));
+        if (WnDecisions.REJECTED.equals(dec)) { CgUi.info(this, "مرفوض", "هذا العنوان مرفوض من الإدارة. غيّر القرار إلى «موافقة» أولاً إن أردت استيراده."); return; }
+        if (!WnDecisions.APPROVED.equals(dec) && !WnDecisions.IMPORTED.equals(dec)) {
+            CgUi.confirm(this, "الموافقة مطلوبة", "لم يُعتمد هذا العنوان بعد. هل توافق عليه الآن ثم تتابع الإضافة؟", "موافقة ومتابعة", false, new Runnable() {
+                @Override public void run() { WnDecisions.set(WnDetailActivity.this, decisionCard(), WnDecisions.APPROVED, ""); refreshDecision(); onImportClicked(); }
+            });
+            return;
+        }
         if (validating || report == null) { CgUi.toast(this, "انتظر انتهاء التحقق أولاً."); return; }
         if (!WnLogic.reportOk(report)) { CgUi.info(this, WnLogic.stateLabel(report.optString("state")), WnLogic.firstProblem(report)); return; }
         if (!WnLogic.canImport(report, ack)) { CgUi.info(this, "إقرار مطلوب", "فعّل «أقرّ وأريد الاستيراد» في بطاقة الإقرار أعلاه لأن مصدر الفيديو لا يمكن إثبات تشغيله من الخادم."); return; }
@@ -1324,6 +1388,7 @@ public class WnDetailActivity extends CgBase {
         if (definitive) importNonce = null; // a retry after a transient failure keeps the id, so the Worker replays instead of duplicating
         if (!alive()) return;
         if (created > 0) {
+            WnDecisions.set(this, decisionCard(), WnDecisions.IMPORTED, created + " عنصر");
             WnUi.dirty = true;
             CgData.load(this, new CgHttp.Done<CgData>() {
                 @Override public void ok(CgData d) { }

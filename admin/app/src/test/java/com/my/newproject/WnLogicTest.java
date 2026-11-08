@@ -42,10 +42,16 @@ public class WnLogicTest {
 
     @Test
     public void everyChipMapsToAWorkerFeedOrView() {
+        // feeds of the live Worker (WN_FEED_KEYS / WN_VIEW_KEYS) …
         List<String> known = Arrays.asList("all:new_releases", "movie:new_releases", "tv:recent_episodes", "all:trending", "movie:upcoming",
-                "tv:new_seasons", "collections", "recently_added", "ready", "unverified", "missing_video", "missing_subtitle", "imported");
+                "tv:new_seasons", "collections", "recently_added", "ready", "unverified", "missing_video", "missing_subtitle", "imported",
+                "movie:popular", "tv:popular",
+                // … 18.2 Worker section (docs/backend/admin-api-subhub.js) …
+                "all:trending_day", "movie:top_rated", "tv:top_rated", "tv:on_the_air",
+                // … and local decision lists (no network)
+                "local:review", "local:approved", "local:rejected");
         for (String[] c : WnLogic.CHIPS) assertTrue(c[0], known.contains(c[2]));
-        assertEquals(14, WnLogic.CHIPS.length);
+        assertEquals(23, WnLogic.CHIPS.length);
     }
 
     @Test

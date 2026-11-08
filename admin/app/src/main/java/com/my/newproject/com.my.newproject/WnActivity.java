@@ -80,6 +80,15 @@ public class WnActivity extends CgBase {
                 @Override public void onClick(View v) { pickChip(chip[0]); }
             });
         }
+        // 18.2: «غير المضاف فقط» hides titles that are already in the catalogue (in every list)
+        final TextView notAdded = chips.add("غير المضاف فقط", notAddedOnly);
+        notAdded.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                notAddedOnly = !notAddedOnly;
+                CgUi.setChipState(notAdded, notAddedOnly);
+                loadFeed(true, false);
+            }
+        });
         filterChip = chips.add("فلترة متقدمة", false);
         filterChip.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { openFilters(); }
@@ -215,9 +224,23 @@ public class WnActivity extends CgBase {
             w.addView(CgUi.spinner(this), new LinearLayout.LayoutParams(CgUi.dp(this, 28), CgUi.dp(this, 28)));
             footer.addView(w, CgUi.lp(this, CgUi.MATCH, CgUi.WRAP, 0, 10, 0, 10));
         }
+        String[] chipDef = WnLogic.chip(chipId);
+        if (chipDef[2].startsWith("local:")) {
+            // decision lists live on this phone: no request, no paging
+            footer.removeAllViews();
+            List<JSONObject> local = WnDecisions.cards(this, chipDef[2].substring(6));
+            for (JSONObject c : local) addCard(c);
+            endReached = true;
+            if (shown == 0) footer.addView(CgUi.empty(this, "القائمة فارغة", "افتح أي عنوان واختر «إضافة لقائمة المراجعة» أو «موافقة» أو «رفض»."));
+            if (WnDecisions.serverMissing(this)) {
+                TextView n = CgUi.text(this, "! القرارات محفوظة على هذا الجهاز فقط: الـ Worker الحالي لا يحتوي مسار /admin/discover/decision.", 12.5f, CgCfg.WARN, false);
+                noteBox.addView(n);
+            }
+            return;
+        }
         loading = true;
         final int pg = page;
-        final JSONObject req = WnLogic.feedRequest(WnLogic.chip(chipId), filters, pg, refresh);
+        final JSONObject req = WnLogic.feedRequest(chipDef, filters, pg, refresh);
         CgHttp.async(this, new CgHttp.Work<JSONObject>() {
             @Override public JSONObject run() throws Exception { return WnApi.feed(req); }
         }, new CgHttp.Done<JSONObject>() {
@@ -268,10 +291,13 @@ public class WnActivity extends CgBase {
         });
     }
 
+    private boolean notAddedOnly;
+
     private void addCard(JSONObject c) {
         if (c == null) return;
         String key = c.optString("key");
         if (key.length() == 0 || cardByKey.containsKey(key)) return;
+        if (notAddedOnly && c.optBoolean("imported", false)) return;
         if (rowBox == null || rowFill >= cols) {
             rowBox = CgUi.hbox(this);
             rowBox.setGravity(Gravity.TOP);
@@ -292,6 +318,13 @@ public class WnActivity extends CgBase {
         shown++;
         View v = makeCard(c);
         slot.addView(v);
+        String dec = WnDecisions.of(this, key);
+        if (dec.length() > 0) {
+            TextView b = CgUi.badge(this, WnDecisions.label(dec), WnDecisions.color(dec));
+            android.widget.FrameLayout.LayoutParams bl = new android.widget.FrameLayout.LayoutParams(CgUi.WRAP, CgUi.WRAP, Gravity.TOP | Gravity.LEFT);
+            bl.setMargins(CgUi.dp(this, 6), CgUi.dp(this, 6), 0, 0);
+            slot.addView(b, bl);
+        }
         WnUi.reveal(v, shown);
     }
 
@@ -378,9 +411,19 @@ public class WnActivity extends CgBase {
             return;
         }
         if (skipped > 0) CgUi.toast(this, "استُبعد " + skipped + " عنصر موجود في المكتبة.");
-        Intent in = new Intent(this, WnBulkActivity.class);
+        final Intent in = new Intent(this, WnBulkActivity.class);
         in.putExtra(WnBulkActivity.EXTRA_CARDS, arr.toString());
-        startActivity(in);
+        // 18.2: bulk approval is one explicit, confirmed decision for exactly the selected titles
+        final JSONArray fArr = arr;
+        CgUi.confirm(this, "اعتماد " + arr.length() + " عنواناً؟", "تُعتمد العناوين المحددة فقط وتنتقل إلى شاشة الاستيراد الجماعي. هناك يُتحقق من كل عنوان في الخادم، والعنوان بلا فيديو صالح لا يُستورد ويبقى «معتمداً» بانتظار الفيديو. لا يُنشر شيء دون الضغط على «ابدأ الاستيراد».", "اعتماد ومتابعة", false, new Runnable() {
+            @Override public void run() {
+                for (int i = 0; i < fArr.length(); i++) {
+                    JSONObject c = fArr.optJSONObject(i);
+                    if (c != null) WnDecisions.set(WnActivity.this, c, WnDecisions.APPROVED, "اعتماد جماعي");
+                }
+                startActivity(in);
+            }
+        });
     }
 
     // ------------------------------------------------------------------ sync

@@ -29,7 +29,16 @@ final class WnLogic {
             {"movies", "أفلام", "movie:new_releases", "movie", ""},
             {"series", "مسلسلات", "tv:recent_episodes", "series", ""},
             {"new", "إصدارات جديدة", "all:new_releases", "any", "release"},
-            {"trending", "الأكثر رواجاً", "all:trending", "any", ""},
+            {"trending", "رائج هذا الأسبوع", "all:trending", "any", ""},
+            // 18.2 Cigram Discovery: TMDB lists the Worker already serves …
+            {"pop_movies", "أفلام شائعة", "movie:popular", "movie", ""},
+            {"pop_tv", "مسلسلات شائعة", "tv:popular", "series", ""},
+            // … and lists that need the 18.2 Worker section (docs/backend): until it is deployed the Worker answers
+            // «قائمة اكتشاف غير معروفة» and the screen shows that error, never an invented list.
+            {"trend_day", "رائج اليوم", "all:trending_day", "any", ""},
+            {"top_movies", "أفلام الأعلى تقييماً", "movie:top_rated", "movie", ""},
+            {"top_tv", "مسلسلات الأعلى تقييماً", "tv:top_rated", "series", ""},
+            {"airing", "تُعرض حالياً", "tv:on_the_air", "series", ""},
             {"upcoming", "قريباً", "movie:upcoming", "movie", ""},
             {"seasons", "مواسم جديدة", "tv:new_seasons", "series", ""},
             {"collections", "سلاسل أفلام", "collections", "movie", ""},
@@ -39,6 +48,10 @@ final class WnLogic {
             {"novideo", "بلا فيديو", "missing_video", "any", ""},
             {"nosub", "بلا ترجمة", "missing_subtitle", "any", ""},
             {"imported", "مستورد مسبقاً", "imported", "any", ""},
+            // 18.2 management decisions (this phone + Worker mirror): never imported or published by themselves
+            {"review", "قائمة المراجعة", "local:review", "any", ""},
+            {"approved", "معتمد", "local:approved", "any", ""},
+            {"rejected", "مرفوض", "local:rejected", "any", ""},
     };
 
     static String[] chip(String id) {

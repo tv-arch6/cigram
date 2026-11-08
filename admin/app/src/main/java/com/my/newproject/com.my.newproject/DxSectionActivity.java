@@ -167,7 +167,7 @@ public class DxSectionActivity extends CgBase {
             box.addView(DxUi.item(this, CgIcons.CHAT, "صندوق المطوّر", "الدعم الخاص ورسائل المستخدمين والمعلنين", "", NxUi.PINK, go(AdInboxActivity.class)));
             box.addView(DxUi.item(this, CgIcons.MEGAPHONE, "الحملات", "إنشاء ومراجعة وموافقة وتقارير", "", NxUi.ORANGE, go(AdCampaignsActivity.class)));
             box.addView(DxUi.item(this, CgIcons.USERS, "المعلنون", "ملفات الشركات وسجل حملاتها", "", NxUi.BLUE, go(AdAdvertisersActivity.class)));
-            box.addView(DxUi.item(this, CgIcons.GEAR, "الأسعار والإعدادات", "المساحات والأسعار والسياسات", "", CgCfg.GRAY, go(AdSettingsActivity.class)));
+            box.addView(DxUi.item(this, CgIcons.GEAR, "الأسعار والإعدادات", "أسعار الحملات، سياسة التواصل، ساعات العمل", "", CgCfg.GRAY, go(AdSettingsActivity.class)));
             box.addView(DxUi.item(this, CgIcons.FLAG, "بلاغات الإعلانات", "حملات أبلغ عنها المستخدمون", "", CgCfg.BAD, go(AdReportsActivity.class)));
             box.addView(DxUi.item(this, CgIcons.SHIELD, "تفعيل وإيقاف الإعلانات", "المفتاح الرئيسي لكل موضع", "", NxUi.TEAL, go(OpsAdsActivity.class)));
             box.addView(DxUi.item(this, CgIcons.CHART, "فحص الإعلانات", "نسبة التعبئة وأسباب الفشل", "", NxUi.UP, go(OpsAdCheckActivity.class)));

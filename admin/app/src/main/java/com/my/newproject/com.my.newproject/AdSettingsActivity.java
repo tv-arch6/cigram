@@ -195,12 +195,16 @@ public class AdSettingsActivity extends CgBase {
         }
         tLangs = field(c, "اللغات", ls.toString().trim(), true, "سطر لكل لغة: الرمز | الاسم. مثال: ar | العربية");
 
+        // 18.2: the user-facing «أعلن هنا» page was removed from the Cigram app. Its content editors (rules, FAQ, contact
+        // buttons, page header) are no longer shown and no longer saved — the stored values stay untouched on the server.
+        // Prices, policies (still asked before the first support message by the current server) and work hours remain.
+        final LinearLayout legacy = CgUi.vbox(this);
         JSONObject rules = st.optJSONObject("rules") == null ? new JSONObject() : st.optJSONObject("rules");
-        c = section(root, "قواعد الإعلان", "تظهر للمعلن في صفحة «أعلن هنا».");
+        c = section(legacy, "قواعد الإعلان", "تظهر للمعلن في صفحة «أعلن هنا».");
         rAccepted = field(c, "المقبول", titleText(rules.optJSONArray("accepted")), true, "سطر لكل قاعدة: العنوان | الشرح");
         rRejected = field(c, "المرفوض", titleText(rules.optJSONArray("rejected")), true, "سطر لكل قاعدة: العنوان | الشرح");
 
-        c = section(root, "السياسات والشروط", "أي تعديل على النص يرفع رقم الإصدار تلقائياً فيُطلب من كل معلن الموافقة من جديد قبل التواصل.");
+        c = section(root, "السياسات والشروط", "تظهر للمستخدم قبل أول رسالة في «الدعم الخاص» ما دام الخادم يطلب الموافقة. أي تعديل على النص يرفع رقم الإصدار تلقائياً فيُطلب من كل معلن الموافقة من جديد قبل التواصل.");
         polBox = CgUi.vbox(this);
         c.addView(polBox);
         JSONArray pj = st.optJSONArray("policies");
@@ -212,7 +216,7 @@ public class AdSettingsActivity extends CgBase {
         c.addView(bumpVersion);
         c.addView(CgUi.muted(this, "الإصدار الحالي: " + st.optInt("policies_version", 1)));
 
-        c = section(root, "الأسئلة الشائعة", null);
+        c = section(legacy, "الأسئلة الشائعة", null);
         faqBox = CgUi.vbox(this);
         c.addView(faqBox);
         JSONArray fj = st.optJSONArray("faq");
@@ -222,7 +226,7 @@ public class AdSettingsActivity extends CgBase {
         c.addView(addF2, CgUi.lp(this, CgUi.MATCH, CgUi.WRAP, 0, 6, 0, 0));
 
         JSONObject ct = st.optJSONObject("contact") == null ? new JSONObject() : st.optJSONObject("contact");
-        c = section(root, "التواصل", "تظهر أزرار واتساب وX في صفحة «أعلن هنا» فقط بعد موافقة المعلن على السياسات.");
+        c = section(legacy, "التواصل", "تظهر أزرار واتساب وX في صفحة «أعلن هنا» فقط بعد موافقة المعلن على السياسات.");
         cWa = field(c, "رقم واتساب (أرقام فقط مع رمز الدولة)", ct.optString("whatsapp"), false, null);
         cWaMsg = field(c, "رسالة واتساب الجاهزة", ct.optString("whatsapp_message"), true, null);
         cXUrl = field(c, "رابط حساب X (https فقط)", ct.optString("x_url"), false, null);
@@ -248,7 +252,7 @@ public class AdSettingsActivity extends CgBase {
         autoReply = field(c, "نص الرد التلقائي", st.optString("auto_reply"), true, null);
 
         JSONObject hero = st.optJSONObject("hero") == null ? new JSONObject() : st.optJSONObject("hero");
-        c = section(root, "رأس صفحة «أعلن هنا»", "الأرقام المقاسة تُحسب من نشاط آخر 7 أيام. اترك الأرقام اليدوية 0 لاستخدام المقاسة. لا تضع رقماً غير حقيقي.");
+        c = section(legacy, "رأس صفحة «أعلن هنا»", "الأرقام المقاسة تُحسب من نشاط آخر 7 أيام. اترك الأرقام اليدوية 0 لاستخدام المقاسة. لا تضع رقماً غير حقيقي.");
         heroTitle = field(c, "العنوان", hero.optString("title"), false, null);
         heroSub = field(c, "العنوان الفرعي", hero.optString("subtitle"), true, null);
         heroUsers = num(c, "مستخدمون نشطون يدوياً (0 = تلقائي)", String.valueOf(hero.optLong("manual_users", 0)));
@@ -409,7 +413,7 @@ public class AdSettingsActivity extends CgBase {
             tg.put("langs", langs);
             patch.put("targeting", tg);
 
-            patch.put("rules", new JSONObject().put("accepted", parseRules(rAccepted)).put("rejected", parseRules(rRejected)));
+            // 18.2: rules / faq / contact / hero belong to the removed «أعلن هنا» page and are not sent (server keeps them)
 
             JSONArray pols = new JSONArray();
             for (View[] r : polRows) {
@@ -429,10 +433,7 @@ public class AdSettingsActivity extends CgBase {
                 String q = r[0].getText().toString().trim(), a = r[1].getText().toString().trim();
                 if (q.length() > 0 && a.length() > 0) faq.put(new JSONObject().put("q", q).put("a", a));
             }
-            patch.put("faq", faq);
 
-            patch.put("contact", new JSONObject().put("whatsapp", cWa.getText().toString().trim()).put("whatsapp_message", cWaMsg.getText().toString().trim())
-                    .put("x_url", cXUrl.getText().toString().trim()).put("x_handle", cXHandle.getText().toString().trim()));
 
             JSONArray days = new JSONArray();
             for (int i = 0; i < 7; i++) if (dayT[i] != null && dayT[i].on) days.put(i);
@@ -440,8 +441,7 @@ public class AdSettingsActivity extends CgBase {
                     .put("from", hFrom.getText().toString().trim()).put("to", hTo.getText().toString().trim()).put("days", days));
             patch.put("auto_reply", autoReply.getText().toString().trim());
 
-            patch.put("hero", new JSONObject().put("title", heroTitle.getText().toString().trim()).put("subtitle", heroSub.getText().toString().trim())
-                    .put("manual_users", in(heroUsers, 0)).put("manual_daily_views", in(heroViews, 0)));
+
 
             showLoading("جارٍ الحفظ...");
             AdApi.post(this, "/admin/settings", new JSONObject().put("patch", patch), new AdApi.Cb() {
