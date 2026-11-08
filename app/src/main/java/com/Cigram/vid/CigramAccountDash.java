@@ -109,9 +109,11 @@ final class CigramAccountDash {
                     @Override public void onClick(View v) { openSettings(a, "logout"); }
                 });
         setSubtitle(theme, themeLabel(a));
-        // a visitor has no profile to edit and nothing to sign out of; the appearance choice is for everybody
+        // a visitor has no profile to edit and nothing to sign out of; the appearance row is for the signed-in page
+        // (a visitor has the same choice as a small link on the welcome card, which disappears with the form)
         edit.setVisibility(logged ? View.VISIBLE : View.GONE);
         logout.setVisibility(logged ? View.VISIBLE : View.GONE);
+        theme.setVisibility(logged ? View.VISIBLE : View.GONE);
         // rows built by CigramAccountExtras have an arrow and a label only: give them the same face as the others
         if (widget != null) CigramAccountUI.restyleRow(a, widget, AdsIcons.IMAGE, 0xFF4DA3FF, "على الشاشة الرئيسية");
         if (plusCode != null) CigramAccountUI.restyleRowAs(a, plusCode, "ضع كود التفعيل", "Cigram Plus", AdsIcons.STAR, pal.gold);

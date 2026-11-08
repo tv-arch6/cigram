@@ -45,6 +45,7 @@ final class CigramAccountDesign {
     static final String TAG_LOGO = "cigram_auth_logo";
     private static final String TAG_GUEST_EXTRAS = "cigram_guest_extras";
     private static final String TAG_GUEST_LINK = "cigram_guest_register_link";
+    private static final String TAG_GUEST_THEME = "cigram_guest_theme";
 
     static final int RED = 0xFFE21B14;
     private static final WeakHashMap<Activity, Boolean> REVEALED = new WeakHashMap<Activity, Boolean>();
@@ -98,6 +99,7 @@ final class CigramAccountDesign {
     static void primaryButton(Activity a, View v, int heightDp, int sideDp, int topDp) {
         if (!(v instanceof TextView)) return;
         TextView b = (TextView) v;
+        if (b.getTag() == null) b.setTag(CigramTheme.SKIP_TAG);   // brand red + white text in both themes: never re-coloured
         b.setAllCaps(false);
         b.setTextSize(16f);
         b.setTextColor(0xFFFFFFFF);
@@ -312,12 +314,30 @@ final class CigramAccountDesign {
                         CigramAuthPolish.showRegister(a);    // then the register tab
                     }
                 });
+                // the appearance choice for a visitor: a quiet link under the two actions
+                TextView themeLink = new TextView(a);
+                themeLink.setTag(TAG_GUEST_THEME);
+                themeLink.setTextSize(12.5f);
+                themeLink.setTypeface(CigramUI.font(a));
+                themeLink.setGravity(Gravity.CENTER);
+                themeLink.setPadding(dp(a, 12), dp(a, 14), dp(a, 12), dp(a, 6));
+                themeLink.setClickable(true);
+                themeLink.setFocusable(true);
+                themeLink.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View v) { CigramAccountDash.showThemeDialog(a); }
+                });
                 LinearLayout.LayoutParams linkLp = new LinearLayout.LayoutParams(-1, dp(a, 52));
                 linkLp.topMargin = dp(a, 12);
                 linkLp.leftMargin = dp(a, 4);
                 linkLp.rightMargin = dp(a, 4);
                 box.addView(link, linkLp);
+                box.addView(themeLink, new LinearLayout.LayoutParams(-1, -2));
                 reveal(a, logo, welcome, hint, benefits, open, link);
+            }
+            View themeView = box.findViewWithTag(TAG_GUEST_THEME);
+            if (themeView instanceof TextView) {
+                ((TextView) themeView).setText("المظهر: " + CigramAccountDash.themeLabel(a) + "  ‹");
+                ((TextView) themeView).setTextColor(CigramPalette.of(a).text3);
             }
             primaryButton(a, open, 54, 4, 20);
             ((TextView) open).setText("تسجيل الدخول");

@@ -22,7 +22,9 @@ import android.text.TextWatcher;
 import android.text.style.ForegroundColorSpan;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.inputmethod.EditorInfo;
@@ -239,9 +241,22 @@ final class CigramLiveHub implements CigramChannelStore.Listener, CigramChannelP
     private void build() {
         navPad = dp(84) + navigationBarHeight();
 
-        root = new FrameLayout(a);
+        slop = ViewConfiguration.get(a).getScaledTouchSlop();
+        root = new FrameLayout(a) {
+            @Override public boolean dispatchTouchEvent(MotionEvent ev) {
+                trackTouch(ev);
+                return super.dispatchTouchEvent(ev);
+            }
+        };
         root.setBackgroundColor(pal.page);
         root.setTag(CigramTheme.SKIP_TAG);   // this page is themed by its own palette, not by the legacy pass
+        // The page itself takes the initial focus. Without this the search field gets it when the window opens,
+        // and its focus listener (which lifts the field above the keyboard) would scroll the player out of view.
+        // Tapping the field still focuses it, and clearFocus() on it hands the focus back to this root.
+        root.setDescendantFocusability(ViewGroup.FOCUS_BEFORE_DESCENDANTS);
+        root.setFocusable(true);
+        root.setFocusableInTouchMode(true);
+        if (android.os.Build.VERSION.SDK_INT >= 26) root.setDefaultFocusHighlightEnabled(false);
 
         stageWrap = new AspectFrame(a);
         stageWrap.setBackgroundColor(pal.pageDeep);
@@ -316,7 +331,9 @@ final class CigramLiveHub implements CigramChannelStore.Listener, CigramChannelP
         scroll.setOnScrollChangeListener(new View.OnScrollChangeListener() {
             @Override public void onScrollChange(View v, int sx, int sy, int ox, int oy) {
                 if (sy != oy) {
-                    if (input != null && input.hasFocus()) hideKeyboard();
+                    // only the user's own drag / fling puts the keyboard away: the page also scrolls by itself
+                    // (lifting the field above the keyboard, going back up to the picture) and that must not close it
+                    if (input != null && input.hasFocus() && userScrolling()) hideKeyboard();
                     queueLogos();
                 }
             }
@@ -1130,6 +1147,39 @@ final class CigramLiveHub implements CigramChannelStore.Listener, CigramChannelP
         if (backCallback instanceof androidx.activity.OnBackPressedCallback) {
             ((androidx.activity.OnBackPressedCallback) backCallback).setEnabled(query.length() > 0 || chipKind != CH_ALL);
         }
+    }
+
+    // ---- told apart from the page's own scrolling: a touch counts as a scroll only once it has moved past the slop
+    private int slop;
+    private boolean touching;
+    private boolean dragged;
+    private float downX, downY;
+    private long touchEnd;
+
+    private void trackTouch(MotionEvent ev) {
+        switch (ev.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                touching = true;
+                dragged = false;
+                downX = ev.getX();
+                downY = ev.getY();
+                break;
+            case MotionEvent.ACTION_MOVE:
+                if (!dragged && (Math.abs(ev.getY() - downY) > slop || Math.abs(ev.getX() - downX) > slop)) dragged = true;
+                break;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                touching = false;
+                touchEnd = SystemClock.uptimeMillis();
+                break;
+            default:
+                break;
+        }
+    }
+
+    /** True while the finger is dragging the page, and for the moment its fling lasts afterwards. */
+    private boolean userScrolling() {
+        return dragged && (touching || SystemClock.uptimeMillis() - touchEnd < 1500L);
     }
 
     private void hideKeyboard() {

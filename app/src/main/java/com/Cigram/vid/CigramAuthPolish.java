@@ -234,6 +234,7 @@ public final class CigramAuthPolish {
             g.setCornerRadius(CigramUI.dp(a, 13));
             t.setBackground(g);
             t.setTextColor(0xFFFFFFFF);
+            if (t.getTag() == null) t.setTag(CigramTheme.SKIP_TAG);   // white on brand red in both themes
         } else {
             t.setBackground(null);
             t.setTextColor(CigramTheme.text2(a));
