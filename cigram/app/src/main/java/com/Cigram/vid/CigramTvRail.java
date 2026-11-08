@@ -56,8 +56,8 @@ final class CigramTvRail {
 
     private static final float RAIL_DP = 188f;
     private static final float LINE_DP = 1f;
-    private static final int BG_TOP = 0xFF04202B;
-    private static final int BG_BOTTOM = 0xFF000B10;
+    private static final int BG_TOP = 0xFF18181B;   // 2026 charcoal (was teal 0xFF04202B)
+    private static final int BG_BOTTOM = 0xFF0A0A0C;   // 2026 charcoal (was 0xFF000B10)
     private static final int LINE = 0x33FFFFFF;
     private static final int INK_DARK = 0xFF0E0E10;
     private static final int RED = 0xFFE21B14;

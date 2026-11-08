@@ -90,7 +90,15 @@ public final class CigramTvActivity extends Activity implements CigramTvHost {
         content = new FrameLayout(this);
         shell.addView(content, new LinearLayout.LayoutParams(0, -1, 1f));
         sidebar = buildSidebar();
-        shell.addView(sidebar, new LinearLayout.LayoutParams(dp(248), -1));
+        // 2026: the ten entries do not fit the height of every TV (or a TV-mode phone); in a ScrollView the
+        // focused entry is always scrolled into view instead of disappearing under the bottom edge
+        android.widget.ScrollView railScroll = new android.widget.ScrollView(this);
+        railScroll.setFillViewport(true);
+        railScroll.setVerticalScrollBarEnabled(false);
+        railScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        railScroll.setBackgroundColor(0xFF0A0A0C);
+        railScroll.addView(sidebar, new FrameLayout.LayoutParams(-1, -2));
+        shell.addView(railScroll, new LinearLayout.LayoutParams(dp(248), -1));
 
         root.addView(shell, new FrameLayout.LayoutParams(-1, -1));
         setContentView(root);
@@ -106,7 +114,7 @@ public final class CigramTvActivity extends Activity implements CigramTvHost {
     private LinearLayout buildSidebar() {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.VERTICAL);
-        bar.setBackgroundColor(0xFF03090E);
+        bar.setBackgroundColor(0xFF0A0A0C);   // 2026 charcoal (was navy 0xFF03090E)
         bar.setPadding(dp(10), dp(26), dp(10), dp(18));
 
         // brand
@@ -128,8 +136,8 @@ public final class CigramTvActivity extends Activity implements CigramTvHost {
             item.setTypeface(font(), Typeface.BOLD);
             item.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
             item.setSingleLine(true);
-            item.setMinHeight(dp(50));
-            item.setPadding(dp(20), dp(10), dp(20), dp(10));
+            item.setMinHeight(dp(46));
+            item.setPadding(dp(20), dp(8), dp(20), dp(8));
             item.setFocusable(true);
             item.setFocusableInTouchMode(false);
             item.setClickable(true);
@@ -171,7 +179,7 @@ public final class CigramTvActivity extends Activity implements CigramTvHost {
     // --------------------------------------------------------------------- navigation
 
     private void onNav(int index) {
-        if (index == current && (index == 0 || index == 1 || index == 2 || index == 7)) {
+        if (index == current && (index == 0 || index == 1 || index == 2 || index == 7 || index == 8 || index == 9)) {
             // same bespoke panel: do nothing (avoid a rebuild / focus jump)
             return;
         }
@@ -180,8 +188,6 @@ public final class CigramTvActivity extends Activity implements CigramTvHost {
             case 4: launch(MyContentActivity.class); return;         // شاهد لاحقاً / قائمتي
             case 5: launch(MyContentActivity.class); return;         // متابعة المشاهدة
             case 6: launch(CigramDiscoverActivity.class); return;    // اكتشف
-            case 8: launch(AccountActivity.class); return;           // الحساب
-            case 9: launch(SettingsActivity.class); return;          // الإعدادات
             default: break;
         }
         current = index;
@@ -192,6 +198,8 @@ public final class CigramTvActivity extends Activity implements CigramTvHost {
             case 1: panel = CigramTvGrid.movies(this); break;
             case 2: panel = CigramTvGrid.series(this); break;
             case 7: panel = CigramTvSearch.build(this); break;
+            case 8: panel = CigramTvPanels.account(this); break;     // 2026: TV account panel (was the phone page)
+            case 9: panel = CigramTvPanels.settings(this); break;    // 2026: TV settings panel (was the phone page)
             case 0:
             default: panel = CigramTvHome.build(this); break;
         }
