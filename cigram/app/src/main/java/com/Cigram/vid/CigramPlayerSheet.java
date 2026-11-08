@@ -108,7 +108,7 @@ public final class CigramPlayerSheet {
     private static final int SHEET = 0xF208141B;
     private static final int SEG = 0x1FFFFFFF;
     private static final int SEG_ON = 0xFFFFFFFF;
-    private static final int ROW = 0xFF0B2936;
+    private static final int ROW = 0xFF1C1C20;
     private static final int ROW_PRESSED = 0xFF12384A;
     private static final int TEXT = 0xFFFFFFFF;
     private static final int VALUE = 0xFFA9B6BD;

@@ -580,10 +580,10 @@ public class AccountActivity extends AppCompatActivity {
 					canvas.clipPath(clip);
 					paint.setStyle(android.graphics.Paint.Style.FILL);
 					paint.setShader(null);
-					paint.setColor(green ? 0x6639DB91 : 0xB005141F);
+					paint.setColor(green ? 0x6639DB91 : 0xB0111113);
 					canvas.drawRoundRect(rect, radius, radius, paint);
 					paint.setShader(new android.graphics.LinearGradient(0, rect.top, rect.width(), rect.bottom,
-					new int[]{0x34FFFFFF, 0x09FFFFFF, 0x0005141F, 0x16FFFFFF},
+					new int[]{0x34FFFFFF, 0x09FFFFFF, 0x00111113, 0x16FFFFFF},
 					new float[]{0f, 0.28f, 0.65f, 1f}, android.graphics.Shader.TileMode.CLAMP));
 					canvas.drawRoundRect(rect, radius, radius, paint);
 					paint.setShader(null);
@@ -831,7 +831,7 @@ public class AccountActivity extends AppCompatActivity {
 		);
 		
 		registerTab.setTextColor(
-		android.graphics.Color.parseColor("#84939B")
+		android.graphics.Color.parseColor("#8A8A8F")
 		);
 		
 		
@@ -910,7 +910,7 @@ public class AccountActivity extends AppCompatActivity {
 				);
 				
 				registerTab.setTextColor(
-				android.graphics.Color.parseColor("#84939B")
+				android.graphics.Color.parseColor("#8A8A8F")
 				);
 			}
 		});
@@ -969,7 +969,7 @@ public class AccountActivity extends AppCompatActivity {
 				);
 				
 				loginTab.setTextColor(
-				android.graphics.Color.parseColor("#84939B")
+				android.graphics.Color.parseColor("#8A8A8F")
 				);
 			}
 		});
@@ -1031,7 +1031,7 @@ public class AccountActivity extends AppCompatActivity {
 			new android.graphics.drawable.GradientDrawable();
 			
 			darkBackground.setColor(
-			android.graphics.Color.parseColor("#FF0B2330")
+			android.graphics.Color.parseColor("#FF1D1D20")
 			);
 			
 			darkBackground.setCornerRadius(50f);
@@ -1067,7 +1067,7 @@ public class AccountActivity extends AppCompatActivity {
 		new android.graphics.drawable.GradientDrawable();
 		
 		tabsBackground.setColor(
-		android.graphics.Color.parseColor("#FF0B2330")
+		android.graphics.Color.parseColor("#FF1D1D20")
 		);
 		tabsBackground.setCornerRadius(50f);
 		
@@ -1648,7 +1648,7 @@ public class AccountActivity extends AppCompatActivity {
 		int[] cgAccountButtons={R.id.linear_account_settings,R.id.linear_account_subtitle_font,R.id.linear_my_content,
 			R.id.linear_help_support,R.id.button_open_login,R.id.button_login,R.id.button_register};
 		for(int id:cgAccountButtons) {android.view.View view=findViewById(id);cgGlass.bind(view,24,true);cgGlass.press(view);if(view instanceof android.widget.TextView)((android.widget.TextView)view).setTextColor(0xFFFFFFFF);}
-		findViewById(R.id.linear_account_content).setBackgroundColor(0xFF05141F);
+		findViewById(R.id.linear_account_content).setBackgroundColor(0xFF111113);
 		if (!getIntent().getBooleanExtra("cigram_nav_reveal", false)) {
 			cgAvatarCard.setAlpha(0f);cgInfoCard.setAlpha(0f);cgAvatarCard.animate().alpha(1f).setDuration(250L).start();cgInfoCard.animate().alpha(1f).setStartDelay(70L).setDuration(250L).start();
 		}
@@ -1896,7 +1896,7 @@ public class AccountActivity extends AppCompatActivity {
 				final android.widget.FrameLayout tnShell =
 				new android.widget.FrameLayout(tnActivity);
 				tnShell.setTag("cigram_nav_shell_v2");
-				tnShell.setBackgroundColor(0xFF00121A);
+				tnShell.setBackgroundColor(0xFF0E0E10);
 				tnContent.addView(tnShell,
 				new android.view.ViewGroup.LayoutParams(
 				android.view.ViewGroup.LayoutParams.MATCH_PARENT,
@@ -2427,7 +2427,7 @@ public class AccountActivity extends AppCompatActivity {
 					tnLabel.setTextColor(
 					n == tnCurrent
 					? 0xFFFFFFFF
-					: 0xFFADBBC2);
+					: 0xFFB0B0B5);
 					tnLabel.setGravity(android.view.Gravity.CENTER);
 					tnLabel.setIncludeFontPadding(false);
 					tnLabel.setSingleLine(true);

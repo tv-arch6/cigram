@@ -1520,7 +1520,7 @@ public final class CigramCastDetails {
 
             TextView label = CigramUI.label(a, "إعلان", 12f, 0xFFFFFFFF, false);
             label.setGravity(Gravity.CENTER);
-            label.setBackground(CigramUI.round(0xCC05141F, 14, a));
+            label.setBackground(CigramUI.round(0xCC111113, 14, a));
             label.setPadding(CigramUI.dp(a, 12), CigramUI.dp(a, 5), CigramUI.dp(a, 12), CigramUI.dp(a, 5));
             LinearLayout.LayoutParams l1 = new LinearLayout.LayoutParams(-2, -2);
             l1.bottomMargin = CigramUI.dp(a, 8);

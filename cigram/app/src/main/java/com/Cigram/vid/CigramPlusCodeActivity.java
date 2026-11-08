@@ -308,7 +308,7 @@ public class CigramPlusCodeActivity extends Activity {
     }
 
     private TextView loungeSub(String s) {
-        return CigramUI.label(this, s, 12f, 0xFF8FA1AA, false);
+        return CigramUI.label(this, s, 12f, 0xFF8E8E94, false);
     }
 
     private String catalogJson() {
@@ -554,7 +554,7 @@ public class CigramPlusCodeActivity extends Activity {
         LinearLayout txt = new LinearLayout(this);
         txt.setOrientation(LinearLayout.VERTICAL);
         txt.addView(CigramUI.label(this, title, 15f, 0xFFFFFFFF, true));
-        TextView s = CigramUI.label(this, sub, 12f, 0xFF8FA1AA, false);
+        TextView s = CigramUI.label(this, sub, 12f, 0xFF8E8E94, false);
         s.setLineSpacing(0f, 1.2f);
         txt.addView(s, lp(2, 0));
         c.addView(txt, new LinearLayout.LayoutParams(0, -2, 1f));
@@ -595,7 +595,7 @@ public class CigramPlusCodeActivity extends Activity {
             });
             c.addView(b, lp(12, 0));
         } else {
-            c.addView(CigramUI.label(this, "التجديد بكود جديد يُضاف على مدتك الحالية.", 11.5f, 0xFF8FA1AA, false), lp(6, 0));
+            c.addView(CigramUI.label(this, "التجديد بكود جديد يُضاف على مدتك الحالية.", 11.5f, 0xFF8E8E94, false), lp(6, 0));
         }
         return c;
     }

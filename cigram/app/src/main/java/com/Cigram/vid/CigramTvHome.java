@@ -115,12 +115,12 @@ final class CigramTvHome {
         // left-to-dark + bottom-to-dark gradients for text legibility
         View shade = new View(a);
         GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.RIGHT_LEFT,
-                new int[]{0x00000000, 0xAA00121A, 0xF200121A});
+                new int[]{0x00000000, 0xAA0E0E10, 0xF20E0E10});
         shade.setBackground(g);
         hero.addView(shade, new FrameLayout.LayoutParams(-1, height));
         View bottom = new View(a);
         bottom.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0x0000121A, 0xF200121A}));
+                new int[]{0x000E0E10, 0xF20E0E10}));
         FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(-1, a.dp(120), Gravity.BOTTOM);
         hero.addView(bottom, blp);
 
@@ -210,7 +210,7 @@ final class CigramTvHome {
     private static View heroButton(final CigramTvActivity a, final JSONObject item, String text, boolean primary) {
         final TextView b = new TextView(a);
         b.setText(text);
-        b.setTextColor(primary ? 0xFF00121A : CigramDesign.TEXT);
+        b.setTextColor(primary ? 0xFF0E0E10 : CigramDesign.TEXT);
         b.setTextSize(16f);
         b.setTypeface(a.font(), Typeface.BOLD);
         b.setGravity(Gravity.CENTER);

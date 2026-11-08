@@ -133,7 +133,7 @@ public final class CigramGlass {
             rect.inset(density / 2f, density / 2f);
             if (sheen == null) {
                 sheen = new LinearGradient(0, rect.top, rect.width(), rect.bottom,
-                        new int[]{0x34FFFFFF, 0x09FFFFFF, 0x0005141F, 0x16FFFFFF},
+                        new int[]{0x34FFFFFF, 0x09FFFFFF, 0x00111113, 0x16FFFFFF},
                         new float[]{0f, 0.28f, 0.65f, 1f}, Shader.TileMode.CLAMP);
                 outline = new LinearGradient(0, rect.top, 0, rect.bottom,
                         new int[]{0x90FFFFFF, 0x15FFFFFF, 0x42FFFFFF}, null, Shader.TileMode.CLAMP);
@@ -146,7 +146,7 @@ public final class CigramGlass {
             canvas.clipPath(clip);
             paint.setStyle(Paint.Style.FILL);
             paint.setShader(null);
-            paint.setColor(green ? 0x6639DB91 : 0xB005141F);
+            paint.setColor(green ? 0x6639DB91 : 0xB0111113);
             canvas.drawRoundRect(rect, radius, radius, paint);
             paint.setShader(sheen);
             canvas.drawRoundRect(rect, radius, radius, paint);

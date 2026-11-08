@@ -29,7 +29,7 @@ import java.util.ArrayList;
  *   ┌────────────────────────────────────────────┐
  *   │  the user's cover (landscape image or muted │
  *   │  video), else the last watched title blurred │
- *   │  light fade into the page colour (#00121A)  │
+ *   │  light fade into the page colour (#0E0E10)  │
  *   │                                name     (●) │
  *   └────────────────────────────────────────────┘
  *
@@ -51,7 +51,7 @@ public final class CigramAccountHeader {
     private static String coverKey = "";
     private static android.graphics.Bitmap coverBitmap;
 
-    private static final int PAGE = 0xFF00121A;
+    private static final int PAGE = 0xFF0E0E10;
     private static final int SECTION_TEXT = 0xD9FFFFFF;
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
@@ -153,7 +153,7 @@ public final class CigramAccountHeader {
         FrameLayout box = new FrameLayout(a);
         box.setTag(TAG_GUEST_TV);
         box.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{0xFF4A1418, 0xFF0B2936, PAGE}));
+                new int[]{0xFF4A1418, 0xFF1C1C20, PAGE}));
         View glow = new View(a);
         GradientDrawable g = new GradientDrawable();
         g.setGradientType(GradientDrawable.RADIAL_GRADIENT);
@@ -318,7 +318,7 @@ public final class CigramAccountHeader {
                 avatarRing = ring; plainRingBg = ringBg; plainRingPad = border;
                 avatar = new ImageView(a);
                 avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                avatar.setBackgroundColor(0xFF0B2936);
+                avatar.setBackgroundColor(0xFF1C1C20);
                 avatar.setOutlineProvider(new ViewOutlineProvider() {
                     @Override public void getOutline(View view, Outline outline) {
                         outline.setOval(0, 0, view.getWidth(), view.getHeight());
@@ -681,7 +681,7 @@ public final class CigramAccountHeader {
                                 // nothing watched yet: a calm brand gradient instead of a picture
                                 backdrop.setImageDrawable(new GradientDrawable(
                                         GradientDrawable.Orientation.TL_BR,
-                                        new int[]{0xFF5A1A1A, 0xFF0B2936}));
+                                        new int[]{0xFF5A1A1A, 0xFF1C1C20}));
                             } else {
                                 CigramStage1InitProvider.cigramLoadPoster(a, found, backdrop);
                             }
@@ -719,7 +719,7 @@ public final class CigramAccountHeader {
         box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         box.setPadding(0, CigramUI.dp(a, 8), 0, CigramUI.dp(a, 8));
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0xFF0B2936);
+        bg.setColor(0xFF1C1C20);
         bg.setCornerRadius(CigramUI.dp(a, 22));
         box.setBackground(bg);
         box.addView(dialogRow(a, hasCover ? "تغيير الغلاف" : "وضع غلاف جديد", 0xFFFFFFFF, new Runnable() {

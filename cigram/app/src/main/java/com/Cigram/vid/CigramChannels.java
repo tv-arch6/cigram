@@ -63,13 +63,13 @@ public final class CigramChannels {
     private static final String PREFS = "cigram_channels_v3";
     private static final String CACHE_PREFS = "cigram_channels_cache_v2";
 
-    private static final int BG = 0xFF00121A;
-    private static final int CARD = 0xFF0F2230;
+    private static final int BG = 0xFF0E0E10;
+    private static final int CARD = 0xFF1E1E21;
     private static final int RED = 0xFFE21B14;
     private static final int GREEN = 0xFF3DDC97;
     private static final int AMBER = 0xFFE9A23B;
     private static final int TEAL = 0xFF26A5B5;
-    private static final int MUTED = 0xFF8FA1AA;
+    private static final int MUTED = 0xFF8E8E94;
 
     private static final Handler UI = new Handler(Looper.getMainLooper());
     private static final ExecutorService IMAGES = CigramPool.fixed(3, "channels-img");
@@ -439,7 +439,7 @@ public final class CigramChannels {
         banner.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         banner.setGravity(Gravity.CENTER_VERTICAL);
         GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.RIGHT_LEFT,
-                new int[]{0xFF12495A, 0xFF0B2733, 0xFF0A1F2B});
+                new int[]{0xFF12495A, 0xFF1B1B1F, 0xFF0A1F2B});
         bg.setCornerRadius(CigramUI.dp(a, 22));
         bg.setStroke(CigramUI.dp(a, 1), 0x2AFFFFFF);
         banner.setBackground(bg);
@@ -478,7 +478,7 @@ public final class CigramChannels {
         LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(-2, -2);
         tl.topMargin = CigramUI.dp(a, 8);
         texts.addView(st.bannerTitle, tl);
-        st.bannerSub = CigramUI.label(a, "", 13f, 0xFFB9C7CE, false);
+        st.bannerSub = CigramUI.label(a, "", 13f, 0xFFBDBDC2, false);
         st.bannerSub.setGravity(Gravity.RIGHT);
         texts.addView(st.bannerSub, new LinearLayout.LayoutParams(-2, -2));
 
@@ -557,7 +557,7 @@ public final class CigramChannels {
         box.setOrientation(LinearLayout.HORIZONTAL);
         box.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         box.setGravity(Gravity.CENTER_VERTICAL);
-        box.setBackground(CigramUI.round(0xFF0B2733, 0x22FFFFFF, 16, a));
+        box.setBackground(CigramUI.round(0xFF1B1B1F, 0x22FFFFFF, 16, a));
         box.setPadding(CigramUI.dp(a, 8), 0, CigramUI.dp(a, 14), 0);
 
         final EditText input = new EditText(a);
@@ -616,9 +616,9 @@ public final class CigramChannels {
         for (int i = labels.size() - 1; i >= 0; i--) {
             final String value = values.get(i);
             boolean on = value.equals(st.chip);
-            TextView chip = CigramUI.label(a, labels.get(i), 14f, on ? Color.WHITE : 0xFFB9C7CE, false);
+            TextView chip = CigramUI.label(a, labels.get(i), 14f, on ? Color.WHITE : 0xFFBDBDC2, false);
             chip.setGravity(Gravity.CENTER);
-            chip.setBackground(on ? CigramUI.round(RED, 18, a) : CigramUI.round(0xFF0B2733, 0x22FFFFFF, 18, a));
+            chip.setBackground(on ? CigramUI.round(RED, 18, a) : CigramUI.round(0xFF1B1B1F, 0x22FFFFFF, 18, a));
             chip.setPadding(CigramUI.dp(a, 16), CigramUI.dp(a, 8), CigramUI.dp(a, 16), CigramUI.dp(a, 8));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
             lp.leftMargin = CigramUI.dp(a, 8);
@@ -703,7 +703,7 @@ public final class CigramChannels {
 
     /** v10.34: with no chips any more, a section opened from «المزيد» gets a way back. */
     private static void addBackToAll(final Activity a, final State st) {
-        TextView back = CigramUI.label(a, "›  كل القنوات", 14f, 0xFFB9C7CE, true);
+        TextView back = CigramUI.label(a, "›  كل القنوات", 14f, 0xFFBDBDC2, true);
         back.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
         back.setPadding(CigramUI.dp(a, 4), CigramUI.dp(a, 8), CigramUI.dp(a, 4), CigramUI.dp(a, 4));
         back.setClickable(true);
@@ -735,7 +735,7 @@ public final class CigramChannels {
         // physical order, right to left: bar, title, count
         String countText = count + (count == 1 ? " قناة" : " قنوات");
         TextView n = CigramUI.label(a, onAll != null ? "المزيد  ‹" : countText,
-                13f, onAll != null ? 0xFFB9C7CE : MUTED, onAll != null);
+                13f, onAll != null ? 0xFFBDBDC2 : MUTED, onAll != null);
         n.setBackground(null);     // v10.34: plain text, no pill
         n.setPadding(CigramUI.dp(a, 4), CigramUI.dp(a, 6), CigramUI.dp(a, 4), CigramUI.dp(a, 6));
         if (onAll != null) {

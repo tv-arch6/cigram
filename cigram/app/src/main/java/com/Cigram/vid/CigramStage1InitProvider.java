@@ -297,7 +297,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             ((Application) appContext).registerActivityLifecycleCallbacks(
                     new Application.ActivityLifecycleCallbacks() {
                         public void onActivityPreCreated(Activity activity, Bundle state) {
-                            CigramSplash.mark(activity);   // the 2 s intro is counted from here
+                            CigramSplash.mark(activity);   // start-up metric (no fixed hold any more)
                             try { CigramProfile.restore(activity); } catch (Throwable ignored) { }
                             cigramStripAdTitleBar(activity);
                             CigramTvMode.apply(activity);   // v10.64: وضع التلفاز (بالعرض + تكبير) — لا أثر على الجوال
@@ -344,11 +344,11 @@ public final class CigramStage1InitProvider extends ContentProvider {
                                 String an = activity.getClass().getSimpleName();
                                 if ("MainActivity".equals(an)) {
                                     CigramSplash.mark(activity);   // Android 9 and older have no PreCreated
-                                    // the branded launch background did its job (first frame); Home gets the plain page colour
+                                    // the launch background (page colour + logo) did its job on the first frame; Home gets
+                                    // the plain page colour of the SAME mode, so there is no flash between the two
                                     try {
                                         activity.getWindow().setBackgroundDrawable(
-                                                new android.graphics.drawable.ColorDrawable(CigramTheme.isLight(activity)
-                                                        ? CigramTheme.page(activity) : 0xFF0A0608));
+                                                new android.graphics.drawable.ColorDrawable(CigramTheme.page(activity)));
                                     } catch (Throwable ignored) { }
                                     CigramAnalytics.timerStart("home_load_ms");
                                 } else if ("DetailsActivity".equals(an)) {
@@ -371,7 +371,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                             CigramAdManager.onActivityStarted();
                             // before the first frame: no full-width bar flashes on a tab switch
                             CigramBottomNav.compact(activity);
-                            // cold start only: launch screen until Home is loaded (3-5 s)
+                            // cold start only: hand-off from the launch screen to Home (leaves when Home is ready)
                             CigramSplash.begin(activity);
                         }
 
@@ -2765,7 +2765,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
         yearCategory.setShadowLayer(0f, 0f, 0f, 0x00000000);
 
         GradientDrawable posterBg = new GradientDrawable();
-        posterBg.setColor(0xFF00121A);
+        posterBg.setColor(0xFF0E0E10);
         posterBg.setCornerRadius(dp(activity, 14f));
         poster.setBackground(posterBg);
         if (Build.VERSION.SDK_INT >= 21) poster.setClipToOutline(true);
@@ -2842,7 +2842,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
         final android.widget.ImageView image = new android.widget.ImageView(activity);
         image.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
         image.setAdjustViewBounds(true);
-        image.setBackground(roundedDrawable(0xFF00121A, dp(activity, 14f)));
+        image.setBackground(roundedDrawable(0xFF0E0E10, dp(activity, 14f)));
         if (Build.VERSION.SDK_INT >= 21) image.setClipToOutline(true);
         card.addView(image, new LinearLayout.LayoutParams(-1, dpInt(activity, 168)));
 
@@ -3089,7 +3089,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                             } else {
                                 // Download failed: stop the skeleton animation, keep a calm static block.
                                 v.setImageDrawable(new android.graphics.drawable.ColorDrawable(
-                                        CigramTheme.adapt(v.getContext(), 0xFF0B2733)));
+                                        CigramTheme.adapt(v.getContext(), 0xFF1B1B1F)));
                             }
                         }
                     }
@@ -3266,7 +3266,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             View root = findByIdName(activity, "linear_section_items");
             if (root instanceof ViewGroup) {
                 itemsRoot = (ViewGroup) root;
-                itemsRoot.setBackgroundColor(0xFF00121A);
+                itemsRoot.setBackgroundColor(0xFF0E0E10);
                 itemsRoot.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
                 itemsRoot.setPadding(dpInt(activity, 8), dpInt(activity, 10),
                         dpInt(activity, 8), dpInt(activity, 20));
@@ -3276,11 +3276,11 @@ public final class CigramStage1InitProvider extends ContentProvider {
             View scroll = findByIdName(activity, "vscroll_section");
             if (scroll instanceof android.widget.ScrollView) {
                 scrollView = (android.widget.ScrollView) scroll;
-                scrollView.setBackgroundColor(0xFF00121A);
+                scrollView.setBackgroundColor(0xFF0E0E10);
                 scrollView.setVerticalScrollBarEnabled(false);
             }
             View pageRoot = findByIdName(activity, "linear_section_root");
-            if (pageRoot != null) pageRoot.setBackgroundColor(0xFF00121A);
+            if (pageRoot != null) pageRoot.setBackgroundColor(0xFF0E0E10);
             View header = findByIdName(activity, "linear_section_header");
             if (header instanceof LinearLayout) {
                 ((LinearLayout) header).setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
@@ -3751,7 +3751,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             posterView.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
             posterView.setAdjustViewBounds(true);
             GradientDrawable posterBackground = new GradientDrawable();
-            posterBackground.setColor(0xFF0B2936);
+            posterBackground.setColor(0xFF1C1C20);
             posterBackground.setCornerRadius(dp(activity, 14f));
             posterView.setBackground(posterBackground);
             if (Build.VERSION.SDK_INT >= 21) posterView.setClipToOutline(true);
@@ -3859,7 +3859,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                         && String.valueOf(posterTag).startsWith("cigram-stage2-poster:");
                 if (!realImageRequested) {
                     poster.setImageDrawable(null);
-                    poster.setBackgroundColor(0xFF0B2733);
+                    poster.setBackgroundColor(0xFF1B1B1F);
                 }
             }
 
@@ -3969,15 +3969,10 @@ public final class CigramStage1InitProvider extends ContentProvider {
         }
     }
 
+    /** Android 13+: keeps the system splash in step with the in-app Light / Dark choice (see CigramSplash). */
     private static void applyLaunchSplashTheme(Activity activity) {
-        if (Build.VERSION.SDK_INT < 33 || activity == null) return;
         try {
-            int theme = activity.getResources()
-                    .getIdentifier("CigramLaunchTheme", "style", activity.getPackageName());
-            if (theme == 0) theme = android.R.style.Theme_DeviceDefault_NoActionBar;
-            Object splash = Activity.class.getMethod("getSplashScreen").invoke(activity);
-            Class<?> splashClass = Class.forName("android.window.SplashScreen");
-            splashClass.getMethod("setSplashScreenTheme", int.class).invoke(splash, theme);
+            CigramSplash.syncSystemSplashTheme(activity);
         } catch (Throwable error) {
             android.util.Log.w("CigramLifecycle", "splash theme setup failed", error);
         }
@@ -4134,7 +4129,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
         final LinearLayout root = (LinearLayout) rootView;
         root.setVisibility(View.VISIBLE);
         root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        root.setBackgroundColor(0xFF00121A);
+        root.setBackgroundColor(0xFF0E0E10);
 
         final JSONObject item = stage3DetailsItem(activity);
         if (item == null || item.length() == 0) return;
@@ -4144,7 +4139,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
         View heroView = findByIdName(activity, "relativelayout1");
         if (heroView instanceof RelativeLayout) hero = (RelativeLayout) heroView;
         if (hero != null) {
-            hero.setBackgroundColor(0xFF00121A);
+            hero.setBackgroundColor(0xFF0E0E10);
             ViewGroup.LayoutParams baseLp = hero.getLayoutParams();
             if (baseLp != null) {
                 // v10.45 (cinematic): the picture fills the top of the page, about 1.2 x the screen width
@@ -4177,7 +4172,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                 // v4.4: darker lower half so the title / meta line read on any backdrop.
                 GradientDrawable gd = new GradientDrawable(
                         GradientDrawable.Orientation.TOP_BOTTOM,
-                        new int[]{0x2600121A, 0x5C00121A, 0xC200121A, 0xFF00121A});
+                        new int[]{0x260E0E10, 0x5C0E0E10, 0xC20E0E10, 0xFF0E0E10});
                 shade.setBackground(gd);
                 hero.addView(shade, 1, new RelativeLayout.LayoutParams(-1, -1));
             }
@@ -4187,7 +4182,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                 String posterUrl = jsonText(item,
                         "poster", "series_poster", "season_poster", "image", "backdrop");
                 poster.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                poster.setBackgroundColor(0xFF0B2733);
+                poster.setBackgroundColor(0xFF1B1B1F);
                 final int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
                 RelativeLayout.LayoutParams lp;
                 if (DETAILS_CINEMATIC) {
@@ -4661,7 +4656,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
         View actionView = findByIdName(activity, "linear_actions");
         if (actionView instanceof LinearLayout) {
             LinearLayout actions = (LinearLayout) actionView;
-            actions.setBackgroundColor(0xFF00121A);
+            actions.setBackgroundColor(0xFF0E0E10);
             // v4.4: physical LTR row, see the reorder below.
             actions.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
             actions.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
@@ -4860,7 +4855,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
         LinearLayout row = new LinearLayout(activity);
         row.setTag("cigram_watch_row");
         row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setBackgroundColor(0xFF00121A);
+        row.setBackgroundColor(0xFF0E0E10);
         row.setPadding(dpInt(activity, 16), dpInt(activity, 14), dpInt(activity, 16), dpInt(activity, 2));
         if (watch instanceof TextView) {
             ((TextView) watch).setMinWidth(0);
@@ -4889,7 +4884,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
         description.setLineSpacing(0f, 1.22f);     // v4.4: Arabic synopsis needs air between lines
         description.setGravity(Gravity.RIGHT);
         description.setTextDirection(View.TEXT_DIRECTION_RTL);
-        description.setBackgroundColor(0xFF00121A);
+        description.setBackgroundColor(0xFF0E0E10);
         description.setPadding(dpInt(activity, 18), dpInt(activity, 14),
                 dpInt(activity, 18), dpInt(activity, 4));
         description.setMaxLines(4);
@@ -5052,7 +5047,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             tab.setGravity(Gravity.CENTER);
             tab.setPadding(dpInt(activity, 14), 0, dpInt(activity, 14), 0);
             tab.setBackground(roundedDrawable(
-                    season.intValue() == firstSeason ? 0xFFE21B14 : 0xFF0B2733,
+                    season.intValue() == firstSeason ? 0xFFE21B14 : 0xFF1B1B1F,
                     dp(activity, 18f)));
             LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(-2, dpInt(activity, 38));
             tlp.setMargins(dpInt(activity, 4), dpInt(activity, 4),
@@ -5063,7 +5058,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                     for (int n = 0; n < tabs.getChildCount(); n++) {
                         View child = tabs.getChildAt(n);
                         child.setBackground(roundedDrawable(
-                                child == tab ? 0xFFE21B14 : 0xFF0B2733,
+                                child == tab ? 0xFFE21B14 : 0xFF1B1B1F,
                                 dp(activity, 18f)));
                     }
                     cigramShownSeason[0] = season.intValue();
@@ -5151,7 +5146,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             row.addView(texts, xlp);
             // v5.1 (episode cards, RTL): the thumbnail is a rounded card that carries the progress strip.
             FrameLayout thumbBox = new FrameLayout(activity);
-            thumbBox.setBackground(roundedDrawable(0xFF0B2733, dp(activity, 8f)));
+            thumbBox.setBackground(roundedDrawable(0xFF1B1B1F, dp(activity, 8f)));
             if (Build.VERSION.SDK_INT >= 21) {
                 final float thumbRadius = dp(activity, 8f);
                 thumbBox.setOutlineProvider(new android.view.ViewOutlineProvider() {
@@ -5545,7 +5540,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
         final TextView more = textViewById(activity, "text_watch_also_more");
         if (parentView instanceof LinearLayout) {
             LinearLayout parent = (LinearLayout) parentView;
-            parent.setBackgroundColor(0xFF00121A);
+            parent.setBackgroundColor(0xFF0E0E10);
             parent.setPadding(dpInt(activity, 8), dpInt(activity, 12),
                     dpInt(activity, 8), dpInt(activity, 12));
 
@@ -5872,7 +5867,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
 
         final CigramAspectPosterView poster = new CigramAspectPosterView(activity);
         poster.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        poster.setBackground(roundedDrawable(0xFF0B2733, dp(activity, 14f)));
+        poster.setBackground(roundedDrawable(0xFF1B1B1F, dp(activity, 14f)));
         if (Build.VERSION.SDK_INT >= 21) {
             final float radius = dp(activity, 14f);
             poster.setOutlineProvider(new android.view.ViewOutlineProvider() {
@@ -5969,7 +5964,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
     private static TextView makeMetaText(Activity activity, String value) {
         TextView text = new TextView(activity);
         text.setText(value == null ? "" : value);
-        text.setTextColor(0xFF8A97A6);
+        text.setTextColor(0xFF8E8E93);
         text.setTextSize(11f);
         text.setGravity(Gravity.CENTER);
         text.setSingleLine(true);
@@ -11351,7 +11346,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
 
             // one tap sends what the app recorded about this failure (so it can be fixed from facts)
             final String shownMessage = message;
-            TextView share = text(activity, "إرسال التشخيص", 13f, 0xFF9FB4BD, font);
+            TextView share = text(activity, "إرسال التشخيص", 13f, 0xFFA3A3A8, font);
             share.setGravity(Gravity.CENTER);
             share.setPadding(px(density, 14), px(density, 12), px(density, 14), px(density, 4));
             share.setClickable(true);
@@ -12165,9 +12160,9 @@ public final class CigramStage1InitProvider extends ContentProvider {
             final android.view.Window window = activity.getWindow();
 
             View root = findByIdName(activity, "vscroll1");
-            if (root != null) root.setBackgroundColor(0xFF00121A);
+            if (root != null) root.setBackgroundColor(0xFF0E0E10);
             View page = findByIdName(activity, "linear1");
-            if (page != null) page.setBackgroundColor(0xFF00121A);
+            if (page != null) page.setBackgroundColor(0xFF0E0E10);
 
             View poster = findByIdName(activity, "imageview_details_poster");
             if (Build.VERSION.SDK_INT >= 21 && poster != null) {
@@ -12839,7 +12834,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
 
         FrameLayout overlay = new FrameLayout(activity);
         overlay.setTag(tag);
-        overlay.setBackgroundColor(0xF500121A);
+        overlay.setBackgroundColor(0xF50E0E10);
         overlay.setClickable(true);
         overlay.setFocusable(true);
         overlay.setElevation(px(density, 100));
@@ -12913,7 +12908,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setGravity(Gravity.CENTER);
         panel.setPadding(px(density, 24), px(density, 30), px(density, 24), px(density, 30));
-        panel.setBackgroundColor(0xF000121A);
+        panel.setBackgroundColor(0xF00E0E10);
 
         ProgressBar progress = new ProgressBar(activity);
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(px(density, 38), px(density, 38));

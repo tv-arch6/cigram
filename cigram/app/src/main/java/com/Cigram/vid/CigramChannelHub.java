@@ -67,12 +67,12 @@ final class CigramChannelHub implements CigramChannelStore.Listener, CigramChann
     private static final String BAR_TAG = "transparent_cigram_nav";
     private static final String NO_NAV_PAD = "cigram_nav_managed";
 
-    private static final int BG = 0xFF00121A;
-    private static final int CARD = 0xFF0F2230;
-    private static final int SOFT = 0xFF102F3B;
-    private static final int STROKE = 0xFF1F4553;
+    private static final int BG = 0xFF0E0E10;
+    private static final int CARD = 0xFF1E1E21;
+    private static final int SOFT = 0xFF26262B;
+    private static final int STROKE = 0xFF34343A;
     private static final int RED = 0xFFE21B14;
-    private static final int MUTED = 0xFF8FA1AA;
+    private static final int MUTED = 0xFF8E8E94;
     private static final int TEXT = 0xFFFFFFFF;
 
     private static final int K_PKG = 0, K_FAV = 1, K_RECENT = 2, K_ALL = 3;
@@ -224,7 +224,7 @@ final class CigramChannelHub implements CigramChannelStore.Listener, CigramChann
 
         // ---- 1. the player
         stageWrap = new FrameLayout(a);
-        stageWrap.setBackgroundColor(CigramTheme.adapt(a, 0xFF040F16));
+        stageWrap.setBackgroundColor(CigramTheme.adapt(a, 0xFF0C0C0E));
         stage = new FrameLayout(a);
         stage.setClickable(true);
         stageWrap.addView(stage, new FrameLayout.LayoutParams(-1, stageHeight, Gravity.BOTTOM));
@@ -1000,7 +1000,7 @@ final class CigramChannelHub implements CigramChannelStore.Listener, CigramChann
                 boolean sel = it.kind == selKind && it.title.equals(selName);
                 if (narrow) {
                     h.row.setBackground(sel ? h.selectedBg : h.normalBg);
-                    h.name.setTextColor(CigramTheme.adaptText(a, sel ? TEXT : 0xFFB9C7CE));
+                    h.name.setTextColor(CigramTheme.adaptText(a, sel ? TEXT : 0xFFBDBDC2));
                 } else {
                     h.count.setText(it.count + " قناة");
                 }
@@ -1069,7 +1069,7 @@ final class CigramChannelHub implements CigramChannelStore.Listener, CigramChann
             h.selectedBg = ripple(roundStroke(0x33E21B14, RED, 16), 16, false);
             r.setBackground(h.normalBg);
             r.setLayoutParams(new AbsListView.LayoutParams(-1, dp(54)));
-            h.name = text("", 12.5f, 0xFFB9C7CE, true);
+            h.name = text("", 12.5f, 0xFFBDBDC2, true);
             h.name.setMaxLines(2);
             h.name.setEllipsize(TextUtils.TruncateAt.END);
             LinearLayout.LayoutParams nl = new LinearLayout.LayoutParams(0, -2, 1f);
@@ -1138,7 +1138,7 @@ final class CigramChannelHub implements CigramChannelStore.Listener, CigramChann
                 }
                 h.sub.setTextColor(CigramTheme.adaptText(a, active ? 0xCCFFFFFF : MUTED));
                 h.row.setBackground(active ? h.backgrounds.active : h.backgrounds.normal);
-                h.logo.setTile(active ? 0x33FFFFFF : 0xFF102F3B);
+                h.logo.setTile(active ? 0x33FFFFFF : 0xFF26262B);
                 String key = ch.logoKey();
                 h.logo.show(key, ch.name, !flinging);
                 if (flinging && key.length() > 0 && CigramLogos.peek(key) == null) needsRebind = true;

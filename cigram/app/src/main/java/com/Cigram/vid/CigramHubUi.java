@@ -254,8 +254,8 @@ final class CigramHubUi {
             super(c);
             this.circle = circle;
             this.radius = radiusPx;
-            tile.setColor(CigramTheme.adapt(c, 0xFF102F3B));
-            text.setColor(CigramTheme.isLight(c) ? 0xFF5F6B73 : 0xFF8FA1AA);
+            tile.setColor(CigramTheme.adapt(c, 0xFF26262B));
+            text.setColor(CigramTheme.isLight(c) ? 0xFF5F6B73 : 0xFF8E8E94);
             text.setTextAlign(Paint.Align.CENTER);
             try { text.setTypeface(CigramUI.font(c)); } catch (Throwable ignored) { }
             setup(line, fill);

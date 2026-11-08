@@ -203,7 +203,7 @@ public final class CigramExternalLink {
         card.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         final float radius = CigramUI.dp(a, 20);
         GradientDrawable base = new GradientDrawable();
-        base.setColor(0xFF0B1F2A);
+        base.setColor(0xFF1A1A1D);
         base.setCornerRadius(radius);
         card.setBackground(base);
         card.setClipToOutline(true);

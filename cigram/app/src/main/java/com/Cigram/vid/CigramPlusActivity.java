@@ -263,7 +263,7 @@ public class CigramPlusActivity extends Activity {
                 card.addView(ic, new LinearLayout.LayoutParams(dp(46), dp(46)));
                 TextView t = CigramUI.label(this, b[i][0], 14.5f, 0xFFFFFFFF, true);
                 card.addView(t, lp(10, 0));
-                TextView s = CigramUI.label(this, b[i][1], 11.5f, 0xFF8FA1AA, false);
+                TextView s = CigramUI.label(this, b[i][1], 11.5f, 0xFF8E8E94, false);
                 s.setLineSpacing(0f, 1.2f);
                 card.addView(s, lp(3, 0));
                 LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
@@ -324,7 +324,7 @@ public class CigramPlusActivity extends Activity {
         line.addView(methodsRow, mp);
         s.addView(line);
 
-        TextView hint = CigramUI.label(this, "اختر طريقة الدفع لتظهر لك التفاصيل", 12f, 0xFF8FA1AA, false);
+        TextView hint = CigramUI.label(this, "اختر طريقة الدفع لتظهر لك التفاصيل", 12f, 0xFF8E8E94, false);
         s.addView(hint, lp(10, 0));
 
         methodDetail = new LinearLayout(this);

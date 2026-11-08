@@ -32,15 +32,15 @@ public final class CigramDesign {
 
     // ------------------------------------------------------------------ tokens
 
-    public static final int BG_APP = 0xFF00121A;
-    public static final int SURFACE = 0xFF0A1F29;
-    public static final int SURFACE_HI = 0xFF0F2A36;
+    public static final int BG_APP = 0xFF0E0E10;
+    public static final int SURFACE = 0xFF1A1A1D;
+    public static final int SURFACE_HI = 0xFF222226;
     public static final int HAIRLINE = 0x1FFFFFFF;
     public static final int GHOST_FILL = 0x14FFFFFF;
     public static final int GHOST_STROKE = 0x2EFFFFFF;
     public static final int ACCENT = CigramUI.RED;
     public static final int TEXT = 0xFFFFFFFF;
-    public static final int TEXT_2 = 0xFFC3CDD2;
+    public static final int TEXT_2 = 0xFFC7C7CC;
     public static final int TEXT_3 = 0xFF8796A0;
     public static final int IMDB = 0xFFF5C518;
 

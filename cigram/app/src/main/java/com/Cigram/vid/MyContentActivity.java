@@ -131,10 +131,10 @@ public class MyContentActivity extends AppCompatActivity {
 					canvas.clipPath(clip);
 					paint.setStyle(android.graphics.Paint.Style.FILL);
 					paint.setShader(null);
-					paint.setColor(green ? 0x6639DB91 : 0xB005141F);
+					paint.setColor(green ? 0x6639DB91 : 0xB0111113);
 					canvas.drawRoundRect(rect, radius, radius, paint);
 					paint.setShader(new android.graphics.LinearGradient(0, rect.top, rect.width(), rect.bottom,
-					new int[]{0x34FFFFFF, 0x09FFFFFF, 0x0005141F, 0x16FFFFFF},
+					new int[]{0x34FFFFFF, 0x09FFFFFF, 0x00111113, 0x16FFFFFF},
 					new float[]{0f, 0.28f, 0.65f, 1f}, android.graphics.Shader.TileMode.CLAMP));
 					canvas.drawRoundRect(rect, radius, radius, paint);
 					paint.setShader(null);
@@ -596,7 +596,7 @@ public class MyContentActivity extends AppCompatActivity {
 					android.widget.TextView empty =
 					new android.widget.TextView(MyContentActivity.this);
 					empty.setText(message);
-					empty.setTextColor(0xFF8FA1AA);
+					empty.setTextColor(0xFF8E8E94);
 					empty.setTextSize(14);
 					empty.setGravity(android.view.Gravity.CENTER);
 					empty.setTextDirection(android.view.View.TEXT_DIRECTION_RTL);

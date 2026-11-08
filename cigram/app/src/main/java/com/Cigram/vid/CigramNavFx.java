@@ -65,7 +65,7 @@ public final class CigramNavFx {
     /** v4.4: refresh of the backdrop while nothing scrolls (carousel / images loading). */
     private static final long IDLE_CAPTURE_MS = 1000L;
 
-    private static final int LABEL_OFF = 0xFFADBBC2;
+    private static final int LABEL_OFF = 0xFFB0B0B5;
     private static final int LABEL_ON = 0xFFFFFFFF;
     /** لون الحد الرصاصي للشريط السفلي وللكبسولة المحددة. */
     private static final int RIM_GRAY = 0xFF8D99A0;
@@ -134,7 +134,7 @@ public final class CigramNavFx {
                     px = new int[bw * bh];
                     tmp = new int[bw * bh];
                 }
-                bmp.eraseColor(0xFF00121A);
+                bmp.eraseColor(0xFF0E0E10);
                 int save = cv.save();
                 cv.scale(bw / (float) w, bh / (float) h);
                 cv.translate(-bar.getLeft(), -bar.getTop());
@@ -539,7 +539,7 @@ public final class CigramNavFx {
     /** لون تعبئة فراغ الأيقونة المحددة (أبيض). غيّره هنا فقط. */
     private static final int ICON_FILL = 0xFFFFFFFF;
     /** لون خطوط التفاصيل الواقعة داخل التعبئة (عدسة البحث، مثلث التشغيل ...). */
-    private static final int ICON_DETAIL = 0xFF04161D;
+    private static final int ICON_DETAIL = 0xFF111113;
 
     /**
      * يكتشف الفراغات المغلقة داخل أي أيقونة: كل بكسل شفاف لا يمكن الوصول إليه من حافة الصورة

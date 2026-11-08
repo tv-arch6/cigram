@@ -167,8 +167,12 @@ public final class CigramLayoutConfig {
                     final String newMode = themeMode(app);
                     MAIN.post(new Runnable() {
                         @Override public void run() {
-                            // the user's own light / dark choice (if any) still wins over what the Admin app forces
-                            if (!oldMode.equals(newMode)) CigramTheme.applyNightMode(CigramTheme.effectiveMode(app));
+                            // 2026: a theme mode forced by the Admin app is NOT applied to the running app any more.
+                            // setDefaultNightMode recreates every open page; arriving during a cold start it destroyed
+                            // and rebuilt Home behind the launch screen (a second, empty-looking start-up). The new mode
+                            // is saved above and CigramTheme.install applies it at the next cold start. The user's own
+                            // choice (Account / Settings) still applies at once and still wins over the Admin's mode.
+                            if (!oldMode.equals(newMode)) android.util.Log.i("CigramLayout", "admin theme " + newMode + " applies next start");
                             if (onChanged != null) onChanged.run();
                         }
                     });

@@ -1,253 +1,231 @@
 package com.Cigram.vid;
 
 import android.app.Activity;
-import android.graphics.Typeface;
+import android.content.Context;
 import android.graphics.drawable.Drawable;
-import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
-import android.text.SpannableString;
-import android.text.Spanned;
-import android.text.style.ForegroundColorSpan;
-import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.view.animation.DecelerateInterpolator;
-import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
 import android.widget.ImageView;
-import android.widget.TextView;
 
 /**
- * Launch screen (v10.36): OTTO-style branded intro shown on a cold start while Home loads its
- * catalogue and first posters in the background.
+ * Cold-start hand-off (2026 rewrite of the launch screen).
  *
- *   - page: near-black #0A0608 with a vertical maroon radial glow in the centre;
- *   - the app logo (launcher icon) centred;
- *   - the line «From by CIGRAM» near the bottom (CIGRAM in the brand red).
+ * <h3>What was wrong (Problem No. 1: "black / almost empty screen for ~2 s")</h3>
+ * <ol>
+ *   <li>Android 12+: {@code CigramLaunchTheme} set {@code windowSplashScreenAnimatedIcon} to
+ *       {@code @android:color/transparent}. The system splash was therefore an EMPTY #0A0608 screen from the tap until
+ *       MainActivity drew its first frame.</li>
+ *   <li>Android 7-11: the launch window background ({@code cigram_launch_bg}) was a maroon glow with NO logo, so the
+ *       same empty dark page showed while the process started and MainActivity.onCreate built Home on the main
+ *       thread.</li>
+ *   <li>The branded overlay with the logo was only added in {@code onActivityStarted}, i.e. after the whole of
+ *       MainActivity.onCreate, and then held for a FIXED {@code HOLD_MS = 2000} counted from onCreate, whether Home was
+ *       ready or not. The user saw: empty dark screen → logo (rest of the 2 s) → Home.</li>
+ *   <li>The page colours did not follow the theme: the launch screen was always near-black, then Home switched to
+ *       its own colour (#00121A hard-coded in MainActivity, or the light page in Light mode): a visible flash.</li>
+ * </ol>
  *
- * The same custom overlay is drawn on every Android version (7+), so the look is identical
- * everywhere. It is shown for {@link #HOLD_MS} (1 s, owner's request) and then fades out; it never
- * waits longer than that, so a slow or missing network cannot keep the user waiting.
- *
- * Only the first Home of the process gets it; coming back from the background never waits.
+ * <h3>Now</h3>
+ * <ul>
+ *   <li>The logo is in the window background itself and in the Android 12+ splash icon (same 112 dp rounded logo, same
+ *       page colour from {@code @color/cg_launch_bg}, which follows Light / Dark), so it is on screen from the very
+ *       first frame the system draws.</li>
+ *   <li>This overlay is the same picture, drawn on MainActivity's first frame, and only bridges to Home: it leaves the
+ *       moment Home reports it has rendered ({@link #markHomeReady}) and at the latest {@link #MAX_HOLD_MS} after its
+ *       first frame. No fixed waiting, no loading animation once Home is there.</li>
+ *   <li>Android 13+: the system splash theme is kept in step with the user's in-app Light / Dark choice
+ *       ({@link #syncSystemSplashTheme}), so a forced mode never flashes the opposite colour on the next cold start.</li>
+ * </ul>
+ * Only the first Home of the process gets the overlay; coming back from the background never waits.
  */
 public final class CigramSplash {
 
-    /** Fixed 2-second branded intro on a cold start, counted from the moment MainActivity starts creating. */
-    static final long HOLD_MS = 2000L;
-    /** Kept for the Home Logic that still reports readiness; the hold is time-based now. */
-    static final long MIN_MS = HOLD_MS;
-    static final long MAX_MS = HOLD_MS;
+    private static final String TAG = "CigramSplash";
 
-    private static final int PAGE = 0xFF0A0608;        // near-black, warm tint
-    private static final int GLOW_CENTER = 0xFF7E1733;  // maroon core of the glow
-    private static final int GLOW_MID = 0xFF3A0C1B;     // maroon fading to the page
-    private static final int LABEL_DIM = 0xFFBDA6AC;    // «From by»
-    private static final int LABEL_HOT = 0xFFE21B14;    // «CIGRAM» (brand red)
-    /** v10.37: smaller logo so the icon is less dominant at the start (was 120). */
-    private static final int ICON_DP = 120;
-    // v10.40: the startup work now runs on a background thread (CigramStage1InitProvider), so the
-    // main thread is free during the splash and these animations play smoothly (they could not
-    // before, which is why the fade-in was dropped in v10.38).
-    /** Exit (OTTO-style): the logo lifts a little as the whole screen dissolves into Home. */
-    private static final long EXIT_MS = 200L;
-    // v10.52 «حروف تتضح»: the name CIGRAM forms letter by letter under the logo, the splash fades
-    // out, then Home's sections rise in one after another and the bottom bar bounces up.
-    private static final String WORD = "CIGRAM";
-    private static final long LETTER_STEP_MS = 110L;
-    private static final long LETTER_MS = 520L;
-    private static final long ENTRANCE_DELAY_MS = 120L;
-    private static final long ENTRANCE_STEP_MS = 55L;
+    /** Upper bound of the hand-off after the overlay's first frame (Home normally reports ready well before). */
+    static final long MAX_HOLD_MS = 650L;
+    /** Kept for callers that still read them: there is no fixed hold any more. */
+    static final long HOLD_MS = 0L;
+    static final long MIN_MS = 0L;
+    static final long MAX_MS = MAX_HOLD_MS;
+
+    /** Logo size: identical to the window background (drawable/cigram_launch_bg) and the Android 12+ splash icon. */
+    private static final int ICON_DP = 112;
+    private static final long EXIT_MS = 220L;
+    private static final long ENTRANCE_STEP_MS = 30L;
 
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static boolean used;
-    private static long startedAt;
-    /** Uptime at MainActivity.onCreate start; the 2 s are counted from here, not from the first overlay frame. */
     private static volatile long createdAt;
     private static volatile boolean homeReady;
+    /** The pending exit of the overlay (set while it is on screen), run early by {@link #markHomeReady}. */
+    private static Runnable pendingExit;
 
     private CigramSplash() { }
 
-    /** Called by the Home Logic through CigramAnalytics when Home finished rendering. */
+    /** Called by the Home logic (through CigramAnalytics) when Home has rendered its content. */
     static void markHomeReady() {
         homeReady = true;
+        MAIN.post(new Runnable() {
+            @Override public void run() {
+                Runnable exit = pendingExit;
+                if (exit != null) {
+                    MAIN.removeCallbacks(exit);
+                    exit.run();
+                }
+            }
+        });
     }
 
-    /**
-     * Call from onActivityPreCreated (before the heavy onCreate). The 2 s are measured from here, so a
-     * slow inflate cannot stretch the intro: if onCreate already took 2 s the splash leaves at once.
-     */
+    /** onActivityPreCreated / onActivityCreated: remembers when the first Home started (start-up metric only). */
     public static void mark(Activity activity) {
         if (used || createdAt != 0L || activity == null) return;
         if (!"MainActivity".equals(activity.getClass().getSimpleName())) return;
         createdAt = SystemClock.uptimeMillis();
     }
 
-    private static long remainingMs() {
-        long from = createdAt != 0L ? createdAt : startedAt;
-        return HOLD_MS - (SystemClock.uptimeMillis() - from);
-    }
-
-    /** Call from onActivityStarted (before the first frame). Does nothing after the first Home. */
+    /** onActivityStarted: puts the hand-off overlay on the first Home of the process. */
     public static void begin(final Activity activity) {
         if (used || activity == null || activity.isFinishing()) return;
         if (!"MainActivity".equals(activity.getClass().getSimpleName())) return;
         used = true;
-        startedAt = SystemClock.uptimeMillis();
-        if (createdAt == 0L) createdAt = startedAt;
+        try {
+            syncSystemSplashTheme(activity);
+        } catch (Throwable error) {
+            Log.w(TAG, "splash theme sync failed", error);
+        }
+        if (homeReady) return;   // Home rendered during onCreate already: nothing to bridge
         try {
             showOverlay(activity);
         } catch (Throwable error) {
-            android.util.Log.w("CigramSplash", "splash failed", error);
+            Log.w(TAG, "splash failed", error);
         }
     }
 
-    /** Draws the branded launch screen above Home and fades it out after HOLD_MS. */
+    /** Page colour of the launch screen for this activity (follows the effective Light / Dark mode). */
+    static int pageColor(Context context) {
+        return CigramTheme.isLight(context) ? 0xFFF4F4F6 : 0xFF0E0E10;
+    }
+
     private static void showOverlay(final Activity activity) {
         View decorView = activity.getWindow() == null ? null : activity.getWindow().getDecorView();
         if (!(decorView instanceof ViewGroup)) return;
         final ViewGroup decor = (ViewGroup) decorView;
 
         final FrameLayout overlay = new FrameLayout(activity);
-        overlay.setBackground(glow(activity));
-        overlay.setClickable(true);   // nothing under it can be tapped while it is up
-        overlay.setFocusable(true);
+        overlay.setTag(CigramTheme.SKIP_TAG);
+        overlay.setBackgroundColor(pageColor(activity));
+        overlay.setClickable(true);   // a tap during the hand-off never reaches a half-built Home
         overlay.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
         try { overlay.setElevation(CigramUI.dp(activity, 32)); } catch (Throwable ignored) { }
 
-        // --- logo (app launcher icon), centred ---
-        ImageView icon = new ImageView(activity);
-        icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        Drawable appIcon = null;
-        try {
-            int logoRes = activity.getResources().getIdentifier("cigram_logo", "drawable", activity.getPackageName());
-            if (logoRes != 0) appIcon = activity.getResources().getDrawable(logoRes);
-        } catch (Throwable ignored) { }
-        if (appIcon == null) {
-            try {
-                appIcon = activity.getPackageManager().getApplicationIcon(activity.getApplicationInfo());
-            } catch (Throwable ignored) { }
-        }
-        if (appIcon != null) icon.setImageDrawable(appIcon);
-        // rounded app-icon shape (same look as the launcher icon)
-        final int radius = CigramUI.dp(activity, ICON_DP) / 5;
-        try {
-            icon.setOutlineProvider(new android.view.ViewOutlineProvider() {
-                @Override public void getOutline(View v, android.graphics.Outline outline) {
-                    outline.setRoundRect(0, 0, v.getWidth(), v.getHeight(), radius);
-                }
-            });
-            icon.setClipToOutline(true);
-        } catch (Throwable ignored) { }
+        ImageView logo = new ImageView(activity);
+        logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        logo.setImageDrawable(logoDrawable(activity));
+        logo.setContentDescription("Cigram");
         int size = CigramUI.dp(activity, ICON_DP);
-        overlay.addView(icon, new FrameLayout.LayoutParams(size, size, Gravity.CENTER));
-
-        // The logo and «Welcome to CIGRAM» are drawn at full opacity from the first frame, so they
-        // appear TOGETHER and are always visible. A fade/scale entrance cannot play here: Home is
-        // built on the main thread while the splash is up, so the thread is busy and an entrance
-        // animation would not run until the very end (it left the screen empty for seconds). Only
-        // the EXIT animation below runs, because by then the thread is free.
+        overlay.addView(logo, new FrameLayout.LayoutParams(size, size, Gravity.CENTER));
         decor.addView(overlay, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        // v10.66 (TV only): the remote stays on the launch screen until it is gone
-        try { if (CigramTvMode.isTv(activity)) overlay.requestFocus(); } catch (Throwable ignored) { }
-
-        final ImageView logo = icon;
-        logo.setScaleX(0.9f);
-        logo.setScaleY(0.9f);
-        logo.animate().scaleX(1f).scaleY(1f).setDuration(350L)
-                .setInterpolator(new DecelerateInterpolator(1.6f)).start();
-
-        // Smooth exit: the fade runs on a hardware layer (no per-frame re-draw of the gradient).
         try { overlay.setLayerType(View.LAYER_TYPE_HARDWARE, null); } catch (Throwable ignored) { }
 
-        // One timer for the whole hold instead of an 80 ms polling loop.
-        MAIN.postDelayed(new Runnable() {
+        final Runnable exit = new Runnable() {
+            private boolean done;
             @Override public void run() {
+                if (done) return;
+                done = true;
+                pendingExit = null;
                 if (activity.isFinishing() || activity.isDestroyed()) {
                     if (overlay.getParent() == decor) decor.removeView(overlay);
                     return;
                 }
                 try { playHomeEntrance(activity); } catch (Throwable ignored) { }
-                overlay.animate().alpha(0f).setDuration(EXIT_MS).withEndAction(new Runnable() {
-                    @Override public void run() {
-                        if (overlay.getParent() == decor) decor.removeView(overlay);
-                        // v10.66 (TV only): the remote starts on «الرئيسية» in the side rail
-                        try { if (CigramTvMode.isTv(activity)) CigramTvRail.focusSelected(activity); }
-                        catch (Throwable ignored) { }
-                    }
-                }).start();
+                overlay.animate().alpha(0f).setDuration(EXIT_MS)
+                        .setInterpolator(new DecelerateInterpolator(1.4f))
+                        .withEndAction(new Runnable() {
+                            @Override public void run() {
+                                if (overlay.getParent() == decor) decor.removeView(overlay);
+                            }
+                        }).start();
             }
-        }, Math.max(0L, remainingMs()));
+        };
+        pendingExit = exit;
+        // Start the cap only once the overlay has really been drawn (the hand-off from the system window is then
+        // seamless); if Home already reported ready, leave right after that first frame.
+        overlay.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+            @Override public boolean onPreDraw() {
+                ViewTreeObserver o = overlay.getViewTreeObserver();
+                if (o.isAlive()) o.removeOnPreDrawListener(this);
+                MAIN.postDelayed(exit, homeReady ? 16L : MAX_HOLD_MS);
+                return true;
+            }
+        });
+        // Safety: if no frame is ever drawn (activity stopped before drawing), never leave the overlay behind.
+        MAIN.postDelayed(exit, 4000L);
+    }
+
+    private static Drawable logoDrawable(Activity activity) {
+        try {
+            int id = activity.getResources().getIdentifier("cigram_logo", "drawable", activity.getPackageName());
+            if (id != 0) return activity.getResources().getDrawable(id, activity.getTheme());
+        } catch (Throwable error) {
+            Log.w(TAG, "logo resource", error);
+        }
+        try {
+            return activity.getPackageManager().getApplicationIcon(activity.getApplicationInfo());
+        } catch (Throwable error) {
+            return null;
+        }
     }
 
     /**
-     * Home's own entrance, started as the splash fades: its blocks (carousel, sections) rise in
-     * from below one after another and the bottom bar bounces up. Only the first screenful is
-     * animated; scrolled-off content is left alone.
+     * Android 13+: the system splash of the NEXT cold start follows the in-app mode. With "follow the device" the
+     * default theme (values / values-night) already matches, so the explicit variants are only used for a forced mode.
      */
+    static void syncSystemSplashTheme(Activity activity) {
+        if (Build.VERSION.SDK_INT < 33 || activity == null) return;
+        String mode = CigramTheme.effectiveMode(activity);
+        int theme = CigramTheme.MODE_LIGHT.equals(mode) ? R.style.CigramLaunchTheme_Light
+                : CigramTheme.MODE_DARK.equals(mode) ? R.style.CigramLaunchTheme_Dark : R.style.CigramLaunchTheme;
+        try {
+            Object splash = Activity.class.getMethod("getSplashScreen").invoke(activity);
+            Class<?> splashClass = Class.forName("android.window.SplashScreen");
+            splashClass.getMethod("setSplashScreenTheme", int.class).invoke(splash, theme);
+        } catch (Throwable error) {
+            Log.w(TAG, "setSplashScreenTheme", error);
+        }
+    }
+
+    /** Home's first screenful rises in quickly as the overlay fades (no delay before content is visible). */
     private static void playHomeEntrance(Activity activity) {
         View root = activity.findViewById(android.R.id.content);
         if (root == null) return;
         int id = activity.getResources().getIdentifier("linear1", "id", activity.getPackageName());
         View home = id == 0 ? null : root.findViewById(id);
         int screenH = activity.getResources().getDisplayMetrics().heightPixels;
-        float rise = CigramUI.dp(activity, 38);
-        if (home instanceof ViewGroup) {
-            ViewGroup group = (ViewGroup) home;
-            int shown = 0;
-            int[] at = new int[2];
-            for (int i = 0; i < group.getChildCount() && shown < 7; i++) {
-                View child = group.getChildAt(i);
-                if (child.getVisibility() != View.VISIBLE || child.getHeight() <= 0) continue;
-                child.getLocationOnScreen(at);
-                if (at[1] > screenH) break;
-                child.setAlpha(0f);
-                child.setTranslationY(rise);
-                child.animate().alpha(1f).translationY(0f)
-                        .setStartDelay(ENTRANCE_DELAY_MS + shown * ENTRANCE_STEP_MS).setDuration(380L)
-                        .setInterpolator(new DecelerateInterpolator(2f)).start();
-                shown++;
-            }
+        float rise = CigramUI.dp(activity, 14);
+        if (!(home instanceof ViewGroup)) return;
+        ViewGroup group = (ViewGroup) home;
+        int shown = 0;
+        int[] at = new int[2];
+        for (int i = 0; i < group.getChildCount() && shown < 6; i++) {
+            View child = group.getChildAt(i);
+            if (child.getVisibility() != View.VISIBLE || child.getHeight() <= 0) continue;
+            child.getLocationOnScreen(at);
+            if (at[1] > screenH) break;
+            child.setTranslationY(rise);
+            child.animate().translationY(0f).setStartDelay(shown * ENTRANCE_STEP_MS).setDuration(260L)
+                    .setInterpolator(new DecelerateInterpolator(2f)).start();
+            shown++;
         }
-        View bar = root.findViewWithTag("transparent_cigram_nav");
-        if (bar != null) {
-            bar.setTranslationY(CigramUI.dp(activity, 90));
-            bar.animate().translationY(0f).setStartDelay(ENTRANCE_DELAY_MS + 120L).setDuration(450L)
-                    .setInterpolator(new OvershootInterpolator(1.2f)).start();
-        }
-    }
-
-    /** "Welcome to CIGRAM" with CIGRAM in the brand red. */
-    private static CharSequence brandLine() {
-        String dim = "Welcome to ";
-        String hot = "CIGRAM";
-        SpannableString s = new SpannableString(dim + hot);
-        s.setSpan(new ForegroundColorSpan(LABEL_DIM), 0, dim.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        s.setSpan(new ForegroundColorSpan(LABEL_HOT), dim.length(), s.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        return s;
-    }
-
-    /** Page colour with a tall maroon radial glow in the centre (OTTO-style). */
-    private static GradientDrawable glow(Activity activity) {
-        GradientDrawable g = new GradientDrawable();
-        g.setShape(GradientDrawable.RECTANGLE);
-        g.setColor(PAGE);
-        g.setGradientType(GradientDrawable.RADIAL_GRADIENT);
-        g.setGradientCenter(0.5f, 0.42f);
-        float radius;
-        try {
-            DisplayMetrics dm = activity.getResources().getDisplayMetrics();
-            radius = Math.max(dm.widthPixels, dm.heightPixels) * 0.62f;
-        } catch (Throwable t) {
-            radius = 1200f;
-        }
-        g.setGradientRadius(radius);
-        g.setColors(new int[]{GLOW_CENTER, GLOW_MID, PAGE});
-        return g;
     }
 }

@@ -195,13 +195,13 @@ public class ChannelsActivity extends AppCompatActivity {
 					channelsRoot.setOrientation(android.widget.LinearLayout.VERTICAL);
 					channelsRoot.setLayoutDirection(RTL);
 					channelsRoot.setTextDirection(android.view.View.TEXT_DIRECTION_RTL);
-					channelsRoot.setBackgroundColor(0xFF00121A);
+					channelsRoot.setBackgroundColor(0xFF0E0E10);
 				}
 				
 				// Keep the back arrow at the far right while Arabic title is right aligned.
 				if (channelsHeader != null) {
 					channelsHeader.setVisibility(VISIBLE);
-					channelsHeader.setBackgroundColor(0xFF00121A);
+					channelsHeader.setBackgroundColor(0xFF0E0E10);
 					channelsHeader.setLayoutDirection(LTR);
 					channelsHeader.setGravity(android.view.Gravity.RIGHT | android.view.Gravity.CENTER_VERTICAL);
 				}
@@ -355,7 +355,7 @@ public class ChannelsActivity extends AppCompatActivity {
 						if (target == null) return;
 						final String url = rawUrl == null ? "" : rawUrl.trim();
 						target.setImageDrawable(null);
-						target.setBackgroundColor(0xFF101820);
+						target.setBackgroundColor(0xFF161619);
 						if (url.length() == 0) return;
 						
 						android.graphics.Bitmap cached = memory.get(url);
@@ -590,7 +590,7 @@ public class ChannelsActivity extends AppCompatActivity {
 						box.setTag(CATEGORY_TAG);
 						box.setOrientation(android.widget.LinearLayout.VERTICAL);
 						box.setLayoutDirection(RTL);
-						box.setBackgroundColor(0xFF00121A);
+						box.setBackgroundColor(0xFF0E0E10);
 						
 						android.widget.TextView title = makeLabel(name.length() == 0 ? "القنوات" : name, 22);
 						title.setGravity(android.view.Gravity.RIGHT | android.view.Gravity.CENTER_VERTICAL);
@@ -820,7 +820,7 @@ public class ChannelsActivity extends AppCompatActivity {
 				final android.widget.FrameLayout tnShell =
 				new android.widget.FrameLayout(tnActivity);
 				tnShell.setTag("cigram_nav_shell_v2");
-				tnShell.setBackgroundColor(0xFF00121A);
+				tnShell.setBackgroundColor(0xFF0E0E10);
 				tnContent.addView(tnShell,
 				new android.view.ViewGroup.LayoutParams(
 				android.view.ViewGroup.LayoutParams.MATCH_PARENT,
@@ -1351,7 +1351,7 @@ public class ChannelsActivity extends AppCompatActivity {
 					tnLabel.setTextColor(
 					n == tnCurrent
 					? 0xFFFFFFFF
-					: 0xFFADBBC2);
+					: 0xFFB0B0B5);
 					tnLabel.setGravity(android.view.Gravity.CENTER);
 					tnLabel.setIncludeFontPadding(false);
 					tnLabel.setSingleLine(true);

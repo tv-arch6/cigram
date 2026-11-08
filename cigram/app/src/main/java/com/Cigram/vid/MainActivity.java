@@ -1151,7 +1151,7 @@ public class MainActivity extends AppCompatActivity {
 					new android.graphics.drawable.GradientDrawable();
 					
 					posterBg.setColor(
-					0xFF00121A
+					0xFF0E0E10
 					);
 					
 					posterBg.setCornerRadius(
@@ -1239,7 +1239,7 @@ public class MainActivity extends AppCompatActivity {
 						new android.graphics.drawable.GradientDrawable();
 						
 						trackBg.setColor(
-						0x9900121A
+						0x990E0E10
 						);
 						
 						trackBg.setCornerRadius(
@@ -1759,7 +1759,7 @@ public class MainActivity extends AppCompatActivity {
 						);
 						
 						section.setBackgroundColor(
-						0xFF00121A
+						0xFF0E0E10
 						);
 						
 						section.setPadding(
@@ -2082,7 +2082,7 @@ public class MainActivity extends AppCompatActivity {
 								);
 								
 								episodeLabel.setTextColor(
-								0xFFADBBC2
+								0xFFB0B0B5
 								);
 								
 								episodeLabel.setGravity(
@@ -2118,7 +2118,7 @@ public class MainActivity extends AppCompatActivity {
 								11
 								);
 								leftLabel.setTextColor(
-								0xFFADBBC2
+								0xFFB0B0B5
 								);
 								leftLabel.setGravity(
 								android.view.Gravity.RIGHT
@@ -3134,7 +3134,7 @@ public class MainActivity extends AppCompatActivity {
 		seriesScroll.setClipToPadding(false);
 		/* منع ظهور الخلفية البيضاء أثناء تحميل البيانات */
 		final int appBackground =
-		android.graphics.Color.parseColor("#00121A");
+		android.graphics.Color.parseColor("#0E0E10");
 		
 		getWindow().setBackgroundDrawable(
 		new android.graphics.drawable.ColorDrawable(
@@ -3214,7 +3214,7 @@ public class MainActivity extends AppCompatActivity {
 				new android.widget.FrameLayout(offlineActivity);
 				
 				offlineScreen.setTag("cigram_offline_screen");
-				offlineScreen.setBackgroundColor(0xFF00121A);
+				offlineScreen.setBackgroundColor(0xFF0E0E10);
 				offlineScreen.setClickable(true);
 				offlineScreen.setFocusable(true);
 				offlineScreen.setElevation(1000 * offlineDensity);
@@ -3440,7 +3440,7 @@ public class MainActivity extends AppCompatActivity {
 				view.setScaleType((crop||view instanceof de.hdodenhof.circleimageview.CircleImageView)?android.widget.ImageView.ScaleType.CENTER_CROP:android.widget.ImageView.ScaleType.FIT_CENTER);
 				final String token="cigram-image:"+url;view.setTag(token);
 				android.graphics.drawable.GradientDrawable cgPlaceholder=new android.graphics.drawable.GradientDrawable();
-				cgPlaceholder.setColor(0xFF101820);cgPlaceholder.setCornerRadius(14f*app.getResources().getDisplayMetrics().density);
+				cgPlaceholder.setColor(0xFF161619);cgPlaceholder.setCornerRadius(14f*app.getResources().getDisplayMetrics().density);
 				view.setImageDrawable(null);view.setBackground(cgPlaceholder);
 				if(url.isEmpty())return;
 				android.graphics.Bitmap cached;
@@ -3950,7 +3950,7 @@ public class MainActivity extends AppCompatActivity {
 									.GradientDrawable();
 									
 									bannerBg.setColor(
-									0xF20B2936
+									0xF21C1C20
 									);
 									bannerBg.setCornerRadius(
 									20 * d
@@ -4001,7 +4001,7 @@ public class MainActivity extends AppCompatActivity {
 									new android.graphics.drawable
 									.GradientDrawable();
 									iconBg.setColor(
-									0xFF102F3B
+									0xFF26262B
 									);
 									iconBg.setCornerRadius(
 									12 * d
@@ -4214,7 +4214,7 @@ public class MainActivity extends AppCompatActivity {
 									new android.graphics.drawable
 									.GradientDrawable();
 									laterBg.setColor(
-									0xFF173542
+									0xFF2D2D30
 									);
 									laterBg.setCornerRadius(
 									14 * d
@@ -4459,12 +4459,12 @@ public class MainActivity extends AppCompatActivity {
 				cgHeroHolder.setTag("cigram_admin_hero_carousel");
 				cgHeroHolder.setOrientation(android.widget.LinearLayout.VERTICAL);
 				cgHeroHolder.setVisibility(android.view.View.GONE);
-				cgHeroHolder.setBackgroundColor(0xFF00121A);
+				cgHeroHolder.setBackgroundColor(0xFF0E0E10);
 				cgHeroHolder.setPadding(0, 0, 0, (int)(8 * cgHeroD));
 				
 				final CigramCarousel.Pager cgHeroPager =
 				new CigramCarousel.Pager(MainActivity.this);
-				cgHeroPager.setBackgroundColor(0xFF00121A);
+				cgHeroPager.setBackgroundColor(0xFF0E0E10);
 				cgHeroPager.setClipToPadding(false);
 				
 				final android.widget.LinearLayout cgHeroDots =
@@ -4782,7 +4782,7 @@ public class MainActivity extends AppCompatActivity {
 						android.graphics.drawable.GradientDrawable shadeBg =
 						new android.graphics.drawable.GradientDrawable(
 						android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
-						new int[]{0x2600121A, 0x0000121A, 0x0000121A, 0x9900121A, 0xEB00121A}
+						new int[]{0x260E0E10, 0x000E0E10, 0x000E0E10, 0x990E0E10, 0xEB0E0E10}
 						);
 						shade.setBackground(shadeBg);
 						page.addView(shade, new android.widget.FrameLayout.LayoutParams(-1, -1));
@@ -4790,7 +4790,7 @@ public class MainActivity extends AppCompatActivity {
 						android.view.View sideShade = new android.view.View(MainActivity.this);
 						sideShade.setBackground(new android.graphics.drawable.GradientDrawable(
 						android.graphics.drawable.GradientDrawable.Orientation.RIGHT_LEFT,
-						new int[]{0x9900121A, 0x3300121A, 0x0000121A}));
+						new int[]{0x990E0E10, 0x330E0E10, 0x000E0E10}));
 						// v10.41: no side scrim (the title sits at the bottom of a narrow card)
 						
 						android.widget.LinearLayout bottom =
@@ -5183,7 +5183,7 @@ public class MainActivity extends AppCompatActivity {
 				final android.widget.FrameLayout tnShell =
 				new android.widget.FrameLayout(tnActivity);
 				tnShell.setTag("cigram_nav_shell_v2");
-				tnShell.setBackgroundColor(0xFF00121A);
+				tnShell.setBackgroundColor(0xFF0E0E10);
 				tnContent.addView(tnShell,
 				new android.view.ViewGroup.LayoutParams(
 				android.view.ViewGroup.LayoutParams.MATCH_PARENT,
@@ -5714,7 +5714,7 @@ public class MainActivity extends AppCompatActivity {
 					tnLabel.setTextColor(
 					n == tnCurrent
 					? 0xFFFFFFFF
-					: 0xFFADBBC2);
+					: 0xFFB0B0B5);
 					tnLabel.setGravity(android.view.Gravity.CENTER);
 					tnLabel.setIncludeFontPadding(false);
 					tnLabel.setSingleLine(true);

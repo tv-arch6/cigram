@@ -25,11 +25,11 @@ public final class CigramAppIcon {
 
     public static final Variant[] ALL = {
         new Variant("classic", "Cigram الكلاسيكي", ".IconClassic", "cigram_logo", false),
-        new Variant("gold", "Cigram VIP الذهبي", ".IconGold", "ic_launcher_gold_bg", true),
-        new Variant("neon", "نيون سايبربنك", ".IconNeon", "ic_launcher_neon_bg", true),
-        new Variant("minimal", "داكن بسيط", ".IconMinimal", "ic_launcher_minimal_bg", true),
-        new Variant("cinema", "سينما كلاسيكية", ".IconCinema", "ic_launcher_cinema_bg", true),
-        new Variant("glass", "زجاج شفاف", ".IconGlass", "ic_launcher_glass_bg", true),
+        new Variant("gold", "Cigram VIP الذهبي", ".IconGold", "ic_launcher_gold_preview", true),
+        new Variant("neon", "نيون سايبربنك", ".IconNeon", "ic_launcher_neon_preview", true),
+        new Variant("minimal", "أبيض بسيط", ".IconMinimal", "ic_launcher_minimal_preview", true),
+        new Variant("cinema", "سينما كلاسيكية", ".IconCinema", "ic_launcher_cinema_preview", true),
+        new Variant("glass", "زجاج شفاف", ".IconGlass", "ic_launcher_glass_preview", true),
     };
 
     private static final String PREFS = "cigram_app_icon";

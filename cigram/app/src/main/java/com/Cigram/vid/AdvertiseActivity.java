@@ -193,7 +193,7 @@ public class AdvertiseActivity extends Activity {
         ctaButton.setClickable(true);
         ctaButton.setFocusable(true);
         ctaButton.setMinimumHeight(AdsUi.dp(this, 56));
-        ctaTitle = AdsUi.text(this, "تواصل معنا", 17f, 0xFF04161D, true);
+        ctaTitle = AdsUi.text(this, "تواصل معنا", 17f, 0xFF111113, true);
         ctaTitle.setGravity(Gravity.CENTER);
         ctaSub = AdsUi.text(this, "اقرأ السياسات أولاً", 12f, 0xFFB8C4CA, false);
         ctaSub.setGravity(Gravity.CENTER);
@@ -215,7 +215,7 @@ public class AdvertiseActivity extends Activity {
         boolean ready = ctaReady();
         if (ready) {
             ctaButton.setBackground(CigramGlass.ripple(this, CigramUI.round(CigramUI.TEAL, 16, this), 16));
-            ctaTitle.setTextColor(0xFF04161D);
+            ctaTitle.setTextColor(0xFF111113);
             ctaSub.setVisibility(View.GONE);
         } else {
             ctaButton.setBackground(CigramUI.round(0xFF3A4E58, 16, this));
@@ -285,7 +285,7 @@ public class AdvertiseActivity extends Activity {
         m.setGravity(Gravity.CENTER);
         m.setLineSpacing(0f, 1.2f);
         box.addView(m, AdsUi.lp(-1, -2, 0, AdsUi.dp(this, 8), 0, AdsUi.dp(this, 18)));
-        TextView retry = AdsUi.button(this, "إعادة المحاولة", CigramUI.TEAL, 0xFF04161D);
+        TextView retry = AdsUi.button(this, "إعادة المحاولة", CigramUI.TEAL, 0xFF111113);
         retry.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
                 showSkeleton();
@@ -384,7 +384,7 @@ public class AdvertiseActivity extends Activity {
         LinearLayout box = AdsUi.vbox(this);
         box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         box.setPadding(AdsUi.dp(this, 20), AdsUi.dp(this, 18), AdsUi.dp(this, 20), AdsUi.dp(this, 18));
-        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{0xFF0F4A5C, 0xFF0B2733});
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{0xFF0F4A5C, 0xFF1B1B1F});
         g.setCornerRadius(AdsUi.dp(this, 22));
         g.setStroke(AdsUi.dp(this, 1), 0x3326A5B5);
         box.setBackground(g);
@@ -412,15 +412,15 @@ public class AdvertiseActivity extends Activity {
             LinearLayout c = AdsUi.vbox(this);
             c.setGravity(Gravity.CENTER_HORIZONTAL);
             c.setPadding(AdsUi.dp(this, 8), AdsUi.dp(this, 12), AdsUi.dp(this, 8), AdsUi.dp(this, 12));
-            c.setBackground(CigramUI.round(0xFF0B2733, 0x22FFFFFF, 16, this));
-            TextView n = AdsUi.text(this, String.valueOf(i + 1), 15f, 0xFF04161D, true);
+            c.setBackground(CigramUI.round(0xFF1B1B1F, 0x22FFFFFF, 16, this));
+            TextView n = AdsUi.text(this, String.valueOf(i + 1), 15f, 0xFF111113, true);
             n.setGravity(Gravity.CENTER);
             n.setBackground(CigramUI.round(CigramUI.TEAL, 20, this));
             c.addView(n, new LinearLayout.LayoutParams(AdsUi.dp(this, 28), AdsUi.dp(this, 28)));
             TextView t = AdsUi.text(this, titles[i], 13.5f, 0xFFFFFFFF, true);
             t.setGravity(Gravity.CENTER);
             c.addView(t, AdsUi.lp(-1, -2, 0, AdsUi.dp(this, 8), 0, 0));
-            TextView d = AdsUi.text(this, descs[i], 11f, 0xFF9FB4BD, false);
+            TextView d = AdsUi.text(this, descs[i], 11f, 0xFFA3A3A8, false);
             d.setGravity(Gravity.CENTER);
             c.addView(d, AdsUi.lp(-1, -2, 0, AdsUi.dp(this, 2), 0, 0));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1f);
@@ -444,7 +444,7 @@ public class AdvertiseActivity extends Activity {
         row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(AdsUi.dp(this, 16), AdsUi.dp(this, 14), AdsUi.dp(this, 16), AdsUi.dp(this, 14));
-        row.setBackground(CigramUI.round(0xFF0B2733, 0x33E9A23B, 16, this));
+        row.setBackground(CigramUI.round(0xFF1B1B1F, 0x33E9A23B, 16, this));
         TextView t = AdsUi.text(this, "طلباتي وحالتها", 15f, 0xFFFFFFFF, true);
         row.addView(t, AdsUi.lp(0, -2, 0, 0, 0, 0));
         ((LinearLayout.LayoutParams) t.getLayoutParams()).weight = 1f;
@@ -474,7 +474,7 @@ public class AdvertiseActivity extends Activity {
         AdsUi.countUp(n, value, new AdsUi.Fmt() {
             @Override public String format(double v) { return CigramAds.count(Math.round(v)); }
         }, 1100L);
-        t.addView(AdsUi.text(this, label, 12f, 0xFF9FB4BD, false), AdsUi.lp(-1, -2, 0, AdsUi.dp(this, 2), 0, 0));
+        t.addView(AdsUi.text(this, label, 12f, 0xFFA3A3A8, false), AdsUi.lp(-1, -2, 0, AdsUi.dp(this, 2), 0, 0));
         t.setContentDescription(label + ": " + CigramAds.count(value));
         return t;
     }
@@ -675,13 +675,13 @@ public class AdvertiseActivity extends Activity {
         // بطاقة السعر
         priceCard = AdsUi.vbox(this);
         priceCard.setPadding(AdsUi.dp(this, 18), AdsUi.dp(this, 18), AdsUi.dp(this, 18), AdsUi.dp(this, 18));
-        GradientDrawable pg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{0xFF0F3B4A, 0xFF0B2733});
+        GradientDrawable pg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{0xFF0F3B4A, 0xFF1B1B1F});
         pg.setCornerRadius(AdsUi.dp(this, 26));
         pg.setStroke(AdsUi.dp(this, 1), 0x6626A5B5);
         priceCard.setBackground(pg);
         box.addView(priceCard, AdsUi.lp(-1, -2, 0, AdsUi.dp(this, 12), 0, 0));
 
-        TextView send = AdsUi.button(this, "أرسل هذا الطلب", CigramUI.TEAL, 0xFF04161D);
+        TextView send = AdsUi.button(this, "أرسل هذا الطلب", CigramUI.TEAL, 0xFF111113);
         send.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { sendOrder(); }
         });
@@ -853,7 +853,7 @@ public class AdvertiseActivity extends Activity {
             priceCard.addView(AdsUi.text(this, "هذه المساحة غير متاحة حالياً.", 15f, 0xFFFFFFFF, false));
             return;
         }
-        priceCard.addView(AdsUi.text(this, "تفصيل التكلفة", 15f, 0xFF9FB4BD, true));
+        priceCard.addView(AdsUi.text(this, "تفصيل التكلفة", 15f, 0xFFA3A3A8, true));
         addPriceLine("السعر الأساسي (" + CigramAds.durationLabel(q.days) + ")", CigramAds.money(cfg, q.base), 0xFFFFFFFF);
         if (q.discount > 0) addPriceLine("خصم المدة الطويلة (" + (int) q.discountPct + "%)", "−" + CigramAds.money(cfg, q.discount), CigramUI.GREEN);
         for (CigramAds.Line l : q.targetingLines) addPriceLine(l.label, "+" + CigramAds.money(cfg, l.amount), 0xFFFFFFFF);
@@ -888,7 +888,7 @@ public class AdvertiseActivity extends Activity {
         views.addView(vt, AdsUi.lp(0, -2, 0, 0, AdsUi.dp(this, 10), 0));
         ((LinearLayout.LayoutParams) vt.getLayoutParams()).weight = 1f;
         priceCard.addView(views, AdsUi.lp(-1, -2, 0, AdsUi.dp(this, 14), 0, 0));
-        TextView note = AdsUi.text(this, "تقدير استرشادي مبني على أرقام التطبيق الفعلية. يُثبَّت السعر النهائي في عرض السعر داخل المحادثة.", 11.5f, 0xFF8FA1AA, false);
+        TextView note = AdsUi.text(this, "تقدير استرشادي مبني على أرقام التطبيق الفعلية. يُثبَّت السعر النهائي في عرض السعر داخل المحادثة.", 11.5f, 0xFF8E8E94, false);
         note.setLineSpacing(0f, 1.15f);
         priceCard.addView(note, AdsUi.lp(-1, -2, 0, AdsUi.dp(this, 10), 0, 0));
     }
@@ -1025,7 +1025,7 @@ public class AdvertiseActivity extends Activity {
 
         AdsIconBox() {
             view = new FrameLayout(AdvertiseActivity.this);
-            tick = new AdsIcons.Icon(AdvertiseActivity.this, AdsIcons.CHECK, 0xFF04161D);
+            tick = new AdsIcons.Icon(AdvertiseActivity.this, AdsIcons.CHECK, 0xFF111113);
             view.addView(tick, new FrameLayout.LayoutParams(AdsUi.dp(AdvertiseActivity.this, 18), AdsUi.dp(AdvertiseActivity.this, 18), Gravity.CENTER));
             render(false);
         }
@@ -1250,7 +1250,7 @@ public class AdvertiseActivity extends Activity {
         LinearLayout tl = AdsUi.hbox(this);
         tl.addView(AdsUi.text(this, title, 15.5f, CigramGlass.text(this), true));
         if (badge != null) {
-            TextView bd = AdsUi.text(this, badge, 11f, 0xFF04161D, true);
+            TextView bd = AdsUi.text(this, badge, 11f, 0xFF111113, true);
             bd.setPadding(AdsUi.dp(this, 8), AdsUi.dp(this, 3), AdsUi.dp(this, 8), AdsUi.dp(this, 3));
             bd.setBackground(CigramUI.round(accent, 8, this));
             tl.addView(bd, AdsUi.lp(-2, -2, 0, 0, AdsUi.dp(this, 8), 0));

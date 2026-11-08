@@ -24,7 +24,7 @@ import android.view.View;
  */
 public final class CigramSkeleton extends Drawable implements Runnable {
 
-    private static final int BASE_COLOR = 0xFF0F2A36;
+    private static final int BASE_COLOR = 0xFF222226;
     private static final int HIGHLIGHT_COLOR = 0x33FFFFFF;
     private static final long PERIOD_MS = 1300L;
     private static final long FRAME_MS = 50L;          // 20 fps is plenty for a soft shimmer

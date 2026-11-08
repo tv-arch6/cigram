@@ -409,6 +409,36 @@ public final class AdsMedia {
 
     public interface BitmapCb { void onBitmap(Bitmap b); }
 
+    /** True when the picture of {@code url} at {@code maxPx} is already decoded in memory (shows without waiting). */
+    public static boolean isReady(String url, int maxPx, boolean videoFrame) {
+        if (url == null || url.length() == 0) return true;   // nothing to load (text ad)
+        return MEM.get(cacheKey(url) + "@" + maxPx + (videoFrame ? "v" : "")) != null;
+    }
+
+    /**
+     * Decodes the picture into the memory cache in the background and runs {@code done} on the main thread with
+     * true (ready) or false (failed). Used so a full-screen ad never opens as an empty black screen.
+     */
+    public static void prefetch(final Context c, final String url, final int maxPx, final boolean videoFrame,
+                                final Callback done) {
+        if (isReady(url, maxPx, videoFrame)) { if (done != null) done.onResult(true); return; }
+        final String key = cacheKey(url) + "@" + maxPx + (videoFrame ? "v" : "");
+        final Context app = c.getApplicationContext();
+        IMG.execute(new Runnable() {
+            @Override public void run() {
+                Bitmap b = null;
+                try {
+                    b = videoFrame ? videoFrameOf(url, maxPx) : download(app, url, maxPx);
+                } catch (Throwable ignored) { }
+                if (b != null) MEM.put(key, b);
+                final boolean ok = b != null;
+                if (done != null) MAIN.post(new Runnable() { @Override public void run() { done.onResult(ok); } });
+            }
+        });
+    }
+
+    public interface Callback { void onResult(boolean ok); }
+
     public static void loadInto(final Context c, final ImageView iv, final String url, final int maxPx, final boolean videoFrame) {
         if (url == null || url.length() == 0) return;
         final String key = cacheKey(url) + "@" + maxPx + (videoFrame ? "v" : "");

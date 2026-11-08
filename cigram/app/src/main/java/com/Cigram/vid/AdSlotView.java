@@ -357,7 +357,7 @@ public class AdSlotView extends FrameLayout {
             t.addView(body, AdsUi.lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, AdsUi.dp(c, 2), 0, 0));
         }
         if (ad.cta.length() > 0 && ad.clickable()) {
-            TextView cta = AdsRender.cta(c, ad.cta, 0xFFFFFFFF, 0xFF0B2530);
+            TextView cta = AdsRender.cta(c, ad.cta, 0xFFFFFFFF, 0xFF1E1E21);
             cta.setMinHeight(AdsUi.dp(c, 40));
             t.addView(cta, AdsUi.lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, AdsUi.dp(c, 8), 0, 0));
         }
@@ -403,7 +403,7 @@ public class AdSlotView extends FrameLayout {
             t.addView(body, AdsUi.lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, AdsUi.dp(c, 3), 0, 0));
         }
         if (ad.cta.length() > 0 && ad.clickable()) {
-            TextView cta = AdsRender.cta(c, ad.cta, ad.isText() ? 0xFFFFFFFF : CigramUI.TEAL, 0xFF04161D);
+            TextView cta = AdsRender.cta(c, ad.cta, ad.isText() ? 0xFFFFFFFF : CigramUI.TEAL, 0xFF111113);
             t.addView(cta, AdsUi.lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, AdsUi.dp(c, 8), 0, 0));
         }
         card.addView(t, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -440,7 +440,7 @@ public class AdSlotView extends FrameLayout {
         }
         bar.addView(texts, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         if (ad.cta.length() > 0 && ad.clickable()) {
-            TextView cta = AdsRender.cta(c, ad.cta, CigramUI.TEAL, 0xFF04161D);
+            TextView cta = AdsRender.cta(c, ad.cta, CigramUI.TEAL, 0xFF111113);
             bar.addView(cta, AdsUi.lp(ViewGroup.LayoutParams.WRAP_CONTENT, AdsUi.dp(c, 44), AdsUi.dp(c, 6), 0, AdsUi.dp(c, 2), 0));
         }
         View label = AdsRender.label(c, ad, hiddenCb);

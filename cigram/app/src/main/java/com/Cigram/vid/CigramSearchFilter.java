@@ -325,7 +325,7 @@ public final class CigramSearchFilter {
         d.setColor(on ? CHIP_ON : CHIP);
         d.setCornerRadius(CigramUI.dp(a, 19));
         c.setBackground(d);
-        c.setTextColor(on ? 0xFF05141F : CHIP_TEXT);
+        c.setTextColor(on ? 0xFF111113 : CHIP_TEXT);
         c.setTypeface(CigramUI.font(a), on ? Typeface.BOLD : Typeface.NORMAL);
     }
 

@@ -259,7 +259,7 @@ public final class CigramShare {
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
 
         // background
-        p.setShader(new LinearGradient(0, 0, 0, H, 0xFF12202B, 0xFF05141F, Shader.TileMode.CLAMP));
+        p.setShader(new LinearGradient(0, 0, 0, H, 0xFF12202B, 0xFF111113, Shader.TileMode.CLAMP));
         cv.drawRect(0, 0, W, H, p);
         p.setShader(new RadialGradient(W / 2f, 260f, 620f, 0x664A1214, 0x004A1214, Shader.TileMode.CLAMP));
         cv.drawRect(0, 0, W, H, p);
@@ -281,7 +281,7 @@ public final class CigramShare {
             RectF dst = new RectF(px + (pw - dw) / 2f, py + (ph - dh) / 2f, px + (pw + dw) / 2f, py + (ph + dh) / 2f);
             cv.drawBitmap(poster, null, dst, p);
         } else {
-            p.setColor(0xFF0B2733);
+            p.setColor(0xFF1B1B1F);
             cv.drawRect(pr, p);
         }
         cv.restore();
@@ -315,7 +315,7 @@ public final class CigramShare {
         String imdb = CigramContent.text(item, "imdb", "rating");
         if (imdb.length() > 0 && !"0".equals(imdb) && !"0.0".equals(imdb)) meta.append("  ·  ★ ").append(imdb);
         TextPaint mp = new TextPaint(Paint.ANTI_ALIAS_FLAG);
-        mp.setColor(0xFFC3CDD2);
+        mp.setColor(0xFFC7C7CC);
         mp.setTextSize(38f);
         mp.setTypeface(font);
         StaticLayout ml = layout(meta.toString(), mp, 940);

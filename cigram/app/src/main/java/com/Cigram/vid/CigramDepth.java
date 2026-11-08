@@ -53,7 +53,7 @@ public final class CigramDepth {
             float d = c.getResources().getDisplayMetrics().density;
             return new Raised(0xFFFFFFFF, 0xFFF2F4F6, 0xFFD3D9DE, 18f * d, 3f * d);
         }
-        return raised(c, 0xFF174660, 0xFF0B2936, 18f, 4f);
+        return raised(c, 0xFF174660, 0xFF1C1C20, 18f, 4f);
     }
 
     /** A coloured "jewel" (icon tile) in the accent colour. */

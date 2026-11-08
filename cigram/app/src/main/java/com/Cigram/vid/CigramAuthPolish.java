@@ -39,9 +39,9 @@ public final class CigramAuthPolish {
     private CigramAuthPolish() { }
 
     private static final String TAG_HEADER = "cigram_auth_header";
-    private static final int TEXT_2 = 0xFFC3CDD2;
+    private static final int TEXT_2 = 0xFFC7C7CC;
     private static final int HINT = 0xFF6F8591;
-    private static final int TAB_ON_TEXT = 0xFF05141F;
+    private static final int TAB_ON_TEXT = 0xFF111113;
 
     private static View byId(Activity a, String name) {
         int id = a.getResources().getIdentifier(name, "id", a.getPackageName());
@@ -266,7 +266,7 @@ public final class CigramAuthPolish {
         int kind = id.contains("password") ? CigramAccountDesign.LOCK
                 : id.contains("name") ? CigramAccountDesign.USER : CigramAccountDesign.MAIL;
         Drawable[] old = e.getCompoundDrawables();
-        Drawable glyph = new CigramAccountDesign.Glyph(a, kind, CigramTheme.isLight(a) ? 0xFF7C878E : 0xFF8FA1AA, 20);
+        Drawable glyph = new CigramAccountDesign.Glyph(a, kind, CigramTheme.isLight(a) ? 0xFF7C878E : 0xFF8E8E94, 20);
         glyph.setBounds(0, 0, glyph.getIntrinsicWidth(), glyph.getIntrinsicHeight());
         e.setCompoundDrawables(old[0], null, glyph, null);
         e.setCompoundDrawablePadding(CigramUI.dp(a, 10));

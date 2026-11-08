@@ -9,7 +9,7 @@
 		android:id="@+id/linear_my_content_root"
 		android:layout_width="match_parent"
 		android:layout_height="match_parent"
-		android:background="#001B23"
+		android:background="#121214"
 		android:gravity="top"
 		android:orientation="vertical">
 		<LinearLayout
@@ -18,7 +18,7 @@
 			android:layout_height="56dp"
 			android:paddingLeft="12dp"
 			android:paddingRight="12dp"
-			android:background="#0B2A38"
+			android:background="#1D1D21"
 			android:gravity="right|center_vertical"
 			android:orientation="horizontal">
 			<TextView
@@ -45,7 +45,7 @@
 			android:id="@+id/vscroll_my_content"
 			android:layout_width="match_parent"
 			android:layout_height="0dp"
-			android:background="#001B23"
+			android:background="#121214"
 			android:layout_weight="1"
 			android:scrollbars="none">
 			<LinearLayout
@@ -56,7 +56,7 @@
 				android:paddingTop="12dp"
 				android:paddingRight="12dp"
 				android:paddingBottom="20dp"
-				android:background="#001B23"
+				android:background="#121214"
 				android:gravity="top"
 				android:orientation="vertical">
 				<TextView

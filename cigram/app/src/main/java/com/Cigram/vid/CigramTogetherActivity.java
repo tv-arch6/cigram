@@ -130,7 +130,7 @@ public class CigramTogetherActivity extends Activity implements CigramTogetherSe
     private void buildShell() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(0xFF00121A);
+        root.setBackgroundColor(0xFF0E0E10);
         root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         root.setFitsSystemWindows(true);
 
@@ -228,7 +228,7 @@ public class CigramTogetherActivity extends Activity implements CigramTogetherSe
                 @Override public void onClick(View v) { createRoom(); }
             }));
         }
-        content.addView(button("الانضمام برمز", 0xFF1F4553, new View.OnClickListener() {
+        content.addView(button("الانضمام برمز", 0xFF34343A, new View.OnClickListener() {
             @Override public void onClick(View v) { if (requireLogin()) showJoin(); }
         }));
     }
@@ -294,7 +294,7 @@ public class CigramTogetherActivity extends Activity implements CigramTogetherSe
                 @Override public void onClick(View v) { retry.run(); }
             }));
         }
-        content.addView(button("رجوع", 0xFF1F4553, new View.OnClickListener() {
+        content.addView(button("رجوع", 0xFF34343A, new View.OnClickListener() {
             @Override public void onClick(View v) { showHub(); }
         }));
     }
@@ -325,7 +325,7 @@ public class CigramTogetherActivity extends Activity implements CigramTogetherSe
 
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        TextView copy = button("نسخ الرمز", 0xFF1F4553, new View.OnClickListener() {
+        TextView copy = button("نسخ الرمز", 0xFF34343A, new View.OnClickListener() {
             @Override public void onClick(View v) {
                 try { ((ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("cigram-room", c)); toast("نُسخ الرمز"); } catch (Throwable ignored) { }
             }
@@ -364,7 +364,7 @@ public class CigramTogetherActivity extends Activity implements CigramTogetherSe
             @Override public void onClick(View v) { startWatching(); }
         });
         content.addView(startBtn);
-        content.addView(button("إلغاء الغرفة", 0xFF1F4553, new View.OnClickListener() {
+        content.addView(button("إلغاء الغرفة", 0xFF34343A, new View.OnClickListener() {
             @Override public void onClick(View v) { onBackPressed(); }
         }));
         refreshStartButton();
@@ -569,7 +569,7 @@ public class CigramTogetherActivity extends Activity implements CigramTogetherSe
         n1.setMarginStart(CigramUI.dp(this, 10));
         guestHolder.addView(on, n1);
         content.addView(note("تمت الموافقة. بانتظار أن يبدأ صاحب الغرفة المشاهدة…", CigramUI.GREEN));
-        content.addView(button("مغادرة الغرفة", 0xFF1F4553, new View.OnClickListener() {
+        content.addView(button("مغادرة الغرفة", 0xFF34343A, new View.OnClickListener() {
             @Override public void onClick(View v) { onBackPressed(); }
         }));
         if (room != null) maybeOpenPlayer(room);

@@ -151,7 +151,7 @@ public class MyAdsActivity extends Activity {
         if ("running".equals(s)) return CigramUI.GREEN;
         if ("rejected".equals(s)) return CigramUI.DANGER;
         if ("paused".equals(s) || "awaiting_payment".equals(s) || "needs_info".equals(s)) return CigramUI.AMBER;
-        if ("ended".equals(s)) return 0xFF8FA1AA;
+        if ("ended".equals(s)) return 0xFF8E8E94;
         return CigramUI.TEAL;
     }
 

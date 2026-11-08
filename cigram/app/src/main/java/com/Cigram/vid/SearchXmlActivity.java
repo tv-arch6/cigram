@@ -420,10 +420,10 @@ public class SearchXmlActivity extends AppCompatActivity {
 					canvas.clipPath(clip);
 					paint.setStyle(android.graphics.Paint.Style.FILL);
 					paint.setShader(null);
-					paint.setColor(green ? 0x6639DB91 : 0xB005141F);
+					paint.setColor(green ? 0x6639DB91 : 0xB0111113);
 					canvas.drawRoundRect(rect, radius, radius, paint);
 					paint.setShader(new android.graphics.LinearGradient(0, rect.top, rect.width(), rect.bottom,
-					new int[]{0x34FFFFFF, 0x09FFFFFF, 0x0005141F, 0x16FFFFFF},
+					new int[]{0x34FFFFFF, 0x09FFFFFF, 0x00111113, 0x16FFFFFF},
 					new float[]{0f, 0.28f, 0.65f, 1f}, android.graphics.Shader.TileMode.CLAMP));
 					canvas.drawRoundRect(rect, radius, radius, paint);
 					paint.setShader(null);
@@ -844,7 +844,7 @@ public class SearchXmlActivity extends AppCompatActivity {
 				view.setScaleType((crop||view instanceof de.hdodenhof.circleimageview.CircleImageView)?android.widget.ImageView.ScaleType.CENTER_CROP:android.widget.ImageView.ScaleType.FIT_CENTER);
 				final String token="cigram-image:"+url;view.setTag(token);
 				android.graphics.drawable.GradientDrawable cgPlaceholder=new android.graphics.drawable.GradientDrawable();
-				cgPlaceholder.setColor(0xFF101820);cgPlaceholder.setCornerRadius(14f*app.getResources().getDisplayMetrics().density);
+				cgPlaceholder.setColor(0xFF161619);cgPlaceholder.setCornerRadius(14f*app.getResources().getDisplayMetrics().density);
 				view.setImageDrawable(null);view.setBackground(cgPlaceholder);
 				if(url.isEmpty())return;
 				android.graphics.Bitmap cached;
@@ -875,7 +875,7 @@ public class SearchXmlActivity extends AppCompatActivity {
 			(android.widget.TextView)findViewById(R.id.textview_tab_movies),
 			(android.widget.TextView)findViewById(R.id.textview_tab_series)};
 		cgRoot.setLayoutDirection(android.view.View.LAYOUT_DIRECTION_RTL);
-		cgRoot.setBackgroundColor(0xFF05141F);
+		cgRoot.setBackgroundColor(0xFF111113);
 		cgTabs.setBackgroundColor(0x00000000); cgTabs.setDividerDrawable(null);
 		cgTabs.setShowDividers(android.widget.LinearLayout.SHOW_DIVIDER_NONE);
 		cgTabs.setLayoutDirection(android.view.View.LAYOUT_DIRECTION_RTL);
@@ -2274,7 +2274,7 @@ public class SearchXmlActivity extends AppCompatActivity {
 				final android.widget.FrameLayout tnShell =
 				new android.widget.FrameLayout(tnActivity);
 				tnShell.setTag("cigram_nav_shell_v2");
-				tnShell.setBackgroundColor(0xFF00121A);
+				tnShell.setBackgroundColor(0xFF0E0E10);
 				tnContent.addView(tnShell,
 				new android.view.ViewGroup.LayoutParams(
 				android.view.ViewGroup.LayoutParams.MATCH_PARENT,
@@ -2805,7 +2805,7 @@ public class SearchXmlActivity extends AppCompatActivity {
 					tnLabel.setTextColor(
 					n == tnCurrent
 					? 0xFFFFFFFF
-					: 0xFFADBBC2);
+					: 0xFFB0B0B5);
 					tnLabel.setGravity(android.view.Gravity.CENTER);
 					tnLabel.setIncludeFontPadding(false);
 					tnLabel.setSingleLine(true);

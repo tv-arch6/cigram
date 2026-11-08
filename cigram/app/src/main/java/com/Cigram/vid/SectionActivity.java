@@ -144,7 +144,7 @@ public class SectionActivity extends AppCompatActivity {
 					int layer = canvas.saveLayerAlpha(rect, alpha);
 					paint.setStyle(android.graphics.Paint.Style.FILL);
 					paint.setShader(null);
-					paint.setColor(0xB005141F);
+					paint.setColor(0xB0111113);
 					canvas.drawRoundRect(rect, radius, radius, paint);
 					
 					paint.setShader(new android.graphics.LinearGradient(
@@ -152,7 +152,7 @@ public class SectionActivity extends AppCompatActivity {
 					rect.right, rect.bottom,
 					new int[] {
 						0x34FFFFFF, 0x09FFFFFF,
-						0x0005141F, 0x16FFFFFF
+						0x00111113, 0x16FFFFFF
 					},
 					new float[] {0f, .28f, .65f, 1f},
 					android.graphics.Shader.TileMode.CLAMP
@@ -1386,7 +1386,7 @@ public class SectionActivity extends AppCompatActivity {
 				);
 				android.graphics.drawable.GradientDrawable cgPlaceholder =
 				new android.graphics.drawable.GradientDrawable();
-				cgPlaceholder.setColor(0xFF101820);
+				cgPlaceholder.setColor(0xFF161619);
 				cgPlaceholder.setCornerRadius(14f * app.getResources().getDisplayMetrics().density);
 				view.setImageDrawable(null);
 				view.setBackground(cgPlaceholder);
@@ -1517,7 +1517,7 @@ public class SectionActivity extends AppCompatActivity {
 		.trim();
 		
 		cgSectionRoot.setBackgroundColor(
-		0xFF00121A
+		0xFF0E0E10
 		);
 		cgSectionRoot.setLayoutDirection(
 		android.view.View.LAYOUT_DIRECTION_RTL
@@ -1749,7 +1749,7 @@ public class SectionActivity extends AppCompatActivity {
 				new CigramPosterView(SectionActivity.this);
 				
 				poster.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
-				poster.setBackground(rounded(0xFF0B2733, 14));
+				poster.setBackground(rounded(0xFF1B1B1F, 14));
 				
 				if (android.os.Build.VERSION.SDK_INT >= 21) {
 					final float radius = cgGlass.px(14);

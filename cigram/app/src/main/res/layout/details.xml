@@ -9,13 +9,13 @@
 		android:id="@+id/vscroll1"
 		android:layout_width="match_parent"
 		android:layout_height="match_parent"
-		android:background="#00121A"
+		android:background="#0E0E10"
 		android:scrollbars="none">
 		<LinearLayout
 			android:id="@+id/linear1"
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
-			android:background="#00121A"
+			android:background="#0E0E10"
 			android:gravity="center_horizontal"
 			android:orientation="vertical">
 			<RelativeLayout
@@ -409,7 +409,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="2004"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview9"
 								android:layout_width="wrap_content"
@@ -419,7 +419,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="|"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview10"
 								android:layout_width="wrap_content"
@@ -427,7 +427,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="أكشن"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 						</LinearLayout>
 					</LinearLayout>
 					<LinearLayout
@@ -506,7 +506,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="2004"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview4"
 								android:layout_width="wrap_content"
@@ -516,7 +516,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="|"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview5"
 								android:layout_width="wrap_content"
@@ -524,7 +524,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="أكشن"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 						</LinearLayout>
 					</LinearLayout>
 					<LinearLayout
@@ -603,7 +603,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="2004"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/text_watch_also_separator1"
 								android:layout_width="wrap_content"
@@ -613,7 +613,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="|"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/text_watch_also_category1"
 								android:layout_width="wrap_content"
@@ -621,7 +621,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="أكشن"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 						</LinearLayout>
 					</LinearLayout>
 				</LinearLayout>
@@ -709,7 +709,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="2004"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview24"
 								android:layout_width="wrap_content"
@@ -719,7 +719,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="|"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview25"
 								android:layout_width="wrap_content"
@@ -727,7 +727,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="أكشن"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 						</LinearLayout>
 					</LinearLayout>
 					<LinearLayout
@@ -806,7 +806,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="2004"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview19"
 								android:layout_width="wrap_content"
@@ -816,7 +816,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="|"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview20"
 								android:layout_width="wrap_content"
@@ -824,7 +824,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="أكشن"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 						</LinearLayout>
 					</LinearLayout>
 					<LinearLayout
@@ -903,7 +903,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="2004"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview14"
 								android:layout_width="wrap_content"
@@ -913,7 +913,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="|"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview15"
 								android:layout_width="wrap_content"
@@ -921,7 +921,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="أكشن"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 						</LinearLayout>
 					</LinearLayout>
 				</LinearLayout>
@@ -935,7 +935,7 @@
 					android:paddingTop="6dp"
 					android:paddingRight="18dp"
 					android:paddingBottom="6dp"
-					android:background="#001B23"
+					android:background="#121214"
 					android:gravity="center_horizontal|center_vertical"
 					android:text="عرض المزيد "
 					android:textSize="14sp"

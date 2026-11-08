@@ -155,7 +155,7 @@ public final class AdsUi {
         Context c = t.getContext();
         t.setSelected(selected);
         if (selected) {
-            t.setTextColor(0xFF04161D);
+            t.setTextColor(0xFF111113);
             t.setBackground(CigramUI.round(CigramUI.TEAL, 14, c));
         } else {
             t.setTextColor(CigramGlass.text(c));

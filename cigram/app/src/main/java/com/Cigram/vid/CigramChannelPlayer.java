@@ -55,7 +55,7 @@ final class CigramChannelPlayer {
 
     private static final String TAG = "CigramChannelPlayer";
     private static final int RED = 0xFFE21B14;
-    private static final int MUTED = 0xFF8FA1AA;
+    private static final int MUTED = 0xFF8E8E94;
     private static final long WATCH_MS = 500L;
     private static final long HIDE_MS = 3200L;
     private static final Handler UI = new Handler(Looper.getMainLooper());
@@ -114,7 +114,7 @@ final class CigramChannelPlayer {
 
         final boolean light = CigramTheme.isLight(a);
         GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                light ? new int[]{0xFFFBFCFD, 0xFFE3E8EC} : new int[]{0xFF0A202B, 0xFF040F16});
+                light ? new int[]{0xFFFBFCFD, 0xFFE3E8EC} : new int[]{0xFF1B1B1E, 0xFF0C0C0E});
         stage.setBackground(bg);
 
         // ---- the empty state

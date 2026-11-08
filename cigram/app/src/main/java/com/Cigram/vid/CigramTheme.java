@@ -67,24 +67,24 @@ public final class CigramTheme {
 
     static {
         int page = 0xF4F5F7, deep = 0xECEEF1, card = 0xFFFFFF, raised = 0xF0F2F4, line = 0xDADFE3, skel = 0xE3E7EA;
-        int[] pages = {0x00121A, 0x05141F, 0x04161D, 0x001B23, 0x0B1F2A, 0x030F16, 0x040F16, 0x0A0608, 0x071E29};
+        int[] pages = {0x0E0E10, 0x111113, 0x111113, 0x121214, 0x1A1A1D, 0x0C0C0E, 0x0C0C0E, 0x0E0E10, 0x18181B};
         for (int c : pages) SURFACE.put(c, page);
-        SURFACE.put(0x05141F, deep);
-        int[] cards = {0x0B2733, 0x0B2936, 0x0B2A38, 0x0B2330, 0x0A1F29, 0x102330, 0x101820, 0x161B22, 0x0D1117,
-                0x1A1A1A, 0x181818, 0x0F2230, 0x0C2431, 0x0A202B, 0x102D3A};
+        SURFACE.put(0x111113, deep);
+        int[] cards = {0x1B1B1F, 0x1C1C20, 0x1D1D21, 0x1D1D20, 0x1A1A1D, 0x1F1F22, 0x161619, 0x161B22, 0x0D1117,
+                0x1A1A1A, 0x181818, 0x1E1E21, 0x1E1E21, 0x1B1B1E, 0x262629};
         for (int c : cards) SURFACE.put(c, card);
-        int[] raisedC = {0x0F2A36, 0x102F3B, 0x173542, 0x173845, 0x1C2128, 0x21262D};
+        int[] raisedC = {0x222226, 0x26262B, 0x2D2D30, 0x303033, 0x1C2128, 0x21262D};
         for (int c : raisedC) SURFACE.put(c, raised);
-        int[] lines = {0x1F4553, 0x1F3440, 0x30363D};
+        int[] lines = {0x34343A, 0x2E2E33, 0x30363D};
         for (int c : lines) SURFACE.put(c, line);
-        SURFACE.put(0x0F2A36, skel);
+        SURFACE.put(0x222226, skel);
 
         int strong = 0x111418, mid = 0x3C474E, soft = 0x5F6B73;
         int[] strongT = {0xFFFFFF, 0xF1EFE8, 0xE6EEF2, 0xE8EEF1, 0xDCE6EA, 0xE6EDF3};
         for (int c : strongT) TEXT.put(c, strong);
-        int[] midT = {0xC3CDD2, 0xC9D2D7, 0xB9C7CE, 0xADBBC2, 0xB5C0C6, 0xAAB4B9, 0xA9B0BC, 0x9FB4BD, 0xBDA6AC};
+        int[] midT = {0xC7C7CC, 0xC9D2D7, 0xBDBDC2, 0xB0B0B5, 0xB5C0C6, 0xAAB4B9, 0xA9B0BC, 0xA3A3A8, 0xBDA6AC};
         for (int c : midT) TEXT.put(c, mid);
-        int[] softT = {0x8FA1AA, 0x8A97A6, 0x84939B, 0x8796A0, 0x707980, 0x6F8591, 0x8B949E};
+        int[] softT = {0x8E8E94, 0x8E8E93, 0x8A8A8F, 0x8796A0, 0x707980, 0x6F8591, 0x8B949E};
         for (int c : softT) TEXT.put(c, soft);
     }
 
@@ -115,15 +115,15 @@ public final class CigramTheme {
     }
 
     /** Colour of the page background for this context. */
-    public static int page(Context c) { return isLight(c) ? 0xFFF4F5F7 : 0xFF00121A; }
+    public static int page(Context c) { return isLight(c) ? 0xFFF4F5F7 : 0xFF0E0E10; }
     /** Colour of cards / sheets. */
-    public static int surface(Context c) { return isLight(c) ? 0xFFFFFFFF : 0xFF0B2733; }
+    public static int surface(Context c) { return isLight(c) ? 0xFFFFFFFF : 0xFF1B1B1F; }
     /** Main text colour. */
     public static int text(Context c) { return isLight(c) ? 0xFF111418 : 0xFFFFFFFF; }
     /** Secondary text colour. */
-    public static int text2(Context c) { return isLight(c) ? 0xFF3C474E : 0xFFC3CDD2; }
+    public static int text2(Context c) { return isLight(c) ? 0xFF3C474E : 0xFFC7C7CC; }
     /** Hairlines / strokes. */
-    public static int stroke(Context c) { return isLight(c) ? 0xFFDADFE3 : 0xFF1F4553; }
+    public static int stroke(Context c) { return isLight(c) ? 0xFFDADFE3 : 0xFF34343A; }
     /** The brand red (same in both modes). */
     public static int brand() { return 0xFFE21B14; }
 
@@ -270,8 +270,8 @@ public final class CigramTheme {
             boolean light = isLight(activity);
             int bg = page(activity);
             window.setBackgroundDrawable(new ColorDrawable(bg));
-            window.setStatusBarColor(light ? bg : 0xFF00121A);
-            window.setNavigationBarColor(light ? 0xFFFFFFFF : 0xFF00121A);
+            window.setStatusBarColor(light ? bg : 0xFF0E0E10);
+            window.setNavigationBarColor(light ? 0xFFFFFFFF : 0xFF0E0E10);
             View decor = window.getDecorView();
             int flags = decor.getSystemUiVisibility();
             if (light) flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;

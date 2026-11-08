@@ -61,7 +61,7 @@ final class CigramTvSearch {
         field.setPadding(a.dp(18), a.dp(14), a.dp(18), a.dp(14));
         android.graphics.drawable.GradientDrawable fieldBg = new android.graphics.drawable.GradientDrawable();
         fieldBg.setCornerRadius(a.dp(12));
-        fieldBg.setColor(0xFF0A1F29);
+        fieldBg.setColor(0xFF1A1A1D);
         fieldBg.setStroke(a.dp(1), CigramDesign.HAIRLINE);
         field.setBackground(fieldBg);
         LinearLayout.LayoutParams flp = new LinearLayout.LayoutParams(a.dp(360), -2);
@@ -147,7 +147,7 @@ final class CigramTvSearch {
         k.setPadding(a.dp(2), 0, a.dp(2), 0);
         android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
         bg.setCornerRadius(a.dp(10));
-        bg.setColor(0xFF0F2A36);
+        bg.setColor(0xFF222226);
         k.setBackground(bg);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(w, h);
         lp.leftMargin = a.dp(4);
@@ -156,7 +156,7 @@ final class CigramTvSearch {
             @Override public void onFocusChange(View v, boolean has) {
                 android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
                 g.setCornerRadius(a.dp(10));
-                g.setColor(has ? CigramDesign.ACCENT : 0xFF0F2A36);
+                g.setColor(has ? CigramDesign.ACCENT : 0xFF222226);
                 v.setBackground(g);
                 v.animate().scaleX(has ? 1.1f : 1f).scaleY(has ? 1.1f : 1f).setDuration(100L).start();
             }

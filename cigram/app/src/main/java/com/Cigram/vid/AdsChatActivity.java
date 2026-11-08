@@ -1307,7 +1307,7 @@ public class AdsChatActivity extends Activity {
         else if (expired) card.addView(AdsUi.text(this, "انتهت صلاحية العرض", 13f, sub, true), AdsUi.lp(-2, -2, 0, AdsUi.dp(this, 6), 0, 0));
         else if ("admin".equals(m.from) && m.seq > 0) {
             LinearLayout btns = AdsUi.hbox(this);
-            TextView ok = AdsUi.button(this, "قبول", 0xFFFFFFFF, 0xFF0B2733);
+            TextView ok = AdsUi.button(this, "قبول", 0xFFFFFFFF, 0xFF1B1B1F);
             ok.setMinHeight(AdsUi.dp(this, 48));
             ok.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { confirmQuote(m, true); } });
             TextView no = AdsUi.button(this, "رفض", 0x33000000, 0xFFFFFFFF);

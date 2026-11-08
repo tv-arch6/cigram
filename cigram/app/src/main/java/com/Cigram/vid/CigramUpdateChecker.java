@@ -56,11 +56,11 @@ public final class CigramUpdateChecker {
     private static final long MIN_INTERVAL_MS = 10L * 60L * 1000L;
     private static final long SNOOZE_MS = 24L * 60L * 60L * 1000L;
 
-    private static final int BG = 0xFF0B2733;
-    private static final int BG_SOFT = 0xFF102F3B;
+    private static final int BG = 0xFF1B1B1F;
+    private static final int BG_SOFT = 0xFF26262B;
     private static final int TEAL = 0xFF26A5B5;
     private static final int TEXT_MAIN = 0xFFFFFFFF;
-    private static final int TEXT_MUTED = 0xFF8FA1AA;
+    private static final int TEXT_MUTED = 0xFF8E8E94;
     private static final int WARN = 0xFFE0B04A;
 
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
@@ -568,7 +568,7 @@ public final class CigramUpdateChecker {
                     android.R.attr.progressBarStyleHorizontal);
             bar.setMax(1000);
             bar.setProgressTintList(android.content.res.ColorStateList.valueOf(CigramUI.RED));
-            bar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF1F4553));
+            bar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF34343A));
             LinearLayout box = new LinearLayout(activity);
             box.setOrientation(LinearLayout.VERTICAL);
             box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);

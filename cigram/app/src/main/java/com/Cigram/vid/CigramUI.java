@@ -29,17 +29,17 @@ import android.widget.TextView;
  */
 public final class CigramUI {
 
-    public static final int BG = 0xFF0B2733;
-    public static final int BG_DEEP = 0xFF05141F;
-    public static final int BG_SOFT = 0xFF102F3B;
-    public static final int STROKE = 0xFF1F4553;
+    public static final int BG = 0xFF1B1B1F;
+    public static final int BG_DEEP = 0xFF111113;
+    public static final int BG_SOFT = 0xFF26262B;
+    public static final int STROKE = 0xFF34343A;
     public static final int RED = 0xFFE21B14;
     public static final int TEAL = 0xFF26A5B5;
     public static final int GREEN = 0xFF3DDC97;
     public static final int AMBER = 0xFFE9A23B;
     public static final int DANGER = 0xFFFF5252;
     public static final int TEXT = 0xFFFFFFFF;
-    public static final int MUTED = 0xFF8FA1AA;
+    public static final int MUTED = 0xFF8E8E94;
 
     public static final int ICON_BELL = 1;
     public static final int ICON_WARN = 2;
@@ -371,7 +371,7 @@ public final class CigramUI {
             tl.topMargin = dp(a, 18);
             card.addView(titleView, tl);
 
-            messageView = label(a, "", 15f, 0xFFC3CDD2, false);
+            messageView = label(a, "", 15f, 0xFFC7C7CC, false);
             messageView.setLineSpacing(0f, 1.25f);
             messageView.setGravity(Gravity.CENTER_HORIZONTAL | Gravity.TOP);
             messageView.setVisibility(View.GONE);
@@ -469,7 +469,7 @@ public final class CigramUI {
             } else {
                 // full-width pill
                 b.setTextSize(17f);
-                b.setTextColor(style == 2 ? TEXT : (accent == GREEN || accent == AMBER || accent == TEAL ? 0xFF04161D : TEXT));
+                b.setTextColor(style == 2 ? TEXT : (accent == GREEN || accent == AMBER || accent == TEAL ? 0xFF111113 : TEXT));
                 b.setBackground(round(accent, 28, activity));
             }
             b.setPadding(dp(activity, 12), 0, dp(activity, 12), 0);

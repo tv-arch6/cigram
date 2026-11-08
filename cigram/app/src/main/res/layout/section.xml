@@ -9,7 +9,7 @@
 		android:id="@+id/linear_section_root"
 		android:layout_width="match_parent"
 		android:layout_height="match_parent"
-		android:background="#05141F"
+		android:background="#111113"
 		android:gravity="top"
 		android:orientation="vertical">
 		<LinearLayout
@@ -18,7 +18,7 @@
 			android:layout_height="56dp"
 			android:paddingLeft="12dp"
 			android:paddingRight="12dp"
-			android:background="#0B2A38"
+			android:background="#1D1D21"
 			android:gravity="right|center_vertical"
 			android:orientation="horizontal">
 			<TextView
@@ -45,7 +45,7 @@
 			android:id="@+id/vscroll_section"
 			android:layout_width="match_parent"
 			android:layout_height="0dp"
-			android:background="#001B23"
+			android:background="#121214"
 			android:layout_weight="1"
 			android:scrollbars="none">
 			<LinearLayout
@@ -143,7 +143,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="2004"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview9"
 								android:layout_width="wrap_content"
@@ -153,7 +153,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="|"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview10"
 								android:layout_width="wrap_content"
@@ -161,7 +161,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="أكشن"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 						</LinearLayout>
 					</LinearLayout>
 					<LinearLayout
@@ -241,7 +241,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="2004"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview4"
 								android:layout_width="wrap_content"
@@ -251,7 +251,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="|"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview5"
 								android:layout_width="wrap_content"
@@ -259,7 +259,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="أكشن"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 						</LinearLayout>
 					</LinearLayout>
 					<LinearLayout
@@ -339,7 +339,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="2004"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/text_watch_also_separator1"
 								android:layout_width="wrap_content"
@@ -349,7 +349,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="|"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/text_watch_also_category1"
 								android:layout_width="wrap_content"
@@ -357,7 +357,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="أكشن"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 						</LinearLayout>
 					</LinearLayout>
 				</LinearLayout>
@@ -446,7 +446,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="2004"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview24"
 								android:layout_width="wrap_content"
@@ -456,7 +456,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="|"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview25"
 								android:layout_width="wrap_content"
@@ -464,7 +464,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="أكشن"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 						</LinearLayout>
 					</LinearLayout>
 					<LinearLayout
@@ -544,7 +544,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="2004"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview19"
 								android:layout_width="wrap_content"
@@ -554,7 +554,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="|"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview20"
 								android:layout_width="wrap_content"
@@ -562,7 +562,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="أكشن"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 						</LinearLayout>
 					</LinearLayout>
 					<LinearLayout
@@ -642,7 +642,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="2004"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview14"
 								android:layout_width="wrap_content"
@@ -652,7 +652,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="|"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview15"
 								android:layout_width="wrap_content"
@@ -660,7 +660,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="أكشن"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 						</LinearLayout>
 					</LinearLayout>
 				</LinearLayout>
@@ -749,7 +749,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="2004"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview39"
 								android:layout_width="wrap_content"
@@ -759,7 +759,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="|"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview40"
 								android:layout_width="wrap_content"
@@ -767,7 +767,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="أكشن"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 						</LinearLayout>
 					</LinearLayout>
 					<LinearLayout
@@ -847,7 +847,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="2004"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview34"
 								android:layout_width="wrap_content"
@@ -857,7 +857,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="|"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview35"
 								android:layout_width="wrap_content"
@@ -865,7 +865,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="أكشن"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 						</LinearLayout>
 					</LinearLayout>
 					<LinearLayout
@@ -945,7 +945,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="2004"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview29"
 								android:layout_width="wrap_content"
@@ -955,7 +955,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="|"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 							<TextView
 								android:id="@+id/textview30"
 								android:layout_width="wrap_content"
@@ -963,7 +963,7 @@
 								android:gravity="center_horizontal|center_vertical"
 								android:text="أكشن"
 								android:textSize="12sp"
-								android:textColor="#8A97A6" />
+								android:textColor="#8E8E93" />
 						</LinearLayout>
 					</LinearLayout>
 				</LinearLayout>

@@ -41,7 +41,7 @@ public final class CigramBottomNav {
     private static final int BAR_SIDE_DP = 0;
     private static final int TAB_HEIGHT_DP = 50;
     private static final int RED = 0xFFE21B14;
-    private static final int BAR_FILL = 0xFF00121A;      // the page colour: the bar and the area under it are one
+    private static final int BAR_FILL = 0xFF0E0E10;      // the page colour: the bar and the area under it are one
     private static final int BAR_LINE = 0x33FFFFFF;      // hairline on top, like Instagram
     private static final String LINE_TAG = "cigram_flat_nav_line";
     /** Width difference of the open tab (0 = all tabs equal). */
@@ -151,7 +151,7 @@ public final class CigramBottomNav {
                 TextView label = new TextView(activity);
                 label.setText(names[i]);
                 label.setTextSize(12f);
-                label.setTextColor(0xFFADBBC2);
+                label.setTextColor(0xFFB0B0B5);
                 label.setGravity(Gravity.CENTER);
                 label.setIncludeFontPadding(false);
                 label.setSingleLine(true);

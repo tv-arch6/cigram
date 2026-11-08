@@ -187,7 +187,7 @@ public class AdsActivity extends AppCompatActivity {
 				
 				adsToolbar.setBackgroundColor(
 				android.graphics.Color.parseColor(
-				"#0B1F2A"
+				"#1A1A1D"
 				)
 				);
 			}
@@ -288,7 +288,7 @@ public class AdsActivity extends AppCompatActivity {
 				
 				adsCardBackground.setColor(
 				android.graphics.Color.parseColor(
-				"#0B2936"
+				"#1C1C20"
 				)
 				);
 				

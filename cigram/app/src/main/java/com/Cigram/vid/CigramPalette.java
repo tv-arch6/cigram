@@ -52,15 +52,15 @@ final class CigramPalette {
 
     private CigramPalette(boolean light) {
         this.light = light;
-        page = light ? 0xFFF4F5F7 : 0xFF00121A;
-        pageDeep = light ? 0xFFECEEF1 : 0xFF040F16;
-        surface = light ? 0xFFFFFFFF : 0xFF0B2733;
-        surfaceHi = light ? 0xFFF0F2F4 : 0xFF102F3B;
-        stroke = light ? 0xFFDADFE3 : 0xFF1F4553;
+        page = light ? 0xFFF4F5F7 : 0xFF0E0E10;
+        pageDeep = light ? 0xFFECEEF1 : 0xFF0C0C0E;
+        surface = light ? 0xFFFFFFFF : 0xFF1B1B1F;
+        surfaceHi = light ? 0xFFF0F2F4 : 0xFF26262B;
+        stroke = light ? 0xFFDADFE3 : 0xFF34343A;
         hairline = light ? 0x14000000 : 0x1FFFFFFF;
         text = light ? 0xFF111418 : 0xFFFFFFFF;
-        text2 = light ? 0xFF3C474E : 0xFFC3CDD2;
-        text3 = light ? 0xFF5F6B73 : 0xFF8FA1AA;
+        text2 = light ? 0xFF3C474E : 0xFFC7C7CC;
+        text3 = light ? 0xFF5F6B73 : 0xFF8E8E94;
         brand = 0xFFE21B14;
         brandSoft = light ? 0x1AE21B14 : 0x33E21B14;
         gold = light ? 0xFF9A7632 : 0xFFD8BE8C;

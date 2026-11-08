@@ -58,9 +58,9 @@ public final class SlotMockView extends View {
         float w = getWidth(), h = getHeight();
         if (w <= 0 || h <= 0) return;
         // جسم الهاتف
-        box(c, 0, 0, w, h, 16 * d, 0xFF1F4553);
+        box(c, 0, 0, w, h, 16 * d, 0xFF34343A);
         float m = 3 * d;
-        box(c, m, m, w - m, h - m, 13 * d, 0xFF05141F);
+        box(c, m, m, w - m, h - m, 13 * d, 0xFF111113);
         float x0 = m + 7 * d, x1 = w - m - 7 * d;
         float y = m + 14 * d;
         // شريط علوي
@@ -85,7 +85,7 @@ public final class SlotMockView extends View {
         box(c, x1 - 40 * d, y, x1, y + 5 * d, 2 * d, 0xFF4A6B79);
         if ("sponsor".equals(slot)) {
             box(c, x0, y - 3 * d, x0 + 44 * d, y + 9 * d, 5 * d, 0xFF26A5B5);
-            p.setColor(0xFF04161D); p.setTextSize(7 * d); p.setTextAlign(Paint.Align.CENTER);
+            p.setColor(0xFF111113); p.setTextSize(7 * d); p.setTextAlign(Paint.Align.CENTER);
             p.setTypeface(CigramUI.font(getContext()));
             c.drawText("برعاية", x0 + 22 * d, y + 5.6f * d, p);
         }
@@ -105,13 +105,13 @@ public final class SlotMockView extends View {
         if ("sticky".equals(slot)) {
             adBox(c, x0 - 3 * d, navTop - 24 * d, x1 + 3 * d, navTop - 4 * d, 6 * d);
         }
-        box(c, m, navTop, w - m, h - m, 13 * d, 0xFF0B2733);
+        box(c, m, navTop, w - m, h - m, 13 * d, 0xFF1B1B1F);
         for (int i = 0; i < 4; i++) box(c, x0 + 6 * d + i * ((x1 - x0 - 12 * d) / 4f), navTop + 7 * d, x0 + 18 * d + i * ((x1 - x0 - 12 * d) / 4f), navTop + 13 * d, 3 * d, i == 0 ? 0xFF26A5B5 : 0xFF3E6270);
         if (popup) {
             box(c, m, m, w - m, h - m, 13 * d, 0xAA000000);
             float pl = w * 0.14f, pr = w * 0.86f, pt = h * 0.26f, pb = h * 0.72f;
             adBox(c, pl, pt, pr, pb, 10 * d);
-            box(c, pl - 5 * d, pt - 5 * d, pl + 9 * d, pt + 9 * d, 7 * d, 0xFF05141F);
+            box(c, pl - 5 * d, pt - 5 * d, pl + 9 * d, pt + 9 * d, 7 * d, 0xFF111113);
             p.setColor(0xFFFFFFFF); p.setTextSize(9 * d); p.setTextAlign(Paint.Align.CENTER);
             c.drawText("×", pl + 2 * d, pt + 5 * d, p);
         }

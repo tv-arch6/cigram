@@ -150,7 +150,7 @@ public final class CigramReport {
             row.setClickable(true);
             row.setFocusable(true);
             row.setPadding(CigramUI.dp(activity, 14), 0, CigramUI.dp(activity, 14), 0);
-            row.setBackground(CigramUI.round(CigramUI.BG_SOFT, 0xFF173845, 14, activity));
+            row.setBackground(CigramUI.round(CigramUI.BG_SOFT, 0xFF303033, 14, activity));
 
             View dot = new View(activity);
             dot.setBackground(ring(activity, false));
@@ -173,7 +173,7 @@ public final class CigramReport {
                         boolean on = k == index;
                         rows[k].setBackground(on
                                 ? CigramUI.round(0x33E21B14, CigramUI.RED, 14, activity)
-                                : CigramUI.round(CigramUI.BG_SOFT, 0xFF173845, 14, activity));
+                                : CigramUI.round(CigramUI.BG_SOFT, 0xFF303033, 14, activity));
                         dots[k].setBackground(ring(activity, on));
                         names[k].setTextColor(on ? 0xFFFFFFFF : 0xFFE6EEF2);
                     }

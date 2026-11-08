@@ -37,6 +37,8 @@ public final class AdsOverlay {
     private static final int SKIP_AFTER = 2;
     private static final long SPLASH_GAP_MS = 20L * 60000L;
     private static final long SPLASH_WAIT_MS = 2500L;
+    /** Longest wait for a splash ad's picture before the ad is skipped for this launch. */
+    private static final long SPLASH_MEDIA_WAIT_MS = 1200L;
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static boolean splashShownThisProcess = false;
     private static boolean busy = false;
@@ -135,8 +137,38 @@ public final class AdsOverlay {
         });
     }
 
+    /**
+     * 2026: a full-screen splash ad is only opened once its picture is decoded. Before, the dialog opened at once on a
+     * black page and the picture was downloaded afterwards, so a cold start could show seconds of an empty black
+     * screen right after the launch screen. If the picture is not ready within {@link #SPLASH_MEDIA_WAIT_MS} the ad is
+     * skipped for this launch (it stays cached and is ready next time) and the app continues normally.
+     */
     private static void showSplash(final Activity a, final AdsServe.Ad ad, final Runnable whenNoSplash) {
-        showSplash(a, ad, whenNoSplash, null);
+        if (ad == null) { busy = false; if (AdsUi.alive(a)) whenNoSplash.run(); return; }
+        final String poster = ad.isText() ? "" : ad.posterUrl();
+        if (AdsMedia.isReady(poster, 1600, ad.posterIsVideoFrame())) {
+            showSplash(a, ad, whenNoSplash, null);
+            return;
+        }
+        final boolean[] settled = {false};
+        final Runnable giveUp = new Runnable() {
+            @Override public void run() {
+                if (settled[0]) return;
+                settled[0] = true;
+                busy = false;
+                if (AdsUi.alive(a)) whenNoSplash.run();
+            }
+        };
+        MAIN.postDelayed(giveUp, SPLASH_MEDIA_WAIT_MS);
+        AdsMedia.prefetch(a, poster, 1600, ad.posterIsVideoFrame(), new AdsMedia.Callback() {
+            @Override public void onResult(boolean ok) {
+                if (settled[0]) return;
+                settled[0] = true;
+                MAIN.removeCallbacks(giveUp);
+                if (ok && AdsUi.alive(a)) showSplash(a, ad, whenNoSplash, null);
+                else { busy = false; if (AdsUi.alive(a)) whenNoSplash.run(); }
+            }
+        });
     }
 
     private static void showSplash(final Activity a, final AdsServe.Ad ad, final Runnable whenNoSplash, final Runnable onClosed) {
@@ -146,7 +178,7 @@ public final class AdsOverlay {
             d.requestWindowFeature(Window.FEATURE_NO_TITLE);
             d.setCancelable(false);
             final FrameLayout root = new FrameLayout(a);
-            root.setBackgroundColor(0xFF000000);
+            root.setBackgroundColor(0xFF0E0E10);   // Cigram charcoal (was pure black)
             root.addView(AdsRender.media(a, ad, true, 1600, ImageView.ScaleType.CENTER_CROP), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
             View scrim = new View(a);
             scrim.setBackground(AdsRender.scrim());
@@ -166,7 +198,7 @@ public final class AdsOverlay {
                 t.addView(body, AdsUi.lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, AdsUi.dp(a, 6), 0, 0));
             }
             if (ad.clickable()) {
-                TextView cta = AdsRender.cta(a, ad.cta.length() > 0 ? ad.cta : "اعرف المزيد", 0xFFFFFFFF, 0xFF0B2530);
+                TextView cta = AdsRender.cta(a, ad.cta.length() > 0 ? ad.cta : "اعرف المزيد", 0xFFFFFFFF, 0xFF1E1E21);
                 t.addView(cta, AdsUi.lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, AdsUi.dp(a, 16), 0, 0));
                 cta.setOnClickListener(new View.OnClickListener() {
                     @Override public void onClick(View v) { AdsServe.perform(a, ad); }
@@ -231,7 +263,7 @@ public final class AdsOverlay {
             Window w = d.getWindow();
             if (w != null) {
                 w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-                w.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.BLACK));
+                w.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0xFF0E0E10));
                 w.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
             }
             d.show();
@@ -345,7 +377,7 @@ public final class AdsOverlay {
                 t.addView(body, AdsUi.lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, AdsUi.dp(a, 6), 0, 0));
             }
             if (ad.clickable()) {
-                TextView cta = AdsRender.cta(a, ad.cta.length() > 0 ? ad.cta : "اعرف المزيد", CigramUI.TEAL, 0xFF04161D);
+                TextView cta = AdsRender.cta(a, ad.cta.length() > 0 ? ad.cta : "اعرف المزيد", CigramUI.TEAL, 0xFF111113);
                 cta.setOnClickListener(new View.OnClickListener() {
                     @Override public void onClick(View v) { AdsServe.perform(a, ad); try { d.dismiss(); } catch (Throwable ignored) { } }
                 });

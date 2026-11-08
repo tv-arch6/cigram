@@ -726,7 +726,7 @@ public class CigramTogetherPlayerActivity extends Activity implements CigramToge
         smartPanel = new FrameLayout(this);
         smartPanel.setClickable(true);
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0xF205141F);
+        bg.setColor(0xF2111113);
         float r = dp(18);
         bg.setCornerRadii(new float[]{r, r, 0, 0, 0, 0, r, r});
         smartPanel.setBackground(bg);

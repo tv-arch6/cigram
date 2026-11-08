@@ -9,7 +9,7 @@
 		android:id="@+id/linear_channels_root"
 		android:layout_width="match_parent"
 		android:layout_height="match_parent"
-		android:background="#0B2936"
+		android:background="#1C1C20"
 		android:orientation="vertical"
 		android:layoutDirection="rtl">
 		<LinearLayout
@@ -18,7 +18,7 @@
 			android:layout_height="56dp"
 			android:paddingLeft="12dp"
 			android:paddingRight="12dp"
-			android:background="#0B2A38"
+			android:background="#1D1D21"
 			android:gravity="right|center_vertical"
 			android:orientation="horizontal"
 			android:layoutDirection="ltr">
@@ -51,7 +51,7 @@
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
 			android:padding="8dp"
-			android:background="#0B2936"
+			android:background="#1C1C20"
 			android:gravity="right"
 			android:text="الرياضة"
 			android:textSize="22sp"
@@ -113,7 +113,7 @@
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
 			android:padding="8dp"
-			android:background="#0B2936"
+			android:background="#1C1C20"
 			android:gravity="right"
 			android:text="الأخبارية"
 			android:textSize="22sp"

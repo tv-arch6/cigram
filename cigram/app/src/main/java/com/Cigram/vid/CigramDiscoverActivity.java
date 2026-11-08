@@ -34,8 +34,8 @@ public class CigramDiscoverActivity extends Activity {
 
     private static final int PAGE = 30;
     private static final int COLUMNS = 3;
-    private static final int BG = 0xFF05141F;
-    private static final int CHIP_OFF = 0xFF0B2733;
+    private static final int BG = 0xFF111113;
+    private static final int CHIP_OFF = 0xFF1B1B1F;
     private static final int CHIP_ON = 0xFFE21B14;
 
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -73,7 +73,7 @@ public class CigramDiscoverActivity extends Activity {
         row.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
         int pad = CigramStage1InitProvider.cigramDp(activity, 16);
         row.setPadding(pad, pad, pad, pad);
-        row.setBackground(CigramStage1InitProvider.cigramRounded(0xFF0B2733,
+        row.setBackground(CigramStage1InitProvider.cigramRounded(0xFF1B1B1F,
                 CigramStage1InitProvider.cigramDp(activity, 14)));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.setMargins(0, 0, 0, CigramStage1InitProvider.cigramDp(activity, 12));

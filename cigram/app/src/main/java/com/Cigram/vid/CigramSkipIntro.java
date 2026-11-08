@@ -466,7 +466,7 @@ public final class CigramSkipIntro {
             texts.setOrientation(LinearLayout.VERTICAL);
             texts.setPadding(CigramUI.dp(activity, 10), 0, CigramUI.dp(activity, 10), 0);
             texts.addView(CigramUI.label(activity, "الحلقة التالية", 16f, 0xFFFFFFFF, true), new LinearLayout.LayoutParams(-2, -2));
-            nextCountdown = CigramUI.label(activity, "", 12.5f, 0xFFC3CDD2, false);
+            nextCountdown = CigramUI.label(activity, "", 12.5f, 0xFFC7C7CC, false);
             texts.addView(nextCountdown, new LinearLayout.LayoutParams(-2, -2));
             top.addView(texts, new LinearLayout.LayoutParams(-2, -2));
             nextCard.addView(top, new LinearLayout.LayoutParams(-2, -2));

@@ -363,11 +363,11 @@ public final class CigramTvDetailsActivity extends Activity implements CigramTvH
 
         View sideShade = new View(this);
         sideShade.setBackground(new GradientDrawable(GradientDrawable.Orientation.RIGHT_LEFT,
-                new int[]{0xF700121A, 0xDD00121A, 0x4D00121A}));
+                new int[]{0xF70E0E10, 0xDD0E0E10, 0x4D0E0E10}));
         root.addView(sideShade, new FrameLayout.LayoutParams(-1, -1));
         View bottomShade = new View(this);
         bottomShade.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP,
-                new int[]{0xFF00121A, 0xE600121A, 0x0000121A}));
+                new int[]{0xFF0E0E10, 0xE60E0E10, 0x000E0E10}));
         root.addView(bottomShade, new FrameLayout.LayoutParams(-1, -1));
 
         ScrollView scroll = new ScrollView(this);
@@ -683,7 +683,7 @@ public final class CigramTvDetailsActivity extends Activity implements CigramTvH
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setPadding(dp(14), dp(12), dp(14), dp(14));
-        panel.setBackground(CigramDesign.round(0xCC0A1F29, 0x24FFFFFF, 16f, this));
+        panel.setBackground(CigramDesign.round(0xCC1A1A1D, 0x24FFFFFF, 16f, this));
 
         LinearLayout head = rtlRow();
         head.addView(text("جاهزية التشغيل", 14f, CigramDesign.TEXT, true, Gravity.RIGHT),
@@ -828,7 +828,7 @@ public final class CigramTvDetailsActivity extends Activity implements CigramTvH
         for (TextView chip : seasonChips) {
             boolean active = ((Integer) chip.getTag()).intValue() == selectedSeason;
             chip.setBackground(CigramDesign.round(active ? 0xFFFFFFFF : 0x18FFFFFF, 16f, this));
-            chip.setTextColor(active ? 0xFF00121A : CigramDesign.TEXT_2);
+            chip.setTextColor(active ? 0xFF0E0E10 : CigramDesign.TEXT_2);
         }
     }
 

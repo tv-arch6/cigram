@@ -163,7 +163,7 @@ public class SettingsActivity extends AppCompatActivity {
 					android.graphics.drawable.GradientDrawable editBoxBg =
 					new android.graphics.drawable.GradientDrawable();
 					
-					editBoxBg.setColor(0xFF0B1F2A);
+					editBoxBg.setColor(0xFF1A1A1D);
 					editBoxBg.setCornerRadius(22 * editD);
 					editBox.setBackground(editBoxBg);
 					
@@ -214,7 +214,7 @@ public class SettingsActivity extends AppCompatActivity {
 					android.graphics.drawable.GradientDrawable nameBg =
 					new android.graphics.drawable.GradientDrawable();
 					
-					nameBg.setColor(0xFF102D3A);
+					nameBg.setColor(0xFF262629);
 					nameBg.setCornerRadius(14 * editD);
 					nameInput.setBackground(nameBg);
 					
@@ -293,10 +293,10 @@ public class SettingsActivity extends AppCompatActivity {
 							"male".equals(selectedGender[0]);
 							
 							femaleBg.setColor(
-							female ? 0xFFFFFFFF : 0xFF173542
+							female ? 0xFFFFFFFF : 0xFF2D2D30
 							);
 							maleBg.setColor(
-							male ? 0xFFFFFFFF : 0xFF173542
+							male ? 0xFFFFFFFF : 0xFF2D2D30
 							);
 							
 							femaleBtn.setTextColor(
@@ -380,7 +380,7 @@ public class SettingsActivity extends AppCompatActivity {
 					android.graphics.drawable.GradientDrawable cancelBg =
 					new android.graphics.drawable.GradientDrawable();
 					
-					cancelBg.setColor(0xFF173542);
+					cancelBg.setColor(0xFF2D2D30);
 					cancelBg.setCornerRadius(12 * editD);
 					cancelBtn.setBackground(cancelBg);
 					
@@ -818,7 +818,7 @@ public class SettingsActivity extends AppCompatActivity {
 				android.graphics.drawable.GradientDrawable boxBg =
 				new android.graphics.drawable.GradientDrawable();
 				
-				boxBg.setColor(0xFF0B1F2A);
+				boxBg.setColor(0xFF1A1A1D);
 				boxBg.setCornerRadius(22 * d);
 				logoutBox.setBackground(boxBg);
 				
@@ -869,7 +869,7 @@ public class SettingsActivity extends AppCompatActivity {
 				android.graphics.drawable.GradientDrawable cancelBg =
 				new android.graphics.drawable.GradientDrawable();
 				
-				cancelBg.setColor(0xFF173542);
+				cancelBg.setColor(0xFF2D2D30);
 				cancelBg.setCornerRadius(13 * d);
 				cancelBtn.setBackground(cancelBg);
 				
@@ -1242,10 +1242,10 @@ public class SettingsActivity extends AppCompatActivity {
 			);
 			
 			settingsRoot.setBackgroundColor(
-			android.graphics.Color.parseColor("#00121A")
+			android.graphics.Color.parseColor("#0E0E10")
 			);
 			settingsToolbar.setBackgroundColor(
-			android.graphics.Color.parseColor("#0B1F2A")
+			android.graphics.Color.parseColor("#1A1A1D")
 			);
 			
 			android.graphics.Typeface settingsFont = null;
@@ -1370,7 +1370,7 @@ public class SettingsActivity extends AppCompatActivity {
 			
 			settingsShape.card(
 			accountCard,
-			0xFF0B2936,
+			0xFF1C1C20,
 			20,
 			0x22FFFFFF
 			);
@@ -1382,7 +1382,7 @@ public class SettingsActivity extends AppCompatActivity {
 			
 			settingsShape.card(
 			logoutRow,
-			0xFF0B2936,
+			0xFF1C1C20,
 			20,
 			0x1AFFFFFF
 			);
@@ -1593,7 +1593,7 @@ public class SettingsActivity extends AppCompatActivity {
 				
 				android.graphics.drawable.GradientDrawable avatarCardBg =
 				new android.graphics.drawable.GradientDrawable();
-				avatarCardBg.setColor(0xFF071E29);
+				avatarCardBg.setColor(0xFF18181B);
 				avatarCardBg.setCornerRadius(
 				24 * avatarDp
 				);
@@ -1686,7 +1686,7 @@ public class SettingsActivity extends AppCompatActivity {
 				
 				android.graphics.drawable.GradientDrawable changeBg =
 				new android.graphics.drawable.GradientDrawable();
-				changeBg.setColor(0xFF0B2936);
+				changeBg.setColor(0xFF1C1C20);
 				changeBg.setCornerRadius(
 				20 * avatarDp
 				);

@@ -37,10 +37,10 @@ import android.widget.Toast;
  */
 public final class CigramSettings {
 
-    private static final int CARD = 0xFF0C2431;
-    private static final int LINE = 0xFF173845;
-    /** v5.29: settings sections span the full width on navy #0B2936 (same as the Account page), white text and icons. */
-    private static final int SECTION_BG = 0xFF0B2936;
+    private static final int CARD = 0xFF1E1E21;
+    private static final int LINE = 0xFF303033;
+    /** v5.29: settings sections span the full width on navy #1C1C20 (same as the Account page), white text and icons. */
+    private static final int SECTION_BG = 0xFF1C1C20;
     private static final int SECTION_LINE = 0x24FFFFFF;
     private static final int SECTION_INK = 0xFFFFFFFF;
     private static final int SECTION_INK_SOFT = 0xB3FFFFFF;
@@ -624,7 +624,7 @@ public final class CigramSettings {
         b.setGravity(Gravity.CENTER);
         b.setBackground(new android.graphics.drawable.RippleDrawable(
                 android.content.res.ColorStateList.valueOf(0x22FFFFFF),
-                CigramUI.round(0xFF0B2936, 0x1FFFFFFF, 16, a), null));
+                CigramUI.round(0xFF1C1C20, 0x1FFFFFFF, 16, a), null));
         b.setClickable(true);
         b.setFocusable(true);
         b.setContentDescription(text);
@@ -658,7 +658,7 @@ public final class CigramSettings {
                     opt.setGravity(Gravity.CENTER_VERTICAL);
                     opt.setPadding(CigramUI.dp(a, 16), 0, CigramUI.dp(a, 16), 0);
                     boolean on = i == now;
-                    opt.setBackground(CigramUI.round(on ? 0xFF12384A : 0xFF0B2936, on ? 0x66FFFFFF : 0x1FFFFFFF, 14, a));
+                    opt.setBackground(CigramUI.round(on ? 0xFF12384A : 0xFF1C1C20, on ? 0x66FFFFFF : 0x1FFFFFFF, 14, a));
                     CigramUI.Glyph check = new CigramUI.Glyph(a, CigramUI.ICON_CHECK, CigramUI.GREEN);
                     check.setVisibility(on ? View.VISIBLE : View.INVISIBLE);
                     opt.addView(check, new LinearLayout.LayoutParams(CigramUI.dp(a, 22), CigramUI.dp(a, 22)));

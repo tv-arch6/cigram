@@ -9,14 +9,14 @@
 		android:id="@+id/linear_settings_root"
 		android:layout_width="match_parent"
 		android:layout_height="match_parent"
-		android:background="#0B1F2A"
+		android:background="#1A1A1D"
 		android:orientation="vertical">
 		<LinearLayout
 			android:id="@+id/linear_settings_toolbar"
 			android:layout_width="match_parent"
 			android:layout_height="52dp"
 			android:padding="12dp"
-			android:background="#0B2A38"
+			android:background="#1D1D21"
 			android:gravity="right|center_vertical"
 			android:orientation="horizontal">
 			<TextView
@@ -43,7 +43,7 @@
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
 			android:padding="16dp"
-			android:background="#102330"
+			android:background="#1F1F22"
 			android:orientation="vertical">
 			<TextView
 				android:id="@+id/textview_account_section"
@@ -75,7 +75,7 @@
 			android:id="@+id/linear_settings_account_card"
 			android:layout_width="match_parent"
 			android:layout_height="58dp"
-			android:background="#0B2936"
+			android:background="#1C1C20"
 			android:orientation="vertical">
 			<LinearLayout
 				android:id="@+id/linear_settings_edit_profile"
@@ -143,7 +143,7 @@
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
 			android:padding="16dp"
-			android:background="#102330"
+			android:background="#1F1F22"
 			android:orientation="vertical">
 			<TextView
 				android:id="@+id/textview_danger_section"

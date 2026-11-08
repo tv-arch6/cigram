@@ -166,10 +166,10 @@ public class PlayerActivity extends AppCompatActivity {
 					canvas.clipPath(clip);
 					paint.setStyle(android.graphics.Paint.Style.FILL);
 					paint.setShader(null);
-					paint.setColor(green ? 0x6639DB91 : 0xB005141F);
+					paint.setColor(green ? 0x6639DB91 : 0xB0111113);
 					canvas.drawRoundRect(rect, radius, radius, paint);
 					paint.setShader(new android.graphics.LinearGradient(0, rect.top, rect.width(), rect.bottom,
-					new int[]{0x34FFFFFF, 0x09FFFFFF, 0x0005141F, 0x16FFFFFF},
+					new int[]{0x34FFFFFF, 0x09FFFFFF, 0x00111113, 0x16FFFFFF},
 					new float[]{0f, 0.28f, 0.65f, 1f}, android.graphics.Shader.TileMode.CLAMP));
 					canvas.drawRoundRect(rect, radius, radius, paint);
 					paint.setShader(null);
@@ -419,7 +419,7 @@ public class PlayerActivity extends AppCompatActivity {
 				view.setScaleType((crop||view instanceof de.hdodenhof.circleimageview.CircleImageView)?android.widget.ImageView.ScaleType.CENTER_CROP:android.widget.ImageView.ScaleType.FIT_CENTER);
 				final String token="cigram-image:"+url;view.setTag(token);
 				android.graphics.drawable.GradientDrawable cgPlaceholder=new android.graphics.drawable.GradientDrawable();
-				cgPlaceholder.setColor(0xFF101820);cgPlaceholder.setCornerRadius(14f*app.getResources().getDisplayMetrics().density);
+				cgPlaceholder.setColor(0xFF161619);cgPlaceholder.setCornerRadius(14f*app.getResources().getDisplayMetrics().density);
 				view.setImageDrawable(null);view.setBackground(cgPlaceholder);
 				if(url.isEmpty())return;
 				android.graphics.Bitmap cached;
@@ -4863,7 +4863,7 @@ public class PlayerActivity extends AppCompatActivity {
 		// v5.29: no poster + play cover between episodes: the next episode starts playing at once.
 		if(false&&getIntent().getBooleanExtra("episode_transition",false)) {
 			final android.widget.FrameLayout cgEpisodeCover=new android.widget.FrameLayout(PlayerActivity.this);
-			cgEpisodeCover.setBackgroundColor(0xB005141F);
+			cgEpisodeCover.setBackgroundColor(0xB0111113);
 			android.widget.ImageView preview=new android.widget.ImageView(PlayerActivity.this);
 			preview.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
 			cgEpisodeCover.addView(preview,new android.widget.FrameLayout.LayoutParams(-1,-1));
@@ -6273,8 +6273,8 @@ public class PlayerActivity extends AppCompatActivity {
 							cgGlass.px(14)
 							);
 							
-							// v5.29: opaque panel #00121A (no see-through glass)
-							{android.graphics.drawable.GradientDrawable cgPanelBg=new android.graphics.drawable.GradientDrawable();cgPanelBg.setColor(0xFF00121A);cgPanelBg.setCornerRadius(cgGlass.px(26));panel.setBackground(cgPanelBg);panel.setClipToOutline(true);}
+							// v5.29: opaque panel #0E0E10 (no see-through glass)
+							{android.graphics.drawable.GradientDrawable cgPanelBg=new android.graphics.drawable.GradientDrawable();cgPanelBg.setColor(0xFF0E0E10);cgPanelBg.setCornerRadius(cgGlass.px(26));panel.setBackground(cgPanelBg);panel.setClipToOutline(true);}
 							
 							// Header
 							android.widget.LinearLayout header =
@@ -6484,7 +6484,7 @@ public class PlayerActivity extends AppCompatActivity {
 								boolean current
 								) {
 									
-									android.graphics.drawable.GradientDrawable glass=new android.graphics.drawable.GradientDrawable();glass.setColor(0xFF0B2936);glass.setCornerRadius(cgGlass.px(17));
+									android.graphics.drawable.GradientDrawable glass=new android.graphics.drawable.GradientDrawable();glass.setColor(0xFF1C1C20);glass.setCornerRadius(cgGlass.px(17));
 									
 									if (!current) {
 										return glass;
@@ -6540,9 +6540,9 @@ public class PlayerActivity extends AppCompatActivity {
 											android.view.Gravity.CENTER
 											);
 											
-											// v5.29: season chips #00121A; the chosen one is solid white with black text
+											// v5.29: season chips #0E0E10; the chosen one is solid white with black text
 											chip.setTextColor(selected ? 0xFF000000 : 0xFFFFFFFF);
-											{android.graphics.drawable.GradientDrawable cgChipBg=new android.graphics.drawable.GradientDrawable();cgChipBg.setColor(selected ? 0xFFFFFFFF : 0xFF00121A);cgChipBg.setCornerRadius(cgGlass.px(20));if(!selected)cgChipBg.setStroke(Math.max(1,cgGlass.px(1)),0x33FFFFFF);chip.setBackground(cgChipBg);}
+											{android.graphics.drawable.GradientDrawable cgChipBg=new android.graphics.drawable.GradientDrawable();cgChipBg.setColor(selected ? 0xFFFFFFFF : 0xFF0E0E10);cgChipBg.setCornerRadius(cgGlass.px(20));if(!selected)cgChipBg.setStroke(Math.max(1,cgGlass.px(1)),0x33FFFFFF);chip.setBackground(cgChipBg);}
 											
 											cgGlass.press(
 											chip

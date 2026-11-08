@@ -415,7 +415,7 @@ public final class CigramNetflix {
             stroke.setTextSize(size);
             stroke.setStyle(Paint.Style.STROKE);
             stroke.setStrokeWidth(Math.max(2f, size * 0.035f));
-            stroke.setColor(CigramTheme.isLight(c) ? 0xFF9AA3A9 : 0xFF8A97A6);
+            stroke.setColor(CigramTheme.isLight(c) ? 0xFF9AA3A9 : 0xFF8E8E93);
             fill.setTextAlign(Paint.Align.RIGHT);
             stroke.setTextAlign(Paint.Align.RIGHT);
             setTag(CigramTheme.SKIP_TAG);

@@ -51,10 +51,10 @@ public final class CigramSketchwareNotifications {
     static void trimMemory(int severity) { CigramStability.shrink(IMAGE_CACHE, severity); }
 
 
-    private static final int ROW_BG = 0xFF0B2733;
-    private static final int POSTER_BG = 0xFF102F3B;
+    private static final int ROW_BG = 0xFF1B1B1F;
+    private static final int POSTER_BG = 0xFF26262B;
     private static final int TEXT_MAIN = 0xFFFFFFFF;
-    private static final int TEXT_MUTED = 0xFF8FA1AA;
+    private static final int TEXT_MUTED = 0xFF8E8E94;
     private static final int BADGE_RED = 0xFFE51C23;
 
     private static final String PREF_SUBSCRIPTIONS = "cigram_series_subscriptions";
@@ -294,7 +294,7 @@ public final class CigramSketchwareNotifications {
 
         if (swipe != null) {
             swipe.setColorSchemeColors(Color.WHITE);
-            swipe.setProgressBackgroundColorSchemeColor(0xFF0B2733);
+            swipe.setProgressBackgroundColorSchemeColor(0xFF1B1B1F);
             swipe.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
                 @Override
                 public void onRefresh() {
@@ -415,7 +415,7 @@ public final class CigramSketchwareNotifications {
                 dp(activity, 14),
                 dp(activity, 10)
         );
-        banner.setBackground(rounded(0xFF102F3B, dp(activity, 12)));
+        banner.setBackground(rounded(0xFF26262B, dp(activity, 12)));
 
         TextView text = new TextView(activity);
         text.setText("إشعارات النظام معطلة");
@@ -647,7 +647,7 @@ public final class CigramSketchwareNotifications {
                 for (int i = 0; i < defs.length; i++) {
                     boolean on = defs[i][0].equals(state.tab);
                     chips[i].setBackground(on ? pillBg(BADGE_RED, 0, 16f, a)
-                            : pillBg(ROW_BG, 0xFF1F4553, 16f, a));
+                            : pillBg(ROW_BG, 0xFF34343A, 16f, a));
                     chips[i].setTextColor(on ? Color.WHITE : 0xFFC9D2D7);
                 }
                 rows.removeAllViews();
@@ -715,7 +715,7 @@ public final class CigramSketchwareNotifications {
         row.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(a, 8f), dp(a, 8f), dp(a, 8f), dp(a, 8f));
-        row.setBackground(pillBg(ROW_BG, 0xFF1F4553, 14f, a));
+        row.setBackground(pillBg(ROW_BG, 0xFF34343A, 14f, a));
 
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);

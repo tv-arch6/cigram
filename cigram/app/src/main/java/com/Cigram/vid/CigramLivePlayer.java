@@ -785,7 +785,7 @@ public final class CigramLivePlayer {
         top.addView(titles, new LinearLayout.LayoutParams(0, -2, 1f));
 
         FrameLayout logoBox = new FrameLayout(a);
-        logoBox.setBackground(CigramUI.round(0xFF0F2230, 0x40FFFFFF, 14, a));
+        logoBox.setBackground(CigramUI.round(0xFF1E1E21, 0x40FFFFFF, 14, a));
         logoBox.setClipToOutline(true);
         s.logoLetter = CigramUI.label(a, "", 17f, 0x99FFFFFF, true);
         s.logoLetter.setGravity(Gravity.CENTER);
@@ -1232,7 +1232,7 @@ public final class CigramLivePlayer {
         tile.setGravity(Gravity.CENTER_HORIZONTAL);
         tile.setTag(Integer.valueOf(i));
         FrameLayout pic = new FrameLayout(a);
-        pic.setBackground(CigramUI.round(0xFF0F2230, 0x33FFFFFF, 12, a));
+        pic.setBackground(CigramUI.round(0xFF1E1E21, 0x33FFFFFF, 12, a));
         pic.setClipToOutline(true);
         TextView letter = CigramUI.label(a, e.name.length() > 0 ? e.name.substring(0, 1) : "؟", 22f, 0x66FFFFFF, true);
         letter.setGravity(Gravity.CENTER);
@@ -1276,8 +1276,8 @@ public final class CigramLivePlayer {
             boolean on = tag instanceof Integer && ((Integer) tag) == s.index;
             if (tile instanceof LinearLayout && ((LinearLayout) tile).getChildCount() > 0) {
                 View pic = ((LinearLayout) tile).getChildAt(0);
-                pic.setBackground(on ? CigramUI.round(0xFF0F2230, RED, 12, s.a)
-                        : CigramUI.round(0xFF0F2230, 0x33FFFFFF, 12, s.a));
+                pic.setBackground(on ? CigramUI.round(0xFF1E1E21, RED, 12, s.a)
+                        : CigramUI.round(0xFF1E1E21, 0x33FFFFFF, 12, s.a));
                 if (on) {
                     GradientDrawable g = (GradientDrawable) pic.getBackground();
                     g.setStroke(dp(s.a, 2), RED);

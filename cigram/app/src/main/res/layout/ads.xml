@@ -9,7 +9,7 @@
 		android:id="@+id/linear_ads_root"
 		android:layout_width="match_parent"
 		android:layout_height="match_parent"
-		android:background="#0B1F2A"
+		android:background="#1A1A1D"
 		android:orientation="vertical">
 		<LinearLayout
 			android:id="@+id/linear_ads_toolbar"
@@ -17,7 +17,7 @@
 			android:layout_height="56dp"
 			android:paddingLeft="12dp"
 			android:paddingRight="12dp"
-			android:background="#0B2A38"
+			android:background="#1D1D21"
 			android:gravity="right|center_vertical"
 			android:orientation="horizontal">
 			<TextView
@@ -64,7 +64,7 @@
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
 			android:layout_marginTop="18dp"
-			android:background="#0B2936"
+			android:background="#1C1C20"
 			android:orientation="vertical">
 			<TextView
 				android:id="@+id/textview_ads_watch_title"

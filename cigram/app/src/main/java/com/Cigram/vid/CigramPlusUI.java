@@ -350,7 +350,7 @@ final class CigramPlusUI {
         for (int i = 0; i < row.getChildCount(); i++) {
             boolean on = i == selected;
             GradientDrawable g = new GradientDrawable();
-            g.setColor(on ? 0xFF16373F : 0xFF0B2530);
+            g.setColor(on ? 0xFF16373F : 0xFF1E1E21);
             g.setCornerRadius(CigramUI.dp(c, 14));
             g.setStroke(CigramUI.dp(c, on ? 2 : 1), on ? GOLD : DARK_STROKE);
             row.getChildAt(i).setBackground(g);
@@ -511,7 +511,7 @@ final class CigramPlusUI {
     private static View infoRow(Activity a, String name, String value) {
         LinearLayout r = new LinearLayout(a);
         r.setOrientation(LinearLayout.HORIZONTAL);
-        TextView n = CigramUI.label(a, name, 12.5f, 0xFF8FA1AA, false);
+        TextView n = CigramUI.label(a, name, 12.5f, 0xFF8E8E94, false);
         r.addView(n, new LinearLayout.LayoutParams(CigramUI.dp(a, 60), -2));
         TextView v = CigramUI.label(a, value, 13.5f, 0xFFFFFFFF, true);
         r.addView(v, new LinearLayout.LayoutParams(0, -2, 1f));

@@ -9,7 +9,7 @@
 		android:id="@+id/vscroll1"
 		android:layout_width="match_parent"
 		android:layout_height="match_parent"
-		android:background="#00121A"
+		android:background="#0E0E10"
 		android:fillViewport="true"
 		android:overScrollMode="never"
 		android:scrollbars="none">
@@ -23,7 +23,7 @@
 				android:id="@+id/linear7"
 				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
-				android:background="#05141F"
+				android:background="#111113"
 				android:gravity="center_vertical"
 				android:orientation="horizontal"
 				layout_marginLeft="0"
@@ -97,14 +97,14 @@
 				android:id="@+id/hscroll1"
 				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
-				android:background="#00121A"
+				android:background="#0E0E10"
 				android:scrollbars="none">
 				<LinearLayout
 					android:id="@+id/linear_movies"
 					android:layout_width="wrap_content"
 					android:layout_height="wrap_content"
 					android:layout_margin="8dp"
-					android:background="#00121A"
+					android:background="#0E0E10"
 					android:gravity="center_vertical"
 					android:orientation="horizontal" />
 			</HorizontalScrollView>
@@ -141,14 +141,14 @@
 				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
 				android:padding="8dp"
-				android:background="#00121A"
+				android:background="#0E0E10"
 				android:scrollbars="none">
 				<LinearLayout
 					android:id="@+id/linear_series"
 					android:layout_width="wrap_content"
 					android:layout_height="wrap_content"
 					android:padding="8dp"
-					android:background="#00121A"
+					android:background="#0E0E10"
 					android:gravity="center_vertical"
 					android:orientation="horizontal" />
 			</HorizontalScrollView>

@@ -9,13 +9,13 @@
 		android:id="@+id/vscroll1"
 		android:layout_width="match_parent"
 		android:layout_height="match_parent"
-		android:background="#05141F"
+		android:background="#111113"
 		android:scrollbars="none">
 		<LinearLayout
 			android:id="@+id/linear_root_search"
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
-			android:background="#0B1F2A"
+			android:background="#1A1A1D"
 			android:orientation="vertical">
 			<LinearLayout
 				android:id="@+id/linear_search_top"
@@ -23,7 +23,7 @@
 				android:layout_height="56dp"
 				android:paddingLeft="10dp"
 				android:paddingRight="10dp"
-				android:background="#0B1F2A"
+				android:background="#1A1A1D"
 				android:gravity="center_vertical"
 				android:orientation="horizontal"
 				android:layout_gravity="center_horizontal|center_vertical">
@@ -68,7 +68,7 @@
 					android:layout_marginLeft="8dp"
 					android:layout_marginTop="16dp"
 					android:layout_marginRight="4dp"
-					android:background="#0B2936"
+					android:background="#1C1C20"
 					android:gravity="center_horizontal|center_vertical"
 					android:orientation="horizontal"
 					android:layout_gravity="left">

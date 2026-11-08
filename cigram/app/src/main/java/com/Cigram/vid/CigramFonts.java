@@ -381,7 +381,7 @@ public final class CigramFonts {
 
             final FrameLayout page = new FrameLayout(activity);
             page.setTag(PAGE_TAG);
-            page.setBackgroundColor(0xFF05141F);
+            page.setBackgroundColor(0xFF111113);
             page.setClickable(true);
             page.setFocusableInTouchMode(true);
             page.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
@@ -577,7 +577,7 @@ public final class CigramFonts {
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(a, 14), dp(a, 10), dp(a, 14), dp(a, 10));
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(selected ? 0xFF1B536B : 0xFF102D3A);
+        bg.setColor(selected ? 0xFF1B536B : 0xFF262629);
         bg.setCornerRadius(dp(a, 14));
         if (selected) bg.setStroke(dp(a, 1), 0xFF29A9E0);
         row.setBackground(bg);
@@ -739,7 +739,7 @@ public final class CigramFonts {
         t.setText(name);
         t.setTextSize(11);
         t.setGravity(Gravity.CENTER);
-        t.setTextColor(selected ? 0xFFFFFFFF : 0xFF8FA1AA);
+        t.setTextColor(selected ? 0xFFFFFFFF : 0xFF8E8E94);
         t.setTypeface(appFont(a));
         t.setPadding(0, dp(a, 4), 0, 0);
         col.addView(t, new LinearLayout.LayoutParams(-2, -2));

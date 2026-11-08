@@ -9,7 +9,7 @@
 		android:id="@+id/vscroll_account"
 		android:layout_width="match_parent"
 		android:layout_height="match_parent"
-		android:background="#05141F"
+		android:background="#111113"
 		android:scrollbars="none">
 		<LinearLayout
 			android:id="@+id/linear_account_content"
@@ -17,7 +17,7 @@
 			android:layout_height="wrap_content"
 			android:paddingTop="35dp"
 			android:paddingBottom="110dp"
-			android:background="#00121A"
+			android:background="#0E0E10"
 			android:gravity="center_horizontal"
 			android:orientation="vertical">
 			<LinearLayout
@@ -64,7 +64,7 @@
 				android:layout_marginRight="16dp"
 				android:layout_marginBottom="24dp"
 				android:padding="4dp"
-				android:background="#0B2330"
+				android:background="#1D1D20"
 				android:gravity="center_horizontal|center_vertical"
 				android:orientation="horizontal">
 				<TextView
@@ -76,7 +76,7 @@
 					android:text="تسجيل (ليس لديك حساب)"
 					android:textSize="15sp"
 					android:textStyle="bold"
-					android:textColor="#84939B"
+					android:textColor="#8A8A8F"
 					android:layout_weight="1" />
 				<TextView
 					android:id="@+id/textview_login_tab"
@@ -109,24 +109,24 @@
 				android:layout_height="56dp"
 				android:layout_marginBottom="12dp"
 				android:padding="16dp"
-				android:background="#0B2330"
+				android:background="#1D1D20"
 				android:gravity="right|center_vertical"
 				android:textSize="15sp"
 				android:textColor="#FFFFFF"
 				android:hint="البريد الالكتروني"
-				android:textColorHint="#84939B" />
+				android:textColorHint="#8A8A8F" />
 			<EditText
 				android:id="@+id/edittext_login_password"
 				android:layout_width="match_parent"
 				android:layout_height="56dp"
 				android:layout_marginTop="12dp"
 				android:padding="16dp"
-				android:background="#0B2330"
+				android:background="#1D1D20"
 				android:gravity="right|center_vertical"
 				android:textSize="12sp"
 				android:textColor="#FFFFFF"
 				android:hint="كلمة المرور"
-				android:textColorHint="#84939B"
+				android:textColorHint="#8A8A8F"
 				android:inputType="textPassword" />
 			<TextView
 				android:id="@+id/textview_forgot_password"
@@ -168,36 +168,36 @@
 					android:layout_width="match_parent"
 					android:layout_height="56dp"
 					android:padding="16dp"
-					android:background="#0B2330"
+					android:background="#1D1D20"
 					android:gravity="right|center_vertical"
 					android:textSize="15sp"
 					android:textColor="#FFFFFF"
 					android:hint="الاسم"
-					android:textColorHint="#84939B" />
+					android:textColorHint="#8A8A8F" />
 				<EditText
 					android:id="@+id/edittext_register_email"
 					android:layout_width="match_parent"
 					android:layout_height="56dp"
 					android:layout_marginTop="12dp"
 					android:padding="16dp"
-					android:background="#0B2330"
+					android:background="#1D1D20"
 					android:gravity="right|center_vertical"
 					android:textSize="15sp"
 					android:textColor="#FFFFFF"
 					android:hint="البريد الالكتروني"
-					android:textColorHint="#84939B" />
+					android:textColorHint="#8A8A8F" />
 				<EditText
 					android:id="@+id/edittext_register_password"
 					android:layout_width="match_parent"
 					android:layout_height="56dp"
 					android:layout_marginTop="12dp"
 					android:padding="16dp"
-					android:background="#0B2330"
+					android:background="#1D1D20"
 					android:gravity="right|center_vertical"
 					android:textSize="15sp"
 					android:textColor="#FFFFFF"
 					android:hint="كلمة المرور"
-					android:textColorHint="#84939B"
+					android:textColorHint="#8A8A8F"
 					android:inputType="textPassword" />
 				<EditText
 					android:id="@+id/edittext_register_confirm_password"
@@ -205,12 +205,12 @@
 					android:layout_height="56dp"
 					android:layout_marginTop="12dp"
 					android:padding="16dp"
-					android:background="#0B2330"
+					android:background="#1D1D20"
 					android:gravity="right|center_vertical"
 					android:textSize="15sp"
 					android:textColor="#FFFFFF"
 					android:hint="تأكيد كلمة المرور"
-					android:textColorHint="#84939B"
+					android:textColorHint="#8A8A8F"
 					android:inputType="textPassword" />
 			</LinearLayout>
 			<Button
@@ -237,7 +237,7 @@
 					android:layout_width="match_parent"
 					android:layout_height="wrap_content"
 					android:padding="12dp"
-					android:background="#0B2936"
+					android:background="#1C1C20"
 					android:gravity="center_horizontal|center_vertical"
 					android:orientation="vertical">
 					<de.hdodenhof.circleimageview.CircleImageView
@@ -256,7 +256,7 @@
 					android:layout_width="match_parent"
 					android:layout_height="match_parent"
 					android:padding="8dp"
-					android:background="#0B2936"
+					android:background="#1C1C20"
 					android:gravity="right"
 					android:orientation="vertical">
 					<TextView
@@ -330,7 +330,7 @@
 					android:id="@+id/linear_account_settings"
 					android:layout_width="match_parent"
 					android:layout_height="56dp"
-					android:background="#00121A"
+					android:background="#0E0E10"
 					android:gravity="center_vertical"
 					android:orientation="horizontal">
 					<ImageView
@@ -354,7 +354,7 @@
 				android:id="@+id/linear_account_subtitle_font"
 				android:layout_width="match_parent"
 				android:layout_height="56dp"
-				android:background="#00121A"
+				android:background="#0E0E10"
 				android:gravity="center_vertical"
 				android:orientation="horizontal">
 				<ImageView
@@ -377,7 +377,7 @@
 				android:id="@+id/linear_my_content"
 				android:layout_width="match_parent"
 				android:layout_height="56dp"
-				android:background="#00121A"
+				android:background="#0E0E10"
 				android:gravity="center_vertical"
 				android:orientation="horizontal">
 				<ImageView
@@ -401,7 +401,7 @@
 				android:id="@+id/linear_help_support"
 				android:layout_width="match_parent"
 				android:layout_height="56dp"
-				android:background="#00121A"
+				android:background="#0E0E10"
 				android:gravity="center_vertical"
 				android:orientation="horizontal">
 				<ImageView
