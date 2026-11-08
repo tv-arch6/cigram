@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>سيكرام</title>
+  <meta name="description" content="شاهد الأفلام والمسلسلات والقنوات المباشرة من أي متصفح: لابتوب، حاسوب أو آيفون.">
+  <meta name="theme-color" content="#00121A">
+  <meta name="color-scheme" content="dark light">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon-64.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="سيكرام">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=Playpen+Sans+Arabic:wght@500;700&display=swap">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/v2.css">
+  <link rel="stylesheet" href="css/plus.css">
+  <script>
+    /* v2: الجهاز (آيفون / أندرويد / حاسوب) والوضع الفاتح أو الداكن قبل أول رسم، فلا يظهر وميض.
+       الوضع يتبع إعداد الجهاز، إلا إذا فرض تطبيق الإدارة وضعاً (يُحفظ من /home-layout). */
+    (function () {
+      var r = document.documentElement, ua = navigator.userAgent || '';
+      var ios = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      var android = /android/i.test(ua);
+      var touch = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+      r.classList.add(ios ? 'ios' : android ? 'android' : (touch ? 'touch' : 'desktop'));
+      if ((window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone) r.classList.add('standalone');
+      var mode = 'system';
+      try { var l = JSON.parse(localStorage.getItem('cigram_home_layout') || '{}'); if (l && l.theme && /^(light|dark)$/.test(l.theme.mode)) mode = l.theme.mode; } catch (e) {}
+      var light = mode === 'light' || (mode === 'system' && window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches);
+      r.setAttribute('data-theme', light ? 'light' : 'dark');
+      var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', light ? '#F4F5F7' : '#00121A');
+    })();
+  </script>
+  <script>
+    /* صفحة التحميل: تظهر عند فتح الموقع على الرئيسية (مرة لكل جلسة)، ولا تظهر في الروابط المباشرة ولا في التطبيق المثبّت */
+    (function () {
+      try {
+        var h = location.hash.replace(/^#\/?/, '');
+        var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone;
+        if (!h && !standalone && !sessionStorage.getItem('cigram_landing_seen')) {
+          document.documentElement.classList.add('landing-on');
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff');
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <style>
+    .landing { display: none; }
+    html.landing-on { background: #fff; }
+    html.landing-on body { background: #fff; }
+    html.landing-on .landing { display: flex; }
+    html.landing-on .topbar, html.landing-on #view, html.landing-on .nav-mobile, html.landing-on .skip-link { display: none !important; }
+  </style>
+</head>
+<body>
+  <section class="landing" id="landing" aria-label="تحميل التطبيق">
+    <div class="landing-inner">
+      <img class="landing-icon" src="icons/app-icon.png" alt="سيكرام" width="120" height="120">
+      <a class="landing-download" id="landingDownload" href="https://cigram.wwq-mixtv.workers.dev/" rel="noopener">تحميل التطبيق</a>
+      <button type="button" class="landing-browse" id="landingBrowse">تصفح موقع التطبيق</button>
+    </div>
+  </section>
+
+  <a class="skip-link" href="#view">تخطي إلى المحتوى</a>
+
+  <header class="topbar" id="topbar">
+    <a class="brand" href="#/" aria-label="الرئيسية">
+      <img class="brand-mark" src="icons/logo-96.png" alt="" width="36" height="36">
+      <span class="brand-name" id="brandName">سيكرام</span>
+    </a>
+    <nav class="nav-desktop" aria-label="التنقل الرئيسي">
+      <a href="#/" data-nav="home"><span class="nv-ic" data-icon="home"></span>الرئيسية</a>
+      <a href="#/channels" data-nav="channels"><span class="nv-ic" data-icon="smart_display"></span>القنوات</a>
+      <a href="#/search" data-nav="search"><span class="nv-ic" data-icon="manage_search"></span>البحث</a>
+      <a href="#/account" data-nav="account"><span class="nv-ic" data-icon="account_circle"></span>حسابي</a>
+    </nav>
+    <a class="top-search" href="#/search" aria-label="بحث">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+    </a>
+  </header>
+
+  <main id="view" tabindex="-1"></main>
+
+  <!-- v2: نفس الشريط السفلي في التطبيق: أيقونات فقط (Material Symbols)، المفتوحة ممتلئة والباقي شفافة -->
+  <nav class="nav-mobile" id="navMobile" aria-label="التنقل الرئيسي">
+    <a href="#/" data-nav="home" aria-label="الرئيسية"><span class="nv-ic" data-icon="home"></span><span class="nv-lbl">الرئيسية</span></a>
+    <a href="#/channels" data-nav="channels" aria-label="القنوات"><span class="nv-ic" data-icon="smart_display"></span><span class="nv-lbl">القنوات</span></a>
+    <a href="#/search" data-nav="search" aria-label="البحث"><span class="nv-ic" data-icon="manage_search"></span><span class="nv-lbl">البحث</span></a>
+    <a href="#/account" data-nav="account" aria-label="حسابي"><span class="nv-ic" data-icon="account_circle"></span><span class="nv-lbl">حسابي</span></a>
+  </nav>
+
+  <div class="toast-host" id="toastHost" aria-live="polite"></div>
+  <noscript><p style="padding:24px;text-align:center">يحتاج الموقع إلى تفعيل جافا سكربت ليعمل.</p></noscript>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
