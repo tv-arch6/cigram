@@ -38,6 +38,23 @@ public final class CigramSupport {
     static final int ONLINE = 0xFF3DDC97;
     static final int ERROR = 0xFFFFB4AB;
 
+    /**
+     * Rounded surface in EXACTLY these colours. The app's {@code CigramUI.round} / {@code CigramGlass} adapt dark colours to
+     * light ones in the phone's Light mode; the private support screen stays black in both modes.
+     */
+    static android.graphics.drawable.GradientDrawable round(int color, float radiusDp, Context c) {
+        android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
+        g.setColor(color);
+        g.setCornerRadius(radiusDp * c.getResources().getDisplayMetrics().density);
+        return g;
+    }
+
+    static android.graphics.drawable.GradientDrawable round(int color, int strokeColor, float radiusDp, Context c) {
+        android.graphics.drawable.GradientDrawable g = round(color, radiusDp, c);
+        if (strokeColor != 0) g.setStroke(Math.max(1, Math.round(c.getResources().getDisplayMetrics().density)), strokeColor);
+        return g;
+    }
+
     static final String TITLE = "الدعم الخاص";
     static final String SUBTITLE_EN = "Cigram Private Support";
 

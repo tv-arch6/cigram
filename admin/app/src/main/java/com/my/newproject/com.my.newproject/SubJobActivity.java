@@ -105,15 +105,19 @@ public class SubJobActivity extends CgBase {
         historyCard();
     }
 
+    /** One right-aligned line «label: value»; Latin ids are isolated (LRI…PDI) so they never reorder the line. */
     private View kv(String k, String v, boolean ltr) {
-        LinearLayout r = CgUi.hbox(this);
-        TextView a = CgUi.muted(this, k + ": ");
-        TextView bv = CgUi.text(this, v, 13.5f, CgCfg.TEXT, false);
-        bv.setTextIsSelectable(true);
-        if (ltr) CgUi.ltr(bv);
-        r.addView(a);
-        r.addView(bv, new LinearLayout.LayoutParams(0, CgUi.WRAP, 1f));
-        return r;
+        String value = ltr ? "\u2066" + v + "\u2069" : v;
+        android.text.SpannableStringBuilder b = new android.text.SpannableStringBuilder();
+        b.append("\u200F").append(k).append(": ");
+        b.setSpan(new android.text.style.ForegroundColorSpan(CgCfg.MUTED), 0, b.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        b.append(value);
+        TextView t = CgUi.text(this, b, 13.5f, CgCfg.TEXT, false);
+        t.setGravity(android.view.Gravity.RIGHT);
+        t.setTextDirection(View.TEXT_DIRECTION_RTL);
+        t.setTextIsSelectable(true);
+        t.setPadding(0, CgUi.dp(this, 2), 0, CgUi.dp(this, 2));
+        return t;
     }
 
     // ------------------------------------------------------------------ actions

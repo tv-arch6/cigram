@@ -294,7 +294,7 @@ public class AdsChatActivity extends Activity {
         mid.addView(list, new FrameLayout.LayoutParams(-1, -1));
         fab = AdsUi.text(this, "↓", 18f, 0xFFFFFFFF, true);
         fab.setGravity(Gravity.CENTER);
-        fab.setBackground(CigramUI.round(CigramSupport.MINE, 24, this));
+        fab.setBackground(CigramSupport.round(CigramSupport.MINE, 24, this));
         fab.setContentDescription("الانتقال لآخر الرسائل");
         fab.setMinWidth(AdsUi.dp(this, 48));
         fab.setMinHeight(AdsUi.dp(this, 48));
@@ -352,7 +352,7 @@ public class AdsChatActivity extends Activity {
         input.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
         input.setTextColor(CigramSupport.TEXT);
         input.setHintTextColor(CigramSupport.FAINT);
-        input.setBackground(CigramUI.round(0xFF141416, 24, this));
+        input.setBackground(CigramSupport.round(0xFF141416, 24, this));
         input.setPadding(AdsUi.dp(this, 16), AdsUi.dp(this, 10), AdsUi.dp(this, 16), AdsUi.dp(this, 10));
         input.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { if (emojiPanel != null) emojiPanel.setVisibility(View.GONE); }
@@ -365,7 +365,7 @@ public class AdsChatActivity extends Activity {
         input.setMinHeight(AdsUi.dp(this, 48));
         inputBox.addView(input, new FrameLayout.LayoutParams(-1, -2));
         recBar = AdsUi.hbox(this);
-        recBar.setBackground(CigramUI.round(0xFF141416, 24, this));
+        recBar.setBackground(CigramSupport.round(0xFF141416, 24, this));
         ((LinearLayout) recBar).setPadding(AdsUi.dp(this, 16), 0, AdsUi.dp(this, 16), 0);
         TextView dot = AdsUi.text(this, "●", 16f, CigramUI.DANGER, true);
         ((LinearLayout) recBar).addView(dot);
@@ -381,7 +381,7 @@ public class AdsChatActivity extends Activity {
 
         // زر إرسال/مايك
         FrameLayout act = new FrameLayout(this);
-        act.setBackground(CigramUI.round(0xFFFFFFFF, 24, this));
+        act.setBackground(CigramSupport.round(0xFFFFFFFF, 24, this));
         sendBtn = new AdsIcons.Icon(this, AdsIcons.SEND, 0xFF000000);
         micBtn = new AdsIcons.Icon(this, AdsIcons.MIC, 0xFF000000);
         act.addView(sendBtn, new FrameLayout.LayoutParams(AdsUi.dp(this, 24), AdsUi.dp(this, 24), Gravity.CENTER));
@@ -839,7 +839,7 @@ public class AdsChatActivity extends Activity {
             row.setClickable(true);
             row.setBackground(CigramGlass.ripple(this, new GradientDrawable(), 12));
             row.addView(new AdsIcons.Icon(this, icons[i], CigramUI.TEAL), new LinearLayout.LayoutParams(AdsUi.dp(this, 24), AdsUi.dp(this, 24)));
-            row.addView(AdsUi.text(this, labels[i], 16f, CigramGlass.text(this), false), AdsUi.lp(-2, -2, AdsUi.dp(this, 12), 0, 0, 0));
+            row.addView(AdsUi.text(this, labels[i], 16f, CigramSupport.TEXT, false), AdsUi.lp(-2, -2, AdsUi.dp(this, 12), 0, 0, 0));
             row.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View v) {
                     if (holder[0] != null) holder[0].dismiss();
@@ -979,7 +979,7 @@ public class AdsChatActivity extends Activity {
             boolean cancel = Math.abs(e.getRawX() - recDownX) > AdsUi.dp(this, 90);
             if (cancel != recCancelled) {
                 recCancelled = cancel;
-                timerText.setTextColor(cancel ? CigramUI.DANGER : CigramGlass.text(this));
+                timerText.setTextColor(cancel ? CigramUI.DANGER : CigramSupport.TEXT);
             }
         } else if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) {
             boolean cancel = recCancelled || a == MotionEvent.ACTION_CANCEL;
@@ -988,7 +988,7 @@ public class AdsChatActivity extends Activity {
             recorder = null;
             recBar.setVisibility(View.GONE);
             input.setVisibility(View.VISIBLE);
-            timerText.setTextColor(CigramGlass.text(this));
+            timerText.setTextColor(CigramSupport.TEXT);
             if (r != null) {
                 showVoicePreview(r);   // 18.2: listen, delete or send — nothing leaves the phone before «إرسال»
             } else if (!cancel && dur < 1000) {
@@ -1078,7 +1078,7 @@ public class AdsChatActivity extends Activity {
         if (labels.isEmpty()) return;
         for (int i = 0; i < labels.size(); i++) {
             final Runnable r = acts.get(i);
-            TextView t = AdsUi.text(this, labels.get(i), 16f, CigramGlass.text(this), false);
+            TextView t = AdsUi.text(this, labels.get(i), 16f, CigramSupport.TEXT, false);
             t.setGravity(Gravity.CENTER_VERTICAL);
             t.setPadding(AdsUi.dp(this, 12), 0, AdsUi.dp(this, 12), 0);
             t.setClickable(true);
@@ -1314,7 +1314,7 @@ public class AdsChatActivity extends Activity {
     private View buildVoicePreview() {
         voicePreview = AdsUi.hbox(this);
         voicePreview.setGravity(Gravity.CENTER_VERTICAL);
-        voicePreview.setBackground(CigramUI.round(0xFF141416, 24, this));
+        voicePreview.setBackground(CigramSupport.round(0xFF141416, 24, this));
         voicePreview.setPadding(AdsUi.dp(this, 6), 0, AdsUi.dp(this, 6), 0);
         View del = iconBtn(AdsIcons.TRASH, "حذف التسجيل", new View.OnClickListener() {
             @Override public void onClick(View v) { discardVoice(); }
@@ -1342,7 +1342,7 @@ public class AdsChatActivity extends Activity {
         voicePreview.addView(play, new LinearLayout.LayoutParams(AdsUi.dp(this, 44), AdsUi.dp(this, 44)));
         TextView send = AdsUi.text(this, "إرسال", 14f, 0xFF000000, true);
         send.setGravity(Gravity.CENTER);
-        send.setBackground(CigramUI.round(0xFFFFFFFF, 18, this));
+        send.setBackground(CigramSupport.round(0xFFFFFFFF, 18, this));
         send.setPadding(AdsUi.dp(this, 14), 0, AdsUi.dp(this, 14), 0);
         send.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { sendVoice(); }
@@ -1411,7 +1411,7 @@ public class AdsChatActivity extends Activity {
         if ("system".equals(m.type)) {
             TextView t = AdsUi.text(c, m.text, 13f, CigramSupport.MUTED, false);
             t.setGravity(Gravity.CENTER);
-            t.setBackground(CigramUI.round(0xFF0E0E10, CigramSupport.HAIRLINE, 14, c));
+            t.setBackground(CigramSupport.round(0xFF0E0E10, CigramSupport.HAIRLINE, 14, c));
             t.setPadding(AdsUi.dp(c, 12), AdsUi.dp(c, 6), AdsUi.dp(c, 12), AdsUi.dp(c, 6));
             LinearLayout.LayoutParams l = new LinearLayout.LayoutParams(-2, -2);
             l.gravity = Gravity.CENTER_HORIZONTAL;
@@ -1435,14 +1435,14 @@ public class AdsChatActivity extends Activity {
         }
         LinearLayout bubble = AdsUi.vbox(c);
         bubble.setPadding(AdsUi.dp(c, 12), AdsUi.dp(c, 8), AdsUi.dp(c, 12), AdsUi.dp(c, 6));
-        bubble.setBackground(CigramUI.round(mine ? CigramSupport.MINE : CigramSupport.THEIRS, mine ? 0 : CigramSupport.THEIRS_STROKE, 18, c));
+        bubble.setBackground(CigramSupport.round(mine ? CigramSupport.MINE : CigramSupport.THEIRS, mine ? 0 : CigramSupport.THEIRS_STROKE, 18, c));
         int tx = CigramSupport.TEXT;
         int sub = CigramSupport.MUTED;
 
         if (m.reply != null && !m.deleted) {
             LinearLayout rp = AdsUi.vbox(c);
             rp.setPadding(AdsUi.dp(c, 8), AdsUi.dp(c, 4), AdsUi.dp(c, 8), AdsUi.dp(c, 4));
-            rp.setBackground(CigramUI.round(mine ? 0x33000000 : 0x22000000, 8, c));
+            rp.setBackground(CigramSupport.round(mine ? 0x33000000 : 0x22000000, 8, c));
             rp.addView(AdsUi.text(c, "رد على: " + ("user".equals(m.reply.optString("from")) ? "أنت" : CigramSupport.developer(c).name), 11f, sub, true));
             TextView pv = AdsUi.text(c, m.reply.optString("preview"), 13f, tx, false);
             pv.setMaxLines(2);
@@ -1472,6 +1472,7 @@ public class AdsChatActivity extends Activity {
             t.setLineSpacing(0f, 1.15f);
             // Arabic right-aligned, English left-aligned and never reversed (paragraph direction = first strong letter)
             t.setGravity(CigramSupport.startsRtl(m.text) ? Gravity.RIGHT : Gravity.LEFT);
+            t.setTextDirection(View.TEXT_DIRECTION_FIRST_STRONG);
             t.setAutoLinkMask(android.text.util.Linkify.WEB_URLS | android.text.util.Linkify.PHONE_NUMBERS);
             t.setLinkTextColor(0xFFFFFFFF);
             t.setTextIsSelectable(false);
@@ -1482,7 +1483,8 @@ public class AdsChatActivity extends Activity {
         foot.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
         String status = "";
         if (m.state == 2) status = m.failMsg.length() > 0 ? m.failMsg : "بانتظار الاتصال — سيُرسل تلقائياً";
-        TextView tm = AdsUi.text(c, status.length() > 0 ? status : timeFmt.format(new Date(m.ts)), 11f, m.state == 2 ? 0xFFFFB4AB : sub, false);
+        boolean waiting = m.state == 2 && m.failMsg.length() == 0;   // queued: not an error, it will be sent by itself
+        TextView tm = AdsUi.text(c, status.length() > 0 ? status : timeFmt.format(new Date(m.ts)), 11f, m.state == 2 && !waiting ? CigramSupport.ERROR : sub, false);
         foot.addView(tm);
         if (mine) {
             int icon = AdsIcons.CHECK;
@@ -1545,7 +1547,7 @@ public class AdsChatActivity extends Activity {
             f.addView(new AdsIcons.Icon(this, AdsIcons.PLAY, 0xFFFFFFFF), new FrameLayout.LayoutParams(AdsUi.dp(this, 44), AdsUi.dp(this, 44), Gravity.CENTER));
             if (m.media.optInt("dur") > 0) {
                 TextView d = AdsUi.text(this, AdsMedia.durLabel(m.media.optInt("dur")), 11f, 0xFFFFFFFF, true);
-                d.setBackground(CigramUI.round(0x99000000, 8, this));
+                d.setBackground(CigramSupport.round(0x99000000, 8, this));
                 d.setPadding(AdsUi.dp(this, 6), AdsUi.dp(this, 2), AdsUi.dp(this, 6), AdsUi.dp(this, 2));
                 f.addView(d, new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.LEFT));
             }
@@ -1584,7 +1586,7 @@ public class AdsChatActivity extends Activity {
         LinearLayout row = AdsUi.hbox(this);
         row.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         final FrameLayout play = new FrameLayout(this);
-        play.setBackground(CigramUI.round(mine ? 0x33FFFFFF : CigramUI.TEAL, 24, this));
+        play.setBackground(CigramSupport.round(mine ? 0x33FFFFFF : CigramUI.TEAL, 24, this));
         play.setContentDescription("تشغيل الرسالة الصوتية");
         final AdsIcons.Icon icon = new AdsIcons.Icon(this, AdsIcons.PLAY, 0xFFFFFFFF);
         play.addView(icon, new FrameLayout.LayoutParams(AdsUi.dp(this, 22), AdsUi.dp(this, 22), Gravity.CENTER));
