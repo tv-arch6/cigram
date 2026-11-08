@@ -6,4 +6,6 @@
     <item name="cg_keep_font" type="id" />
     <!-- the subtitle TextView of an account row (CigramAccountUI.fillRow), so a row can change it later -->
     <item name="cg_row_subtitle" type="id" />
+    <!-- the content view of a page already fitted between the system bars (CigramSystemBars, targetSdk 36) -->
+    <item name="cg_insets_fitted" type="id" />
 </resources>

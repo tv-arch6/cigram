@@ -367,6 +367,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
 
                         @Override
                         public void onActivityStarted(Activity activity) {
+                            CigramSystemBars.fit(activity);   // targetSdk 36: classic layout between the bars
                             CigramAnalytics.onForeground(activity);
                             CigramAdManager.onActivityStarted();
                             // before the first frame: no full-width bar flashes on a tab switch

@@ -200,11 +200,13 @@ save(fit(mono, 96), "drawable-nodpi", "cigram_watermark.png")            # small
 if not ADMIN:
     save(fit(master, 512), "drawable-xhdpi", "hoo.png")                  # home header logo (was the red play logo)
 
-# Android 12+ splash icon: 240 dp canvas (with an icon background circle of 160 dp)
-spl = Image.new("RGBA", (960, 960), (0, 0, 0, 0))
-s = int(960 * 0.40)
-spl.alpha_composite(fit(mark, s), ((960 - s) // 2, (960 - s) // 2))
-save(spl, "drawable-nodpi", "cigram_splash_mark.png")
+# Android 12+ splash icon WITHOUT icon background: 288 dp canvas, content inside the 192 dp circle. The rounded logo is
+# drawn at 112 dp, the same size as the pre-12 window background (drawable/cigram_launch_bg) and the in-app hand-off
+# overlay (CigramSplash), so the three launch pictures are identical.
+spl = Image.new("RGBA", (1152, 1152), (0, 0, 0, 0))
+s = int(round(1152 * 112 / 288))
+spl.alpha_composite(fit(master, s), ((1152 - s) // 2, (1152 - s) // 2))
+save(spl, "drawable-nodpi", "cigram_splash_icon.png")
 
 # ---------------------------------------------------------------- TV banner (320x180 px xhdpi, + higher densities)
 def banner(wpx, hpx):

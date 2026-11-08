@@ -740,6 +740,7 @@ public final class CigramVidResolver {
 
             // broadcast للـ activity الحالي أو أي مشغّل مسجّل
             Intent intent = new Intent(activity.getPackageName() + ".ACTION_PLAY_VID");
+            intent.setPackage(activity.getPackageName());   // explicit (API 34+)
             intent.putExtra("url",    resolvedUrl);
             intent.putExtra("title",  contentTitle);
             intent.putExtra("srt",    srtPath);

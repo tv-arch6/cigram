@@ -420,6 +420,7 @@ public final class CigramVidWatchSheet {
 
     private void broadcastPlay(String mode) {
         Intent i = new Intent(activity.getPackageName() + ".ACTION_PLAY_VID");
+        i.setPackage(activity.getPackageName());   // explicit: never leaves the app (implicit broadcasts, API 34+)
         i.putExtra("url",   resolvedUrl);
         i.putExtra("title", tryText("title", "series_title", "name"));
         i.putExtra("srt",   srtPath);

@@ -14,6 +14,9 @@
 	<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 	<uses-permission android:name="com.google.android.gms.permission.AD_ID" />
 	<uses-permission android:name="android.permission.WAKE_LOCK" />
+	<!-- the periodic new-episode check is a persisted job (JobScheduler needs this to keep it after a reboot;
+	     without it scheduling threw IllegalArgumentException and the check silently never ran) -->
+	<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 	<uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
 	<!-- Android TV: no touch screen / microphone required, and the app is offered with the leanback (TV) launcher -->
 	<uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -39,6 +42,7 @@
 		android:banner="@drawable/tv_banner"
 		android:label="@string/app_name"
 		android:usesCleartextTraffic="true"
+		android:enableOnBackInvokedCallback="false"
 		android:theme="@style/AppTheme">
 		<activity
 			android:name=".MainActivity"
