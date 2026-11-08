@@ -734,7 +734,7 @@ public final class CigramChannels {
         row.setGravity(Gravity.CENTER_VERTICAL);
         // physical order, right to left: bar, title, count
         String countText = count + (count == 1 ? " قناة" : " قنوات");
-        TextView n = CigramUI.label(a, onAll != null ? "المزيد  ‹" : countText,
+        TextView n = CigramUI.label(a, onAll != null ? "المزيد" : countText,
                 13f, onAll != null ? 0xFFBDBDC2 : MUTED, onAll != null);
         n.setBackground(null);     // v10.34: plain text, no pill
         n.setPadding(CigramUI.dp(a, 4), CigramUI.dp(a, 6), CigramUI.dp(a, 4), CigramUI.dp(a, 6));
@@ -749,10 +749,7 @@ public final class CigramChannels {
         t.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
         t.setPadding(CigramUI.dp(a, 10), 0, CigramUI.dp(a, 10), 0);
         row.addView(t, new LinearLayout.LayoutParams(0, -2, 1f));
-        View bar = new View(a);
-        bar.setBackground(CigramUI.round(accent, 3, a));
-        // v4.4: same accent-bar size as every other section title (CigramDesign)
-        row.addView(bar, CigramDesign.accentBarParams(a));
+        // 2026: no red accent bar beside section titles (same as every other page)
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.topMargin = CigramUI.dp(a, host.getChildCount() == 0 ? 14 : 24);
         lp.bottomMargin = CigramUI.dp(a, 12);
@@ -838,9 +835,14 @@ public final class CigramChannels {
         FrameLayout pic = new Frame169(a);
         pic.setBackground(CigramUI.round(CARD, 14, a));
         pic.setClipToOutline(true);
-        TextView letter = CigramUI.label(a, ch.name.length() > 0 ? ch.name.substring(0, 1).toUpperCase(Locale.US) : "؟",
-                34f, 0x44FFFFFF, true);
-        letter.setGravity(Gravity.CENTER);
+        // 2026: while the channel's own picture loads, a faint Cigram mark holds its place (it is hidden as soon as
+        // the real artwork arrives; the channel's picture is never replaced)
+        ImageView letter = new ImageView(a);
+        letter.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        letter.setImageDrawable(CigramBrand.placeholder(a));
+        letter.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        int markPad = CigramUI.dp(a, 26);
+        letter.setPadding(markPad, markPad, markPad, markPad);
         pic.addView(letter, new FrameLayout.LayoutParams(-1, -1));
         ImageView image = new ImageView(a);
         image.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -880,7 +882,7 @@ public final class CigramChannels {
                 Gravity.TOP | Gravity.RIGHT);
         hl.setMargins(0, CigramUI.dp(a, 6), CigramUI.dp(a, 6), 0);
         pic.addView(heart, hl);
-        CigramDesign.posterFrame(pic, 14f);
+        CigramDesign.posterFrame(pic, 14f, false);   // channel artwork: frame only, no watermark
         tile.addView(pic, new LinearLayout.LayoutParams(-1, -2));
 
         TextView name = CigramUI.label(a, ch.name, 14f, ch.available ? Color.WHITE : MUTED, true);

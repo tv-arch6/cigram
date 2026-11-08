@@ -84,15 +84,23 @@ public final class CigramDesign {
         return CigramGlass.ripple(c, round(GHOST_FILL, GHOST_STROKE, radiusDp, c), radiusDp);
     }
 
-    /** Thin light frame drawn ABOVE a poster image (foreground), so it never hides the picture. */
+    /**
+     * Thin light frame drawn ABOVE a poster image (foreground), so it never hides the picture. 2026: posters (home,
+     * movies, series, search) also carry the small, transparent Cigram watermark in the same foreground layer.
+     */
     public static void posterFrame(View poster, float radiusDp) {
+        posterFrame(poster, radiusDp, true);
+    }
+
+    /** Same frame; {@code watermark} false for artwork that belongs to someone else (channel logos). */
+    public static void posterFrame(View poster, float radiusDp, boolean watermark) {
         if (poster == null || Build.VERSION.SDK_INT < 23) return;
         try {
             GradientDrawable frame = new GradientDrawable();
             frame.setColor(Color.TRANSPARENT);
             frame.setCornerRadius(dp(poster.getContext(), radiusDp));
             frame.setStroke(Math.max(1, dp(poster.getContext(), 1)), HAIRLINE);
-            poster.setForeground(frame);
+            poster.setForeground(watermark ? CigramBrand.withWatermark(poster.getContext(), frame) : frame);
         } catch (Throwable ignored) { }
     }
 
@@ -228,28 +236,32 @@ public final class CigramDesign {
 
     // --------------------------------------------------------- section headers
 
-    /** Small rounded red bar placed at the right of every section title (same as Channels). */
+    /**
+     * 2026 redesign: section titles no longer carry the red accent bar (owner's request: "remove the red lines beside
+     * the home section titles"). The view is kept (GONE, zero size) because existing code looks it up by its tag and
+     * re-parents it; removing it would change their layout logic.
+     */
     public static View accentBar(Context c) {
         View bar = new View(c);
         bar.setTag("cigram_section_accent");
-        bar.setBackground(round(ACCENT, 3, c));
+        bar.setVisibility(View.GONE);
         return bar;
     }
 
     public static LinearLayout.LayoutParams accentBarParams(Context c) {
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(c, 4), dp(c, 20));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, 0);
         lp.gravity = Gravity.CENTER_VERTICAL;
         return lp;
     }
 
-    /** «المزيد» as plain text (no background) with a left-pointing chevron (forward direction in Arabic). */
+    /** «المزيد» as plain text (no background). 2026: the "‹" chevron next to the word is removed; the word stays. */
     public static void styleMore(TextView more) {
         if (more == null) return;
         Context c = more.getContext();
         CharSequence current = more.getText();
         String label = current == null ? "" : current.toString().replace("‹", "").trim();
         if (label.length() == 0) label = "المزيد";
-        more.setText(label + "  ‹");
+        more.setText(label);
         more.setTextColor(TEXT_2);
         more.setTextSize(13f);
         more.setTypeface(font(c), Typeface.BOLD);
@@ -375,11 +387,8 @@ public final class CigramDesign {
             title.setTextSize(20f);
             title.setTypeface(font(c), Typeface.BOLD);
             title.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-            title.setCompoundDrawablePadding(dp(c, 10));
-            GradientDrawable bar = round(ACCENT, 3, c);
-            bar.setBounds(0, 0, dp(c, 4), dp(c, 20));
-            // right compound drawable = physical right side of the text
-            title.setCompoundDrawables(null, null, bar, null);
+            // 2026: no red accent bar beside section titles any more
+            title.setCompoundDrawables(null, null, null, null);
         } catch (Throwable ignored) { }
     }
 

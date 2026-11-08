@@ -420,13 +420,7 @@ public final class CigramSettings {
     private static TextView heading(Activity a, String text) {
         TextView t = CigramUI.label(a, text, 13.5f, CigramDesign.TEXT_2, true);
         t.setPadding(CigramUI.dp(a, 22), CigramUI.dp(a, 24), CigramUI.dp(a, 24), CigramUI.dp(a, 10));
-        // v4.4: the same red accent mark as the home / details section titles
-        try {
-            android.graphics.drawable.GradientDrawable bar = CigramDesign.round(CigramDesign.ACCENT, 2, a);
-            bar.setBounds(0, 0, CigramUI.dp(a, 3), CigramUI.dp(a, 14));
-            t.setCompoundDrawables(null, null, bar, null);
-            t.setCompoundDrawablePadding(CigramUI.dp(a, 8));
-        } catch (Throwable ignored) { }
+        // 2026: plain heading, no red accent mark (consistent with the section titles)
         t.setLayoutParams(new LinearLayout.LayoutParams(-1, -2));
         return t;
     }

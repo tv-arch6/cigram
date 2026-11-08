@@ -266,6 +266,9 @@ final class CigramChannelCard extends View implements CigramLogos.Sink {
 
     // ------------------------------------------------------------------ drawing
 
+    /** Faint Cigram mark drawn while the channel picture is loading (created on first use). */
+    private android.graphics.drawable.Drawable placeholderMark;
+
     @Override protected void onDraw(Canvas c) {
         if (tile.width() <= 0f) return;
         float radius = (logoOnly ? 10 : 14) * dp;
@@ -288,13 +291,15 @@ final class CigramChannelCard extends View implements CigramLogos.Sink {
             linePaint.setStrokeWidth(Math.max(1f, dp));
             linePaint.setColor(pal.hairline);
             c.drawRoundRect(tile, radius, radius, linePaint);
-            String letter = ch.name.length() == 0 ? "" : ch.name.substring(0, 1);
-            ink.setTypeface(CigramUI.font(getContext()));
-            ink.setTextAlign(Paint.Align.CENTER);
-            ink.setColor(pal.text3);
-            ink.setTextSize(Math.min(tile.width(), tile.height()) * 0.40f);
-            float y = tile.centerY() - (ink.descent() + ink.ascent()) / 2f;
-            c.drawText(letter, tile.centerX(), y, ink);
+            // 2026: a faint Cigram mark holds the place of the channel's own picture until it has loaded
+            if (placeholderMark == null) placeholderMark = CigramBrand.placeholder(getContext());
+            if (placeholderMark != null) {
+                if (CigramTheme.isLight(getContext())) placeholderMark.setColorFilter(pal.text3, android.graphics.PorterDuff.Mode.SRC_IN);
+                int m = Math.round(Math.min(tile.width(), tile.height()) * 0.38f);
+                int cx = Math.round(tile.centerX()), cy = Math.round(tile.centerY());
+                placeholderMark.setBounds(cx - m / 2, cy - m / 2, cx + m / 2, cy + m / 2);
+                placeholderMark.draw(c);
+            }
         }
 
         // definition for pictures that fill the tile: a barely visible edge, never a heavy border

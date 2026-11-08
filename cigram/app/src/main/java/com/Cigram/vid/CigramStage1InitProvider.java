@@ -5591,7 +5591,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
         if (more != null) {
             boolean showMore = related.length() > 6;
             more.setVisibility(showMore ? View.VISIBLE : View.GONE);
-            more.setText("عرض المزيد  ‹");
+            more.setText("عرض المزيد");
             more.setTextColor(Color.WHITE);
             more.setTextSize(14.5f);
             more.setTypeface(cigramTypeface(activity), Typeface.BOLD);
