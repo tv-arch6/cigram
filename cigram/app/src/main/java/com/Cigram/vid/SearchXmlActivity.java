@@ -84,6 +84,9 @@ import org.json.*;
 
 public class SearchXmlActivity extends AppCompatActivity {
 	
+	/** One background thread for parsing the search index (never the main thread). */
+	private static final java.util.concurrent.ExecutorService CG_SEARCH_PARSE = CigramPool.fixed(1, "search-parse");
+	
 	private SearchXmlBinding binding;
 	private HashMap<String, Object> search_source = new HashMap<>();
 	private HashMap<String, Object> search_results = new HashMap<>();
@@ -898,11 +901,30 @@ public class SearchXmlActivity extends AppCompatActivity {
 			org.json.JSONArray items=new org.json.JSONArray();
 			int generation;
 			boolean failed;
+			/** 2026: a large index is parsed on a background thread (it froze the page on entry and after every
+			 *  catalogue refresh); the previous results stay on screen and the search re-runs when it is ready. */
+			String pending=null;
 			void reload() {
 				String value=search_json==null?"":search_json.trim();
-				if(value.equals(source))return;
-				try { items=cgCatalog.parse(value); source=value; failed=false; }
-				catch(Exception error){failed=true;}
+				if(value.equals(source)||value.equals(pending))return;
+				if(value.length()<24000){
+					try { items=cgCatalog.parse(value); source=value; failed=false; }
+					catch(Exception error){failed=true;}
+					return;
+				}
+				pending=value;
+				final String job=value;
+				CG_SEARCH_PARSE.execute(new java.lang.Runnable(){@Override public void run(){
+					org.json.JSONArray parsed=null;
+					try{parsed=cgCatalog.parse(job);}catch(Throwable error){parsed=null;}
+					final org.json.JSONArray result=parsed;
+					cgSearchHandler.post(new java.lang.Runnable(){@Override public void run(){
+						if(isFinishing()||isDestroyed()||!job.equals(pending))return;
+						pending=null;
+						if(result!=null){items=result;source=job;failed=false;}else failed=true;
+						queue();
+					}});
+				}});
 			}
 			boolean advanced() {
 				return CigramSearchFilter.active(cgFilters);
@@ -1205,6 +1227,13 @@ public class SearchXmlActivity extends AppCompatActivity {
 				reload(); tabs(); cgEmptyIcon.setVisibility(android.view.View.GONE);
 				cgEmpty.animate().cancel();cgEmpty.setVisibility(android.view.View.GONE);
 				cgResults.removeAllViews();cgResults.setAlpha(1f);cgResults.setTranslationY(0f);
+				if(pending!=null&&items.length()==0){   // the index is still being parsed in the background
+					android.widget.TextView cgWait=new android.widget.TextView(SearchXmlActivity.this);
+					cgWait.setText("\u200Fجارٍ تجهيز البحث…");cgWait.setTextColor(0xAAFFFFFF);cgWait.setTypeface(cgGlass.font);
+					cgWait.setGravity(android.view.Gravity.CENTER);cgWait.setPadding(0,cgGlass.px(40),0,0);
+					cgResults.addView(cgWait,new android.widget.LinearLayout.LayoutParams(-1,-2));
+					return;
+				}
 				try{CigramRequestPrompt.hide(findViewById(R.id.linear_search_empty));}catch(Throwable cgReqIgnored){}
 				String query=cgInput.getText().toString().trim();
 				boolean browse=query.isEmpty()&&(!cgType[0].equals("all")||advanced());
@@ -1933,12 +1962,10 @@ public class SearchXmlActivity extends AppCompatActivity {
 					true;
 					
 					
-					requestPermissions(
-					new String[] {
-						android.Manifest.permission.RECORD_AUDIO
-					},
-					8902
-					);
+					// 2026: explanation first, settings offer after a permanent refusal (CigramPermissions)
+					CigramPermissions.ensure(SearchXmlActivity.this,
+					android.Manifest.permission.RECORD_AUDIO, 8902,
+					"يحتاج Cigram إلى الميكروفون للبحث الصوتي فقط، أثناء ضغطك على زر الميكروفون.");
 					
 					
 					/*

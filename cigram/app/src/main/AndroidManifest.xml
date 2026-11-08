@@ -166,7 +166,8 @@
 		<activity
 			android:name=".SearchXmlActivity"
 			android:theme="@style/CigramDarkTheme"
-			android:windowSoftInputMode="stateHidden" />
+			android:configChanges="orientation|screenSize|keyboard|keyboardHidden|navigation|smallestScreenSize|screenLayout"
+			android:windowSoftInputMode="stateHidden|adjustPan" />
 		<activity
 			android:name=".AccountActivity"
 			android:theme="@style/CigramDarkTheme"

@@ -43,6 +43,12 @@ public final class AdsMedia {
 
 
     public static final long MAX_BYTES = 25L * 1024L * 1024L;
+    /**
+     * 2026: videos up to 1 GB. They are NOT copied into the cache: the picked file is streamed part by part straight
+     * from its content URI (memory use = one part), and a failed upload resumes from the parts the server already has.
+     * The server must accept the same limit (init answers 413 / an error message otherwise, shown as is).
+     */
+    public static final long MAX_VIDEO_BYTES = 1024L * 1024L * 1024L;
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final ExecutorService IO = CigramPool.fixed(3, "ads-io");
     private static final ExecutorService IMG = CigramPool.fixed(2, "ads-img");
@@ -57,6 +63,12 @@ public final class AdsMedia {
 
     public static final class Prepared {
         public File file;
+        /** Large video: read directly from here instead of a cached copy (file is then null). */
+        public Uri source;
+        /** Upload session on the server, kept after a failure so «إعادة المحاولة» resumes instead of restarting. */
+        public String uploadId;
+        public int partSize;
+        public int parts;
         public String name = "ملف";
         public String kind = "file";
         public int w;
@@ -158,7 +170,33 @@ public final class AdsMedia {
             return p;
         }
         long declared = displaySize(c, uri);
-        if (declared > MAX_BYTES) throw new IllegalStateException("الملف أكبر من 25MB.");
+        if ("video".equals(kind)) {
+            if (declared > MAX_VIDEO_BYTES) throw new IllegalStateException("حجم الفيديو أكبر من 1 غيغابايت.");
+            if (declared > 0) {
+                // stream it from where it is: no 1 GB copy in the cache, no 1 GB in memory
+                try {
+                    c.getContentResolver().takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                } catch (Throwable ignored) { }   // not every provider allows it; the upload still works while the app runs
+                p.source = uri;
+                p.size = declared;
+                try {
+                    MediaMetadataRetriever r = new MediaMetadataRetriever();
+                    r.setDataSource(c, uri);
+                    String w = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH);
+                    String h = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT);
+                    String d = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+                    p.w = w == null ? 0 : Integer.parseInt(w);
+                    p.h = h == null ? 0 : Integer.parseInt(h);
+                    p.durMs = d == null ? 0 : Integer.parseInt(d);
+                    r.release();
+                } catch (Throwable ignored) { }
+                return p;
+            }
+        } else if (declared > MAX_BYTES) {
+            throw new IllegalStateException("الملف أكبر من 25MB.");
+        }
+        final long limit = "video".equals(kind) ? MAX_VIDEO_BYTES : MAX_BYTES;
+        final String tooBig = "video".equals(kind) ? "حجم الفيديو أكبر من 1 غيغابايت." : "الملف أكبر من 25MB.";
         File out = new File(upDir(c), "u_" + UUID.randomUUID().toString().replace("-", ""));
         InputStream in = cr.openInputStream(uri);
         if (in == null) throw new IllegalStateException("تعذر قراءة الملف.");
@@ -170,7 +208,7 @@ public final class AdsMedia {
                 int n;
                 while ((n = in.read(buf)) > 0) {
                     total += n;
-                    if (total > MAX_BYTES) { os.close(); out.delete(); throw new IllegalStateException("الملف أكبر من 25MB."); }
+                    if (total > limit) { os.close(); out.delete(); throw new IllegalStateException(tooBig); }
                     os.write(buf, 0, n);
                 }
             } finally {
@@ -262,7 +300,7 @@ public final class AdsMedia {
                 String err = null;
                 String id = null;
                 try {
-                    id = uploadSync(p, durMs, wave, basePath, query, bearer, progress, cancel);
+                    id = uploadSync(c.getApplicationContext(), p, durMs, wave, basePath, query, bearer, progress, cancel);
                 } catch (IllegalStateException e) {
                     err = e.getMessage();
                 } catch (Throwable t) {
@@ -281,30 +319,46 @@ public final class AdsMedia {
         return (query == null || query.length() == 0) ? base : (base.contains("?") ? base + "&" + query : base + "?" + query);
     }
 
-    private static String uploadSync(Prepared p, int durMs, int[] wave, String basePath, String query, String bearer, Progress progress, AtomicBoolean cancel) throws Exception {
-        JSONObject init = new JSONObject();
-        init.put("name", p.name);
-        init.put("kind", p.kind);
-        init.put("size", p.size);
-        init.put("dur", durMs > 0 ? durMs : p.durMs);
-        init.put("w", p.w);
-        init.put("h", p.h);
-        if (wave != null) {
-            JSONArray w = new JSONArray();
-            for (int v : wave) w.put(v);
-            init.put("wave", w);
+    /** The bytes of a prepared file: the cached copy, or (large video) the picked content itself. */
+    private static InputStream openSource(Context c, Prepared p) throws Exception {
+        if (p.file != null) return new FileInputStream(p.file);
+        if (p.source != null && c != null) {
+            InputStream in = c.getContentResolver().openInputStream(p.source);
+            if (in != null) return in;
         }
-        CigramAds.Result r = CigramAds.request("POST", q(query, basePath + "/init"), init.toString(), bearer);
-        if (!r.ok) throw new IllegalStateException(r.message.length() > 0 ? r.message : "تعذر بدء الرفع.");
-        String id = r.json.optString("media_id");
-        int partSize = r.json.optInt("part_size", 1024 * 1024);
-        int parts = r.json.optInt("parts", 1);
-        boolean[] have = new boolean[parts];
-        FileInputStream in = new FileInputStream(p.file);
+        throw new IllegalStateException("تعذر قراءة الملف. أعد اختياره.");
+    }
+
+    private static void skipFully(InputStream in, long n) throws Exception {
+        long left = n;
+        byte[] scratch = null;
+        while (left > 0) {
+            long k = in.skip(left);
+            if (k <= 0) {
+                // some content streams cannot skip: read and drop
+                if (scratch == null) scratch = new byte[64 * 1024];
+                int r = in.read(scratch, 0, (int) Math.min(scratch.length, left));
+                if (r < 0) throw new IllegalStateException("الملف تغيّر أثناء الرفع.");
+                k = r;
+            }
+            left -= k;
+        }
+    }
+
+    /** Sends every part the server does not have yet, reading the source once, in order (memory = one part). */
+    private static void sendParts(Context c, Prepared p, boolean[] have, String basePath, String query, String bearer,
+                                  Progress progress, AtomicBoolean cancel) throws Exception {
+        int done = 0;
+        for (boolean h : have) if (h) done++;
+        InputStream in = openSource(c, p);
         try {
-            for (int n = 0; n < parts; n++) {
+            long position = 0;
+            for (int n = 0; n < p.parts; n++) {
                 if (cancel != null && cancel.get()) throw new IllegalStateException("أُلغي الرفع.");
-                long len = Math.min((long) partSize, p.size - (long) n * partSize);
+                if (have[n]) continue;
+                long offset = (long) n * p.partSize;
+                if (offset > position) { skipFully(in, offset - position); position = offset; }
+                long len = Math.min((long) p.partSize, p.size - offset);
                 byte[] buf = new byte[(int) len];
                 int off = 0;
                 while (off < buf.length) {
@@ -312,40 +366,73 @@ public final class AdsMedia {
                     if (k < 0) throw new IllegalStateException("الملف تغيّر أثناء الرفع.");
                     off += k;
                 }
-                if (!have[n]) putPartWithRetry(basePath, query, id, n, buf, bearer, cancel);
-                if (progress != null) postProgress(progress, (int) (((n + 1) * 100L) / parts));
+                position += len;
+                putPartWithRetry(basePath, query, p.uploadId, n, buf, bearer, cancel);
+                have[n] = true;
+                done++;
+                if (progress != null) postProgress(progress, (int) ((done * 100L) / Math.max(1, p.parts)));
             }
         } finally {
             try { in.close(); } catch (Throwable ignored) { }
         }
-        CigramAds.Result done = CigramAds.request("POST", q(query, basePath + "/complete?id=" + id), "{}", bearer);
+    }
+
+    private static boolean[] serverHas(String basePath, String query, Prepared p, String bearer) {
+        boolean[] got = new boolean[p.parts];
+        try {
+            CigramAds.Result st = CigramAds.request("GET", q(query, basePath + "/status?id=" + p.uploadId), null, bearer);
+            if (!st.ok) return null;
+            JSONArray ha = st.json.optJSONArray("have");
+            if (ha != null) for (int i = 0; i < ha.length(); i++) { int x = ha.optInt(i, -1); if (x >= 0 && x < p.parts) got[x] = true; }
+        } catch (Throwable t) {
+            return null;
+        }
+        return got;
+    }
+
+    private static String uploadSync(Context c, Prepared p, int durMs, int[] wave, String basePath, String query, String bearer, Progress progress, AtomicBoolean cancel) throws Exception {
+        boolean[] have = null;
+        if (p.uploadId != null && p.parts > 0) {
+            // «إعادة المحاولة»: continue the same session; only what the server is missing is sent again
+            have = serverHas(basePath, query, p, bearer);
+            if (have == null) { p.uploadId = null; }   // the session expired on the server: start a new one
+        }
+        if (p.uploadId == null) {
+            JSONObject init = new JSONObject();
+            init.put("name", p.name);
+            init.put("kind", p.kind);
+            init.put("size", p.size);
+            init.put("dur", durMs > 0 ? durMs : p.durMs);
+            init.put("w", p.w);
+            init.put("h", p.h);
+            if (wave != null) {
+                JSONArray w = new JSONArray();
+                for (int v : wave) w.put(v);
+                init.put("wave", w);
+            }
+            CigramAds.Result r = CigramAds.request("POST", q(query, basePath + "/init"), init.toString(), bearer);
+            if (!r.ok) {
+                if (r.code == 413) throw new IllegalStateException("خادم المحادثة لا يقبل حالياً ملفاً بهذا الحجم.");
+                throw new IllegalStateException(r.message.length() > 0 ? r.message : "تعذر بدء الرفع.");
+            }
+            p.uploadId = r.json.optString("media_id");
+            p.partSize = Math.max(64 * 1024, r.json.optInt("part_size", 1024 * 1024));
+            p.parts = Math.max(1, r.json.optInt("parts", (int) ((p.size + p.partSize - 1) / p.partSize)));
+            have = new boolean[p.parts];
+        }
+        sendParts(c, p, have, basePath, query, bearer, progress, cancel);
+        CigramAds.Result done = CigramAds.request("POST", q(query, basePath + "/complete?id=" + p.uploadId), "{}", bearer);
         if (!done.ok) {
-            // قطع ناقصة: نسأل عن الحالة ونعيد المفقود مرة واحدة
-            CigramAds.Result st = CigramAds.request("GET", q(query, basePath + "/status?id=" + id), null, bearer);
-            if (st.ok) {
-                JSONArray ha = st.json.optJSONArray("have");
-                boolean[] got = new boolean[parts];
-                if (ha != null) for (int i = 0; i < ha.length(); i++) { int x = ha.optInt(i, -1); if (x >= 0 && x < parts) got[x] = true; }
-                FileInputStream in2 = new FileInputStream(p.file);
-                try {
-                    for (int n = 0; n < parts; n++) {
-                        long len = Math.min((long) partSize, p.size - (long) n * partSize);
-                        byte[] buf = new byte[(int) len];
-                        int off = 0;
-                        while (off < buf.length) {
-                            int k = in2.read(buf, off, buf.length - off);
-                            if (k < 0) break;
-                            off += k;
-                        }
-                        if (!got[n]) putPartWithRetry(basePath, query, id, n, buf, bearer, cancel);
-                    }
-                } finally {
-                    try { in2.close(); } catch (Throwable ignored) { }
-                }
-                done = CigramAds.request("POST", q(query, basePath + "/complete?id=" + id), "{}", bearer);
+            // missing parts on the server: ask which, send them once more, complete again
+            boolean[] got = serverHas(basePath, query, p, bearer);
+            if (got != null) {
+                sendParts(c, p, got, basePath, query, bearer, progress, cancel);
+                done = CigramAds.request("POST", q(query, basePath + "/complete?id=" + p.uploadId), "{}", bearer);
             }
             if (!done.ok) throw new IllegalStateException(done.message.length() > 0 ? done.message : "تعذر إكمال الرفع.");
         }
+        String id = p.uploadId;
+        p.uploadId = null;   // finished: a later send of the same Prepared would be a new upload
         return id;
     }
 

@@ -326,10 +326,17 @@ public final class AdsOverlay {
         try {
             final Dialog d = new Dialog(a);
             d.requestWindowFeature(Window.FEATURE_NO_TITLE);
+            // 2026: always easy to leave: the ✕ button, Back, or a tap outside the card
             d.setCancelable(true);
-            d.setCanceledOnTouchOutside(false);
+            d.setCanceledOnTouchOutside(true);
             LinearLayout card = AdsUi.vbox(a);
-            CigramGlass.bind(card, 20, true);
+            // rounded card (20 dp) on the Cigram charcoal with a thin white outline; the picture follows the corners
+            android.graphics.drawable.GradientDrawable cardBg = new android.graphics.drawable.GradientDrawable();
+            cardBg.setColor(0xFF141417);
+            cardBg.setCornerRadius(AdsUi.dp(a, 20));
+            cardBg.setStroke(Math.max(1, AdsUi.dp(a, 1)), 0xB3FFFFFF);
+            card.setBackground(cardBg);
+            card.setClipToOutline(true);
             card.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
             FrameLayout top = new FrameLayout(a);
@@ -353,7 +360,11 @@ public final class AdsOverlay {
             close.setGravity(Gravity.CENTER);
             close.setMinWidth(AdsUi.dp(a, 48));
             close.setMinHeight(AdsUi.dp(a, 48));
-            close.setBackground(AdsUi.pill(a, 0x99000000, 24));
+            android.graphics.drawable.GradientDrawable closeBg = new android.graphics.drawable.GradientDrawable();
+            closeBg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            closeBg.setColor(0xB3000000);
+            closeBg.setStroke(Math.max(1, AdsUi.dp(a, 1)), 0x80FFFFFF);
+            close.setBackground(closeBg);
             close.setClickable(true);
             close.setContentDescription("إغلاق الإعلان");
             close.setOnClickListener(new View.OnClickListener() {
@@ -366,18 +377,24 @@ public final class AdsOverlay {
 
             LinearLayout t = AdsUi.vbox(a);
             t.setPadding(AdsUi.dp(a, 18), AdsUi.dp(a, 14), AdsUi.dp(a, 18), AdsUi.dp(a, 18));
+            TextView badge = AdsUi.text(a, "\u200Fإعلان", 11.5f, 0xB3FFFFFF, true);
+            badge.setGravity(Gravity.RIGHT);
+            t.addView(badge, AdsUi.lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 0, 0, AdsUi.dp(a, 4)));
             if (ad.title.length() > 0) {
-                TextView title = AdsUi.text(a, ad.title, 19f, CigramGlass.text(a), true);
+                TextView title = AdsUi.text(a, "\u200F" + ad.title, 19f, 0xFFFFFFFF, true);
+                title.setGravity(Gravity.RIGHT);
                 title.setMaxLines(3);
-                t.addView(title);
+                t.addView(title, AdsUi.lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 0, 0, 0));
             }
             if (ad.body.length() > 0) {
-                TextView body = AdsUi.text(a, ad.body, 14f, CigramGlass.muted(a), false);
+                TextView body = AdsUi.text(a, "\u200F" + ad.body, 14f, 0xFFC7C7CC, false);
+                body.setGravity(Gravity.RIGHT);
                 body.setMaxLines(5);
-                t.addView(body, AdsUi.lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, AdsUi.dp(a, 6), 0, 0));
+                t.addView(body, AdsUi.lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, AdsUi.dp(a, 6), 0, 0));
             }
             if (ad.clickable()) {
-                TextView cta = AdsRender.cta(a, ad.cta.length() > 0 ? ad.cta : "اعرف المزيد", CigramUI.TEAL, 0xFF111113);
+                // the one action of the pop-up: Cigram yellow with dark text, clearly separate from the ✕
+                TextView cta = AdsRender.cta(a, ad.cta.length() > 0 ? ad.cta : "اعرف المزيد", 0xFFF2C14E, 0xFF141414);
                 cta.setOnClickListener(new View.OnClickListener() {
                     @Override public void onClick(View v) { AdsServe.perform(a, ad); try { d.dismiss(); } catch (Throwable ignored) { } }
                 });

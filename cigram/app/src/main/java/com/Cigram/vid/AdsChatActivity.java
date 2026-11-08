@@ -62,6 +62,10 @@ public class AdsChatActivity extends Activity {
         int state; // 0 على الخادم، 1 قيد الإرسال، 2 فشل
         int progress = -1;
         String localPath;
+        /** The prepared file of an upload that failed: «إعادة المحاولة» resumes it (not persisted). */
+        AdsMedia.Prepared prepared;
+        int uploadDur;
+        int[] uploadWave;
         AtomicBoolean cancel;
         long replyTo;
 
@@ -274,14 +278,23 @@ public class AdsChatActivity extends Activity {
         composer.setPadding(AdsUi.dp(this, 6), AdsUi.dp(this, 6), AdsUi.dp(this, 6), AdsUi.dp(this, 8));
         composer.setBackgroundColor(CigramGlass.card(this));
         composer.setGravity(Gravity.BOTTOM);
-        attachBtn = iconBtn(AdsIcons.CLIP, "إرفاق", new View.OnClickListener() {
-            @Override public void onClick(View v) { showAttachSheet(); }
+        // 2026 RTL composer, physical order left → right: [send / mic][video][photo][message ...]
+        // (the app has no RTL support switched on, so the order is built by hand). Photo and video open the system
+        // photo picker directly; a long press on the photo button opens the full sheet (camera, documents).
+        attachBtn = iconBtn(AdsIcons.IMAGE, "إرسال صورة", new View.OnClickListener() {
+            @Override public void onClick(View v) { pick(0); }
         });
-        composer.addView(attachBtn, new LinearLayout.LayoutParams(AdsUi.dp(this, 48), AdsUi.dp(this, 48)));
+        attachBtn.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override public boolean onLongClick(View v) { showAttachSheet(); return true; }
+        });
+        final View videoBtn = iconBtn(AdsIcons.VIDEO, "إرسال فيديو (حتى 1 غيغابايت)", new View.OnClickListener() {
+            @Override public void onClick(View v) { pick(1); }
+        });
 
         FrameLayout inputBox = new FrameLayout(this);
         input = new EditText(this);
-        CigramUI.styleInput(input, "اكتب رسالة...");
+        CigramUI.styleInput(input, "\u200Fاكتب رسالتك هنا");
+        input.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
         input.setMaxLines(5);
         input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         input.setMinHeight(AdsUi.dp(this, 48));
@@ -296,10 +309,9 @@ public class AdsChatActivity extends Activity {
         ((LinearLayout) recBar).addView(AdsUi.text(this, "اسحب للإلغاء", 13f, CigramGlass.muted(this), false));
         recBar.setVisibility(View.GONE);
         inputBox.addView(recBar, new FrameLayout.LayoutParams(-1, AdsUi.dp(this, 48)));
-        LinearLayout.LayoutParams il = new LinearLayout.LayoutParams(0, -2);
+        final LinearLayout.LayoutParams il = new LinearLayout.LayoutParams(0, -2);
         il.weight = 1f;
         il.setMargins(AdsUi.dp(this, 4), 0, AdsUi.dp(this, 4), 0);
-        composer.addView(inputBox, il);
 
         // زر إرسال/مايك
         FrameLayout act = new FrameLayout(this);
@@ -311,6 +323,9 @@ public class AdsChatActivity extends Activity {
         act.setContentDescription("إرسال أو تسجيل رسالة صوتية");
         sendBtn.setVisibility(View.GONE);
         composer.addView(act, new LinearLayout.LayoutParams(AdsUi.dp(this, 48), AdsUi.dp(this, 48)));
+        composer.addView(videoBtn, new LinearLayout.LayoutParams(AdsUi.dp(this, 42), AdsUi.dp(this, 48)));
+        composer.addView(attachBtn, new LinearLayout.LayoutParams(AdsUi.dp(this, 42), AdsUi.dp(this, 48)));
+        composer.addView(inputBox, il);
         act.setOnTouchListener(new View.OnTouchListener() {
             @Override public boolean onTouch(View v, MotionEvent e) { return onActionTouch(e); }
         });
@@ -359,7 +374,7 @@ public class AdsChatActivity extends Activity {
         subtitle.setVisibility(s == null || s.length() == 0 ? View.GONE : View.VISIBLE);
         boolean can = !banned;
         input.setEnabled(can);
-        input.setHint(banned ? "تم تقييد المحادثة من قبل الإدارة" : "اكتب رسالة...");
+        input.setHint(banned ? "تم تقييد المحادثة من قبل الإدارة" : "\u200Fاكتب رسالتك هنا");
         attachBtn.setEnabled(can);
     }
 
@@ -761,9 +776,14 @@ public class AdsChatActivity extends Activity {
                 startActivityForResult(i, REQ_CAMERA);
                 return;
             }
+            if (which == 0 || which == 1) {
+                // photos / videos: the system photo picker (no storage permission at all) where available
+                startActivityForResult(CigramPermissions.pickVisualMedia(which == 0 ? "image/*" : "video/*"), REQ_PICK + which * 100);
+                return;
+            }
             Intent i = new Intent(Intent.ACTION_GET_CONTENT);
             i.addCategory(Intent.CATEGORY_OPENABLE);
-            i.setType(which == 0 ? "image/*" : which == 1 ? "video/*" : "*/*");
+            i.setType("*/*");
             if (which == 3) i.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/pdf", "application/zip", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
             startActivityForResult(Intent.createChooser(i, "اختر"), REQ_PICK + which * 100);
         } catch (Throwable t) {
@@ -798,7 +818,10 @@ public class AdsChatActivity extends Activity {
 
     private void startUpload(AdsMedia.Prepared p, String kind, int durMs, int[] wave) {
         final Msg m = newPending(kind, "");
-        m.localPath = p.file.getAbsolutePath();
+        m.localPath = p.file != null ? p.file.getAbsolutePath() : (p.source != null ? p.source.toString() : null);
+        m.prepared = p;
+        m.uploadDur = durMs;
+        m.uploadWave = wave;
         m.cancel = new AtomicBoolean(false);
         m.progress = 0;
         try {
@@ -809,6 +832,11 @@ public class AdsChatActivity extends Activity {
             m.media = md;
         } catch (Throwable ignored) { }
         adapter.notifyDataSetChanged();
+        runUpload(m, p, durMs, wave);
+    }
+
+    /** Uploads (or, after a failure, resumes) the file of {@code m}; progress and the result update the bubble. */
+    private void runUpload(final Msg m, AdsMedia.Prepared p, int durMs, int[] wave) {
         AdsMedia.upload(this, p, durMs, wave, "/chat/upload", null, CigramUserData.token(this), new AdsMedia.Progress() {
             @Override public void onProgress(int pct) { if (!destroyed) { m.progress = pct; adapter.notifyDataSetChanged(); } }
         }, new AdsMedia.Done() {
@@ -838,8 +866,8 @@ public class AdsChatActivity extends Activity {
         }
         if (banned) return true;
         if (a == MotionEvent.ACTION_DOWN) {
-            if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission("android.permission.RECORD_AUDIO") != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{"android.permission.RECORD_AUDIO"}, REQ_PERM_AUDIO);
+            if (!CigramPermissions.ensure(this, "android.permission.RECORD_AUDIO", REQ_PERM_AUDIO,
+                    "يحتاج Cigram إلى الميكروفون لتسجيل رسالتك الصوتية فقط، ولا يستمع إليك في أي وقت آخر.")) {
                 return true;
             }
             recDownX = e.getRawX();
@@ -928,7 +956,18 @@ public class AdsChatActivity extends Activity {
         if (m.state == 2) {
             labels.add("إعادة المحاولة");
             acts.add(new Runnable() { @Override public void run() {
-                if (m.localPath != null && (m.media == null || m.media.optString("id").length() == 0)) { items.remove(m); adapter.notifyDataSetChanged(); AdsUi.toast(AdsChatActivity.this, "أعد اختيار الملف لإرساله."); }
+                boolean uploaded = m.media != null && m.media.optString("id").length() > 0;
+                if (m.localPath != null && !uploaded && m.prepared != null) {
+                    // 2026: resume the same upload session; only the missing parts are sent again
+                    m.state = 1;
+                    m.failMsg = "";
+                    m.progress = 0;
+                    m.cancel = new AtomicBoolean(false);
+                    adapter.notifyDataSetChanged();
+                    runUpload(m, m.prepared, m.uploadDur, m.uploadWave);
+                } else if (m.localPath != null && !uploaded) {
+                    items.remove(m); adapter.notifyDataSetChanged(); AdsUi.toast(AdsChatActivity.this, "أعد اختيار الملف لإرساله.");
+                }
                 else dispatch(m);
             } });
             labels.add("حذف");
