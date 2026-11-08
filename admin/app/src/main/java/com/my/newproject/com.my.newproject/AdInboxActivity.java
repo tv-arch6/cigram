@@ -129,6 +129,8 @@ public class AdInboxActivity extends CgBase {
         TextView name = CgUi.text(this, t.optString("name", "معلن"), 15.5f, CgCfg.TEXT, true);
         head.addView(name, new LinearLayout.LayoutParams(0, CgUi.WRAP, 1f));
         if (t.optBoolean("online")) head.addView(CgUi.badge(this, "متصل", CgCfg.GOOD), CgUi.lp(this, CgUi.WRAP, CgUi.WRAP, 4, 0, 0, 0));
+        // 2026: a conversation about advertising is marked at a glance (order card / «أريد إعلاناً» in the app)
+        if (AdInboxNotifier.isAdRequest(t)) head.addView(CgUi.badge(this, "طلب إعلان", CgCfg.ACCENT_2), CgUi.lp(this, CgUi.WRAP, CgUi.WRAP, 4, 0, 0, 0));
         int un = t.optInt("unread_admin");
         if (un > 0) head.addView(CgUi.badge(this, String.valueOf(un), CgCfg.ACCENT), CgUi.lp(this, CgUi.WRAP, CgUi.WRAP, 4, 0, 0, 0));
         c.addView(head);

@@ -68,19 +68,27 @@ public final class CigramPlaybackError {
         }
     }
 
-    /** Checks a link before any player is opened. Returns UNKNOWN when it looks playable. */
+    /**
+     * Checks a link before any player is opened. Returns UNKNOWN when it may be playable. Only links that can never
+     * play are refused: empty / "null" values, no scheme at all, script-like schemes, or a network scheme without a
+     * host. Every scheme the stream layer understands (http(s), rtsp(s), rtmp(s), udp, srt, data: playlists,
+     * content:, file:) passes.
+     */
     public static int validateUrl(String raw) {
         if (raw == null) return INVALID_URL;
         String url = raw.trim();
-        if (url.length() < 8) return INVALID_URL;
+        String low = url.toLowerCase(Locale.ROOT);
+        if (url.length() < 6 || low.equals("null") || low.equals("undefined") || low.equals("none")) return INVALID_URL;
         try {
             Uri u = Uri.parse(url);
             String scheme = u.getScheme() == null ? "" : u.getScheme().toLowerCase(Locale.ROOT);
-            if (!(scheme.equals("http") || scheme.equals("https") || scheme.equals("rtsp") || scheme.equals("rtmp")
-                    || scheme.equals("content") || scheme.equals("file"))) return INVALID_URL;
-            if ((scheme.startsWith("http") || scheme.equals("rtsp")) && (u.getHost() == null || u.getHost().length() == 0)) {
+            if (scheme.length() == 0) return INVALID_URL;
+            if (scheme.equals("javascript") || scheme.equals("about") || scheme.equals("mailto") || scheme.equals("tel")) {
                 return INVALID_URL;
             }
+            boolean network = scheme.equals("http") || scheme.equals("https") || scheme.startsWith("rtsp")
+                    || scheme.startsWith("rtmp") || scheme.equals("udp") || scheme.equals("srt");
+            if (network && (u.getHost() == null || u.getHost().length() == 0)) return INVALID_URL;
         } catch (Throwable t) {
             return INVALID_URL;
         }

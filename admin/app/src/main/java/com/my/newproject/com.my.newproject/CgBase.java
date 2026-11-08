@@ -63,6 +63,9 @@ public abstract class CgBase extends Activity {
             getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         } catch (Exception ignored) { }
         onBuild();
+        // 2026: new advertising requests / customer messages reach the admin as notifications (idempotent)
+        AdInboxNotifier.ensureScheduled(this);
+        if (this instanceof AdInboxActivity) AdInboxNotifier.askPermissionOnce(this);
     }
 
     @Override

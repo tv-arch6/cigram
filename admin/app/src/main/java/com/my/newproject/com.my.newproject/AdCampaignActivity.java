@@ -161,7 +161,11 @@ public class AdCampaignActivity extends CgBase {
         flow.add(btn("تجديد", 1, new Runnable() { @Override public void run() { askDays("تجديد (نسخة جديدة)", "مدة الحملة الجديدة بالأيام", "renew"); } }));
         flow.add(btn("حذف", 2, new Runnable() {
             @Override public void run() {
-                CgUi.confirm(AdCampaignActivity.this, "حذف الحملة", "ستُحذف الحملة ومواد الإعلان وإحصاءاتها نهائياً.", "حذف", true, new Runnable() { @Override public void run() { act("delete", null, "تم الحذف."); } });
+                // 2026: the campaign is named in the confirmation, never only its internal id
+                String cname = camp.optString("name", "").trim();
+                CgUi.confirm(AdCampaignActivity.this, "حذف الحملة «" + (cname.length() > 0 ? cname : "بلا اسم") + "»",
+                        "ستُحذف حملة «" + (cname.length() > 0 ? cname : "بلا اسم") + "» ومواد الإعلان وإحصاءاتها نهائياً. لا يمكن التراجع.",
+                        "حذف", true, new Runnable() { @Override public void run() { act("delete", null, "تم حذف «" + camp.optString("name", "") + "»."); } });
             }
         }));
         box.addView(flow);
@@ -562,7 +566,9 @@ public class AdCampaignActivity extends CgBase {
         c.addView(CgUi.sectionTitle(this, "المواد الإعلانية (" + creatives.length() + ")"));
         for (int i = 0; i < creatives.length(); i++) {
             final JSONObject o = creatives.optJSONObject(i);
+            final String label = creativeName(o, i);
             LinearLayout card = CgUi.card(this);
+            card.addView(CgUi.text(this, label, 15f, CgCfg.TEXT, true), CgUi.lp(this, CgUi.MATCH, CgUi.WRAP, 0, 0, 0, 6));
             card.addView(buildPreview(this, slot, o.optString("type"), o.optString("media_url"), o.optString("thumb_url"), o.optString("title"), o.optString("body"), o.optString("cta"), o.optString("bg_color"), o.optString("text_color")));
             LinearLayout row = CgUi.hbox(this);
             row.addView(CgUi.badge(this, "image".equals(o.optString("type")) ? "صورة" : "video".equals(o.optString("type")) ? "فيديو" : "نص", CgCfg.ACCENT));
@@ -574,7 +580,7 @@ public class AdCampaignActivity extends CgBase {
             TextView d = CgUi.smallButton(this, "حذف", 2);
             d.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View v) {
-                    CgUi.confirm(AdCampaignActivity.this, "حذف المادة", "ستُحذف المادة وملفها.", "حذف", true, new Runnable() {
+                    CgUi.confirm(AdCampaignActivity.this, "حذف «" + label + "»", "ستُحذف المادة الإعلانية «" + label + "» وملفها نهائياً.", "حذف", true, new Runnable() {
                         @Override public void run() {
                             try { AdApi.post(AdCampaignActivity.this, "/admin/creatives/delete", new JSONObject().put("id", o.optString("id")), new AdApi.Cb() { @Override public void on(AdApi.Result r) { if (r.ok) reload(); else CgUi.toast(AdCampaignActivity.this, r.message); } }); } catch (Throwable ignored) { }
                         }
@@ -589,6 +595,20 @@ public class AdCampaignActivity extends CgBase {
         TextView add = CgUi.button(this, "＋ إضافة مادة إعلانية", 0);
         add.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { editCreative(null); } });
         c.addView(add, CgUi.lp(this, CgUi.MATCH, CgUi.WRAP, 0, 4, 0, 0));
+    }
+
+    /**
+     * 2026: every ad has a recognisable name. The name the admin typed («اسم الإعلان», saved as "name"); for older
+     * records without one, its title; otherwise its type and position — never only an internal id.
+     */
+    static String creativeName(JSONObject o, int index) {
+        if (o == null) return "مادة " + (index + 1);
+        String n = o.optString("name", "").trim();
+        if (n.length() > 0) return n;
+        String t = o.optString("title", "").trim();
+        if (t.length() > 0) return t;
+        String type = o.optString("type");
+        return ("video".equals(type) ? "إعلان فيديو " : "image".equals(type) ? "إعلان صورة " : "إعلان نصي ") + (index + 1);
     }
 
     /** معاينة تقريبية لشكل الإعلان داخل مساحته. */
@@ -635,7 +655,7 @@ public class AdCampaignActivity extends CgBase {
     // حالة محرر المادة
     private String cType = "image", cMediaKey = "", cMediaUrl = "", cThumbKey = "", cThumbUrl = "", cActionType = "none";
     private boolean cActive = true;
-    private EditText cTitle, cBody, cCta, cActionValue, cActionExtra, cBg, cFg;
+    private EditText cName, cTitle, cBody, cCta, cActionValue, cActionExtra, cBg, cFg;
     private TextView cMediaStatus, cThumbStatus;
     private LinearLayout cPreview;
     private String pickKind = "media";
@@ -684,6 +704,7 @@ public class AdCampaignActivity extends CgBase {
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) { refreshPreview(); }
             @Override public void afterTextChanged(Editable s) { }
         };
+        cName = field(box, "اسم الإعلان (يظهر لك فقط ليسهل تمييزه)", ex == null ? "" : ex.optString("name"), false, false);
         cTitle = field(box, "العنوان (حتى 80 حرفاً)", ex == null ? "" : ex.optString("title"), false, false);
         cBody = field(box, "النص (حتى 300 حرف)", ex == null ? "" : ex.optString("body"), true, false);
         cCta = field(box, "نص الزر (حتى 24 حرفاً)", ex == null ? "" : ex.optString("cta"), false, false);
@@ -736,7 +757,7 @@ public class AdCampaignActivity extends CgBase {
             @Override public void onReady(final AdMedia.Prepared p, String error) {
                 if (!alive()) return;
                 if (p == null) { hideLoading(); CgUi.toast(AdCampaignActivity.this, error == null ? "تعذر تجهيز الملف." : error); return; }
-                if (p.size > ("video".equals(hint) ? 40L : 6L) * 1024 * 1024) { hideLoading(); CgUi.toast(AdCampaignActivity.this, "الملف أكبر من الحد المسموح (" + ("video".equals(hint) ? "40" : "6") + "MB)."); return; }
+                if (p.size > ("video".equals(hint) ? 40L : 6L) * 1024 * 1024) { hideLoading(); CgUi.toast(AdCampaignActivity.this, "الملف أكبر من الحد المسموح (" + ("video".equals(hint) ? "40" : "6") + "MB). الإعلان يُعرض للجمهور، فاستخدم نسخة مضغوطة."); return; }
                 loadingMessage("جارٍ الرفع 0%");
                 AdMedia.uploadCreative(p, thumb ? "thumb" : "creative", new AdMedia.Progress() { @Override public void onProgress(int pct) { loadingMessage("جارٍ الرفع " + pct + "%"); } }, new AdMedia.CreativeDone() {
                     @Override public void onDone(boolean ok, String key, String url, String mime, String message) {
@@ -757,6 +778,9 @@ public class AdCampaignActivity extends CgBase {
             JSONObject b = new JSONObject();
             if (editing != null) b.put("id", editing.optString("id"));
             b.put("campaign_id", id);
+            String adName = cName == null ? "" : cName.getText().toString().trim();
+            if (adName.length() == 0) { CgUi.toast(this, "أدخل اسماً للإعلان ليسهل تمييزه عند التعديل أو الحذف."); return; }
+            b.put("name", adName);
             b.put("type", cType);
             b.put("media_key", "text".equals(cType) ? "" : cMediaKey);
             b.put("thumb_key", cThumbKey);

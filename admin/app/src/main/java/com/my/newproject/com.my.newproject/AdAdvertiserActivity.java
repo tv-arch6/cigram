@@ -129,7 +129,9 @@ public class AdAdvertiserActivity extends CgBase {
     }
 
     private void confirmDelete() {
-        CgUi.confirm(this, "حذف المعلن", "سيُحذف المعلن مع كل حملاته ومواده ومحادثته نهائياً. لا يمكن التراجع.", "حذف", true, new Runnable() {
+        String advName = fName == null ? "" : fName.getText().toString().trim();
+        if (advName.length() == 0) advName = adv.optString("name", "بلا اسم");
+        CgUi.confirm(this, "حذف «" + advName + "»", "سيُحذف المعلن «" + advName + "» مع كل حملاته ومواده ومحادثته نهائياً. لا يمكن التراجع.", "حذف", true, new Runnable() {
             @Override public void run() {
                 try {
                     showLoading("جارٍ الحذف...");

@@ -5300,6 +5300,13 @@ public final class CigramStage1InitProvider extends ContentProvider {
             Toast.makeText(activity, "رابط الفيديو غير متوفر", Toast.LENGTH_SHORT).show();
             return;
         }
+        // 2026: a malformed link from the Admin app (no scheme, no host, "null", spaces ...) is explained here
+        // instead of opening a player that can only fail
+        if (CigramPlaybackError.validateUrl(video) != CigramPlaybackError.UNKNOWN) {
+            Toast.makeText(activity, CigramPlaybackError.message(CigramPlaybackError.INVALID_URL), Toast.LENGTH_LONG).show();
+            android.util.Log.w("CigramDetails", "invalid video link refused: " + video);
+            return;
+        }
         try {
             boolean isEp = parentSeries != null;
             CigramAnalytics.track(activity, episodeTransition ? "episode_switch"

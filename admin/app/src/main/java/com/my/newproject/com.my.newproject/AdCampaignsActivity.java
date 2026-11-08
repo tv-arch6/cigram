@@ -73,7 +73,8 @@ public class AdCampaignsActivity extends CgBase {
                     final JSONObject o = a.optJSONObject(i);
                     LinearLayout c = CgUi.card(AdCampaignsActivity.this);
                     LinearLayout h = CgUi.hbox(AdCampaignsActivity.this);
-                    h.addView(CgUi.text(AdCampaignsActivity.this, o.optString("name"), 15, CgCfg.TEXT, true), new LinearLayout.LayoutParams(0, CgUi.WRAP, 1f));
+                    String cname = o.optString("name", "").trim();
+                    h.addView(CgUi.text(AdCampaignsActivity.this, cname.length() > 0 ? cname : "حملة بلا اسم — افتحها لتسميتها", 15, cname.length() > 0 ? CgCfg.TEXT : CgCfg.WARN, true), new LinearLayout.LayoutParams(0, CgUi.WRAP, 1f));
                     String st = o.optString("stage");
                     h.addView(CgUi.badge(AdCampaignsActivity.this, AdApi.stageLabel(st), AdApi.stageColor(st)));
                     c.addView(h);
