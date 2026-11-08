@@ -187,3 +187,23 @@ Screenshots (`docs/screenshots-18.2/`, 1080×2280): `01`–`14` as in the 18.2 r
 7. Decide whether the admin app should move from targetSdk 34 to 36 (the helper is ready).
 8. Sign the release builds with the production keystore.
 9. Optional hardening: Keystore-backed token storage; restrict the Firebase key.
+
+---
+
+## 7. Archives (verified)
+| File | Path | Size (bytes) | SHA-256 |
+|---|---|---|---|
+| HASAN-FINAL.ZIP | `deliverables/HASAN-FINAL.ZIP` | 10,735,088 | `d8ce5390fa04ee57eaa436dd03adf3ec8be5f701fdb4832c834bf7bf8d34347d` |
+| ADMIN-FINAL.ZIP | `deliverables/ADMIN-FINAL.ZIP` | 4,542,648 | `78ec270d9bb849cfdb4e5309406b26f16f20e5b1552f9a35a8ead9f13ab64b19` |
+| BACKEND-FINAL.ZIP | `deliverables/BACKEND-FINAL.ZIP` | 301,216 | `72ae0d098ba642872fbbe6f487e9e30508cdb40aa515deffe21f705ffdb05caa` |
+
+(This section exists only in the standalone copy of the report: it describes the archives, so it cannot be inside them.)
+Built from commit `5f1c95e` (tracked files only: no `build/`, no `local.properties`, no keystore, no private key; pattern scan clean).
+
+Verification done here:
+1. `unzip -t` on all three: no errors.
+2. Extracted into new empty directories (only `local.properties` with `sdk.dir` added).
+3. Main: `testPlayDebugUnitTest assemblePlayDebug assemblePlayRelease` → exit 0, APK sizes identical to the repository build
+   (20,958,554 / 17,757,821). Admin: `testDebugUnitTest assembleDebug assembleRelease` → exit 0 (8,134,032 / 6,589,096).
+4. Backend: `sha256sum -c deploy/SHA256SUMS` OK for both bundles; the shipped bundles pass the shipped tests (30 / 30 and 11 / 11).
+5. The uploaded `cigram.zip` / `admin.zip` were never modified; the repository's first commit holds them byte-for-byte.
