@@ -54,7 +54,7 @@ final class CigramTvPanels {
         g.tile(AdsIcons.SWITCH, "تبديل", CigramAccountDash.switchLabel(a), new Runnable() {
             @Override public void run() { CigramAccountDash.showSwitchDialog(a); }
         });
-        g.tile(AdsIcons.MEGAPHONE, "أريد إعلاناً", "اطلب حملة إعلانية", open(a, AdvertiseActivity.class));
+        g.tile(AdsIcons.CHAT, "أريد إعلاناً", "الدعم الخاص مع المطوّر", open(a, AdsChatActivity.class));
         g.tile(AdsIcons.HEADSET, "الدعم والتواصل", "راسل فريق Cigram", open(a, CommunicationActivity.class));
         g.tile(AdsIcons.USER, logged ? "إدارة الحساب" : "تسجيل الدخول",
                 logged ? "الاسم والصورة والبريد" : "أو إنشاء حساب جديد", open(a, AccountActivity.class));

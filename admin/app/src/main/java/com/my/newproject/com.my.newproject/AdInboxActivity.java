@@ -11,7 +11,11 @@ import org.json.JSONObject;
 
 import java.util.Date;
 
-/** صندوق محادثات المعلنين: فرز غير المقروء أولاً، فلاتر حالة، بحث، وتحديث لحظي عبر WebSocket + استطلاع احتياطي. */
+/**
+ * 18.2: Cigram Developer Inbox (صندوق المطوّر) — every private conversation of the app's «أريد إعلاناً» / Private Support
+ * entry (and the advertisers' threads, same server). Unread first, state filters, search by name / e-mail / tag / INTERNAL ID
+ * (the ids are only shown here, behind the admin token), online state, archive; WebSocket + polling.
+ */
 public class AdInboxActivity extends CgBase {
 
     private String filter = "all";
@@ -30,11 +34,11 @@ public class AdInboxActivity extends CgBase {
         }
     };
 
-    @Override protected String screenTitle() { return "صندوق المعلنين"; }
+    @Override protected String screenTitle() { return "صندوق المطوّر"; }
 
     @Override protected void onBuild() {
         bar.action("تحديث", new Runnable() { @Override public void run() { load(true); } });
-        final EditText search = CgUi.field(this, "بحث بالاسم أو البريد أو الوسم...", false);
+        final EditText search = CgUi.field(this, "بحث بالاسم أو البريد أو الوسم أو المعرّف الداخلي...", false);
         search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
         search.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override public boolean onEditorAction(TextView v, int a, android.view.KeyEvent e) { query = v.getText().toString().trim(); load(true); return true; }
@@ -99,7 +103,9 @@ public class AdInboxActivity extends CgBase {
         if ("unread".equals(filter)) qs += "&unread=1";
         else if ("archived".equals(filter)) qs += "&archived=1";
         else if (!"all".equals(filter)) qs += "&status=" + filter;
-        if (query.length() > 0) qs += "&q=" + AdApi.enc(query);
+        // 18.2: the server searches names / e-mails / tags; ids are matched here (the list carries them)
+        final boolean idQuery = query.matches("(?i)^(u_|usr_|id:)?[a-z0-9_-]{6,}$") && !query.contains("@");
+        if (query.length() > 0 && !idQuery) qs += "&q=" + AdApi.enc(query);
         AdApi.get(this, qs, new AdApi.Cb() {
             @Override public void on(AdApi.Result r) {
                 if (!alive() || my != reqId) return;
@@ -116,7 +122,18 @@ public class AdInboxActivity extends CgBase {
                 String live = ws != null && ws.isOpen() ? "مباشر" : "تحديث دوري";
                 bar.subtitle((unread > 0 ? unread + " رسالة غير مقروءة • " : "") + live);
                 JSONArray a = r.json.optJSONArray("threads");
-                if (a == null || a.length() == 0) { listBox.addView(CgUi.empty(AdInboxActivity.this, "لا توجد محادثات", "ستظهر هنا رسائل المعلنين فور وصولها.")); return; }
+                if (idQuery && a != null) {
+                    JSONArray f = new JSONArray();
+                    String q = query.toLowerCase(java.util.Locale.ROOT).replace("id:", "");
+                    for (int i = 0; i < a.length(); i++) {
+                        JSONObject t = a.optJSONObject(i);
+                        if (t == null) continue;
+                        String hay = (t.optString("id") + " " + t.optString("user_id") + " " + t.optString("name") + " " + t.optString("email")).toLowerCase(java.util.Locale.ROOT);
+                        if (hay.contains(q)) f.put(t);
+                    }
+                    a = f;
+                }
+                if (a == null || a.length() == 0) { listBox.addView(CgUi.empty(AdInboxActivity.this, "لا توجد محادثات", "ستظهر هنا رسائل المستخدمين فور وصولها.")); return; }
                 for (int i = 0; i < a.length(); i++) listBox.addView(card(a.optJSONObject(i)), CgUi.lp(AdInboxActivity.this, CgUi.MATCH, CgUi.WRAP, 0, 0, 0, 8));
             }
         });
@@ -126,7 +143,7 @@ public class AdInboxActivity extends CgBase {
         LinearLayout c = CgUi.card(this);
         c.setClickable(true);
         LinearLayout head = CgUi.hbox(this);
-        TextView name = CgUi.text(this, t.optString("name", "معلن"), 15.5f, CgCfg.TEXT, true);
+        TextView name = CgUi.text(this, t.optString("name", "مستخدم"), 15.5f, CgCfg.TEXT, true);
         head.addView(name, new LinearLayout.LayoutParams(0, CgUi.WRAP, 1f));
         if (t.optBoolean("online")) head.addView(CgUi.badge(this, "متصل", CgCfg.GOOD), CgUi.lp(this, CgUi.WRAP, CgUi.WRAP, 4, 0, 0, 0));
         // 2026: a conversation about advertising is marked at a glance (order card / «أريد إعلاناً» in the app)
@@ -134,6 +151,14 @@ public class AdInboxActivity extends CgBase {
         int un = t.optInt("unread_admin");
         if (un > 0) head.addView(CgUi.badge(this, String.valueOf(un), CgCfg.ACCENT), CgUi.lp(this, CgUi.WRAP, CgUi.WRAP, 4, 0, 0, 0));
         c.addView(head);
+        // 18.2: internal ids (admin only) — the thread key and, when the server sends it, the account id
+        String ids = "ID " + t.optString("id") + (t.optString("user_id").length() > 0 ? " · " + t.optString("user_id") : "");
+        TextView idv = CgUi.text(this, ids, 11.5f, CgCfg.FAINT, false);
+        CgUi.ltr(idv);
+        c.addView(idv);
+        if (!t.optBoolean("online") && t.optLong("user_seen") > 0) {
+            c.addView(CgUi.text(this, "آخر ظهور " + new java.text.SimpleDateFormat("d/M HH:mm", java.util.Locale.US).format(new java.util.Date(t.optLong("user_seen"))), 11.5f, CgCfg.MUTED, false));
+        }
         String prev = t.optString("preview");
         TextView p = CgUi.text(this, ("user".equals(t.optString("last_from")) ? "" : "أنت: ") + prev, 13.5f, un > 0 ? CgCfg.TEXT : CgCfg.MUTED, un > 0);
         p.setMaxLines(2);

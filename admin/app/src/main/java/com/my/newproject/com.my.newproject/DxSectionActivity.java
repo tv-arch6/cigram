@@ -162,8 +162,9 @@ public class DxSectionActivity extends CgBase {
             box.addView(DxUi.item(this, CgIcons.SEND, "إرسال إشعار", "إشعار فوري لكل المستخدمين", "", NxUi.ORANGE, go(NxNotifyActivity.class)));
             box.addView(DxUi.item(this, CgIcons.HISTORY, "الرسائل العامة", "رسائل تظهر داخل التطبيق بجدولة", "", NxUi.BLUE, go(CgAnnouncementsActivity.class)));
             box.addView(DxUi.item(this, CgIcons.CHAT, "طلبات المستخدمين", "أفلام ومسلسلات وقنوات طلبها المشاهدون", "", NxUi.PINK, go(NxRequestsActivity.class)));
+            box.addView(DxUi.item(this, CgIcons.CHAT, "صندوق المطوّر", "Cigram Developer Inbox — محادثات الدعم الخاص", "", NxUi.VIOLET, go(AdInboxActivity.class)));
         } else if ("ads".equals(key)) {
-            box.addView(DxUi.item(this, CgIcons.CHAT, "صندوق المعلنين", "رسائل الشركات ومحادثاتها", "", NxUi.PINK, go(AdInboxActivity.class)));
+            box.addView(DxUi.item(this, CgIcons.CHAT, "صندوق المطوّر", "الدعم الخاص ورسائل المستخدمين والمعلنين", "", NxUi.PINK, go(AdInboxActivity.class)));
             box.addView(DxUi.item(this, CgIcons.MEGAPHONE, "الحملات", "إنشاء ومراجعة وموافقة وتقارير", "", NxUi.ORANGE, go(AdCampaignsActivity.class)));
             box.addView(DxUi.item(this, CgIcons.USERS, "المعلنون", "ملفات الشركات وسجل حملاتها", "", NxUi.BLUE, go(AdAdvertisersActivity.class)));
             box.addView(DxUi.item(this, CgIcons.GEAR, "الأسعار والإعدادات", "المساحات والأسعار والسياسات", "", CgCfg.GRAY, go(AdSettingsActivity.class)));

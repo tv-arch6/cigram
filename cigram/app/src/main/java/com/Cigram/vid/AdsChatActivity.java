@@ -44,6 +44,10 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
+ * 18.2: Cigram Private Support (الدعم الخاص) — the private conversation between the viewer and the Cigram developer
+ * (entry «أريد إعلاناً»). Same server thread, same reliability layer as before; new premium black design, developer
+ * identity, emoji panel, voice preview, 24-hour times, offline retry with backoff. See {@link CigramSupport}.
+ *
  * شاشة محادثة المعلن مع إدارة Cigram: نص، صور، فيديو، ملفات، رسائل صوتية، عروض أسعار، طلبات إعلان،
  * حضور وكتابة لحظية (WebSocket) مع بديل استطلاع، رسائل معلّقة تُعاد تلقائياً، ونسخة محلية مشفّرة.
  * Intent extras: order_json (اختياري) — يُرسل كبطاقة طلب مرة واحدة.
@@ -59,6 +63,8 @@ public class AdsChatActivity extends Activity {
         long ts, delivered, read;
         boolean deleted;
         JSONObject media, quote, order, reply;
+        /** 18.2: the sender's PUBLIC developer identity (name / picture) on developer messages, when the server sends it. */
+        JSONObject dev;
         int state; // 0 على الخادم، 1 قيد الإرسال، 2 فشل
         int progress = -1;
         String localPath;
@@ -84,6 +90,7 @@ public class AdsChatActivity extends Activity {
             m.quote = o.optJSONObject("quote");
             m.order = o.optJSONObject("order");
             m.reply = o.optJSONObject("reply");
+            m.dev = o.optJSONObject("dev");
             return m;
         }
     }
@@ -112,6 +119,18 @@ public class AdsChatActivity extends Activity {
     private EditText input;
     private LinearLayout composer;
     private int maxBubble;
+    // 18.2 support UI
+    private TextView devName;
+    private AdsViews.Round devAvatar;
+    private LinearLayout emojiPanel;
+    private LinearLayout voicePreview;
+    private TextView voicePreviewTime;
+    private AdsIcons.Icon voicePreviewIcon;
+    private AdsVoice.Recorder.Result pendingVoice;
+    private int retryDelayMs = 2000;
+    private final Runnable retryRun = new Runnable() {
+        @Override public void run() { if (!destroyed) flushPending(); }
+    };
 
     private final Runnable pollRun = new Runnable() {
         @Override public void run() {
@@ -127,8 +146,8 @@ public class AdsChatActivity extends Activity {
         super.onCreate(b);
         try {
             getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-            getWindow().setStatusBarColor(CigramGlass.bg(this));
-            getWindow().setNavigationBarColor(CigramGlass.bg(this));
+            getWindow().setStatusBarColor(CigramSupport.BG);
+            getWindow().setNavigationBarColor(CigramSupport.BAR);
         } catch (Throwable ignored) { }
         if (!CigramAds.isLoggedIn(this)) {
             AdsUi.toast(this, "سجّل الدخول أولاً.");
@@ -182,6 +201,7 @@ public class AdsChatActivity extends Activity {
 
     @Override protected void onDestroy() {
         destroyed = true;
+        if (pendingVoice != null && pendingVoice.file != null) pendingVoice.file.delete();
         AdsVoice.setListener(null);
         h.removeCallbacksAndMessages(null);
         super.onDestroy();
@@ -192,35 +212,66 @@ public class AdsChatActivity extends Activity {
     private void build() {
         FrameLayout shell = new FrameLayout(this);
         shell.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        shell.setBackgroundColor(CigramGlass.bg(this));
+        shell.setBackgroundColor(CigramSupport.BG);
         LinearLayout col = AdsUi.vbox(this);
         shell.addView(col, new FrameLayout.LayoutParams(-1, -1));
 
+        // 18.2 header (physical order, the app has no RTL layout support): [⋯] [name / status ...] [picture] [back]
+        CigramSupport.Developer dev = CigramSupport.developer(this);
         LinearLayout top = AdsUi.hbox(this);
-        top.setPadding(AdsUi.dp(this, 8), AdsUi.dp(this, 6), AdsUi.dp(this, 12), AdsUi.dp(this, 6));
-        top.setBackgroundColor(CigramGlass.card(this));
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        top.setPadding(AdsUi.dp(this, 4), AdsUi.dp(this, 6), AdsUi.dp(this, 4), AdsUi.dp(this, 6));
+        top.setBackgroundColor(CigramSupport.BAR);
+        top.addView(iconBtn(AdsIcons.MORE, "خيارات", new View.OnClickListener() {
+            @Override public void onClick(View v) { showMenu(); }
+        }), new LinearLayout.LayoutParams(AdsUi.dp(this, 48), AdsUi.dp(this, 48)));
+        LinearLayout titles = AdsUi.vbox(this);
+        titles.setGravity(Gravity.RIGHT);
+        devName = AdsUi.text(this, dev.name, 17f, CigramSupport.TEXT, true);
+        devName.setGravity(Gravity.RIGHT);
+        titles.addView(devName, new LinearLayout.LayoutParams(-1, -2));
+        subtitle = AdsUi.text(this, "", 12f, CigramSupport.MUTED, false);
+        subtitle.setGravity(Gravity.RIGHT);
+        subtitle.setVisibility(View.GONE);
+        titles.addView(subtitle, AdsUi.lp(-1, -2, 0, AdsUi.dp(this, 1), 0, 0));
+        TextView brand = AdsUi.text(this, CigramSupport.TITLE + " · " + CigramSupport.SUBTITLE_EN, 10.5f, CigramSupport.FAINT, false);
+        brand.setGravity(Gravity.RIGHT);
+        titles.addView(brand, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(0, -2);
+        tl.weight = 1f;
+        tl.setMargins(AdsUi.dp(this, 4), 0, AdsUi.dp(this, 10), 0);
+        top.addView(titles, tl);
+        devAvatar = new AdsViews.Round(this, AdsUi.dp(this, 21));
+        devAvatar.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+        devAvatar.setContentDescription("صورة المطوّر");
+        setDevAvatar(dev);
+        top.addView(devAvatar, new LinearLayout.LayoutParams(AdsUi.dp(this, 42), AdsUi.dp(this, 42)));
         top.addView(iconBtn(AdsIcons.BACK, "رجوع", new View.OnClickListener() {
             @Override public void onClick(View v) { finish(); }
         }), new LinearLayout.LayoutParams(AdsUi.dp(this, 48), AdsUi.dp(this, 48)));
-        LinearLayout titles = AdsUi.vbox(this);
-        titles.addView(AdsUi.text(this, "إدارة Cigram", 18f, CigramGlass.text(this), true));
-        subtitle = AdsUi.text(this, "", 12f, CigramGlass.muted(this), false);
-        subtitle.setVisibility(View.GONE);
-        titles.addView(subtitle, AdsUi.lp(-2, -2, 0, AdsUi.dp(this, 2), 0, 0));
-        LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(0, -2);
-        tl.weight = 1f;
-        tl.setMargins(AdsUi.dp(this, 4), 0, 0, 0);
-        top.addView(titles, tl);
         col.addView(top, new LinearLayout.LayoutParams(-1, -2));
+        View topLine = new View(this);
+        topLine.setBackgroundColor(CigramSupport.HAIRLINE);
+        col.addView(topLine, new LinearLayout.LayoutParams(-1, Math.max(1, AdsUi.dp(this, 0.5f))));
 
-        banner = AdsUi.text(this, "", 13f, 0xFF1B1B1B, true);
+        banner = AdsUi.text(this, "", 13f, CigramSupport.TEXT, true);
         banner.setGravity(Gravity.CENTER);
-        banner.setBackgroundColor(CigramUI.AMBER);
+        banner.setBackgroundColor(0xFF161618);
         banner.setPadding(AdsUi.dp(this, 12), AdsUi.dp(this, 6), AdsUi.dp(this, 12), AdsUi.dp(this, 6));
         banner.setVisibility(View.GONE);
         col.addView(banner, new LinearLayout.LayoutParams(-1, -2));
 
         FrameLayout mid = new FrameLayout(this);
+        // 18.2: the developer logo as a faint watermark behind the conversation
+        android.widget.ImageView mark = new android.widget.ImageView(this);
+        int markRes = getResources().getIdentifier("cigram_mark", "drawable", getPackageName());
+        if (markRes == 0) markRes = getResources().getIdentifier("cigram_logo", "drawable", getPackageName());
+        if (markRes != 0) mark.setImageResource(markRes);
+        mark.setAlpha(0.05f);
+        mark.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        mark.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        int markSize = (int) (getResources().getDisplayMetrics().widthPixels * 0.55f);
+        mid.addView(mark, new FrameLayout.LayoutParams(markSize, markSize, Gravity.CENTER));
         list = new ListView(this);
         list.setDivider(null);
         list.setDividerHeight(0);
@@ -243,7 +294,7 @@ public class AdsChatActivity extends Activity {
         mid.addView(list, new FrameLayout.LayoutParams(-1, -1));
         fab = AdsUi.text(this, "↓", 18f, 0xFFFFFFFF, true);
         fab.setGravity(Gravity.CENTER);
-        fab.setBackground(CigramUI.round(CigramUI.TEAL, 24, this));
+        fab.setBackground(CigramUI.round(CigramSupport.MINE, 24, this));
         fab.setContentDescription("الانتقال لآخر الرسائل");
         fab.setMinWidth(AdsUi.dp(this, 48));
         fab.setMinHeight(AdsUi.dp(this, 48));
@@ -261,8 +312,9 @@ public class AdsChatActivity extends Activity {
         // شريط الرد
         replyBar = AdsUi.hbox(this);
         ((LinearLayout) replyBar).setPadding(AdsUi.dp(this, 14), AdsUi.dp(this, 6), AdsUi.dp(this, 6), AdsUi.dp(this, 6));
-        replyBar.setBackgroundColor(CigramGlass.soft(this));
-        replyText = AdsUi.text(this, "", 13f, CigramGlass.muted(this), false);
+        replyBar.setBackgroundColor(0xFF0D0D0F);
+        replyText = AdsUi.text(this, "", 13f, CigramSupport.MUTED, false);
+        replyText.setGravity(Gravity.RIGHT);
         replyText.setMaxLines(1);
         LinearLayout.LayoutParams rtl = new LinearLayout.LayoutParams(0, -2);
         rtl.weight = 1f;
@@ -276,8 +328,11 @@ public class AdsChatActivity extends Activity {
         // الكتابة
         composer = AdsUi.hbox(this);
         composer.setPadding(AdsUi.dp(this, 6), AdsUi.dp(this, 6), AdsUi.dp(this, 6), AdsUi.dp(this, 8));
-        composer.setBackgroundColor(CigramGlass.card(this));
+        composer.setBackgroundColor(CigramSupport.BAR);
         composer.setGravity(Gravity.BOTTOM);
+        final View emojiBtn = iconBtn(AdsIcons.SMILE, "الرموز التعبيرية", new View.OnClickListener() {
+            @Override public void onClick(View v) { toggleEmoji(); }
+        });
         // 2026 RTL composer, physical order left → right: [send / mic][video][photo][message ...]
         // (the app has no RTL support switched on, so the order is built by hand). Photo and video open the system
         // photo picker directly; a long press on the photo button opens the full sheet (camera, documents).
@@ -295,29 +350,37 @@ public class AdsChatActivity extends Activity {
         input = new EditText(this);
         CigramUI.styleInput(input, "\u200Fاكتب رسالتك هنا");
         input.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        input.setTextColor(CigramSupport.TEXT);
+        input.setHintTextColor(CigramSupport.FAINT);
+        input.setBackground(CigramUI.round(0xFF141416, 24, this));
+        input.setPadding(AdsUi.dp(this, 16), AdsUi.dp(this, 10), AdsUi.dp(this, 16), AdsUi.dp(this, 10));
+        input.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { if (emojiPanel != null) emojiPanel.setVisibility(View.GONE); }
+        });
         input.setMaxLines(5);
         input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         input.setMinHeight(AdsUi.dp(this, 48));
         inputBox.addView(input, new FrameLayout.LayoutParams(-1, -2));
         recBar = AdsUi.hbox(this);
-        recBar.setBackground(CigramUI.round(CigramGlass.soft(this), 24, this));
+        recBar.setBackground(CigramUI.round(0xFF141416, 24, this));
         ((LinearLayout) recBar).setPadding(AdsUi.dp(this, 16), 0, AdsUi.dp(this, 16), 0);
         TextView dot = AdsUi.text(this, "●", 16f, CigramUI.DANGER, true);
         ((LinearLayout) recBar).addView(dot);
-        timerText = AdsUi.text(this, "0:00", 16f, CigramGlass.text(this), true);
+        timerText = AdsUi.text(this, "0:00", 16f, CigramSupport.TEXT, true);
         ((LinearLayout) recBar).addView(timerText, AdsUi.lp(-2, -2, AdsUi.dp(this, 8), 0, AdsUi.dp(this, 12), 0));
-        ((LinearLayout) recBar).addView(AdsUi.text(this, "اسحب للإلغاء", 13f, CigramGlass.muted(this), false));
+        ((LinearLayout) recBar).addView(AdsUi.text(this, "اسحب للإلغاء", 13f, CigramSupport.MUTED, false));
         recBar.setVisibility(View.GONE);
         inputBox.addView(recBar, new FrameLayout.LayoutParams(-1, AdsUi.dp(this, 48)));
+        inputBox.addView(buildVoicePreview(), new FrameLayout.LayoutParams(-1, AdsUi.dp(this, 48)));
         final LinearLayout.LayoutParams il = new LinearLayout.LayoutParams(0, -2);
         il.weight = 1f;
         il.setMargins(AdsUi.dp(this, 4), 0, AdsUi.dp(this, 4), 0);
 
         // زر إرسال/مايك
         FrameLayout act = new FrameLayout(this);
-        act.setBackground(CigramUI.round(CigramUI.TEAL, 24, this));
-        sendBtn = new AdsIcons.Icon(this, AdsIcons.SEND, 0xFFFFFFFF);
-        micBtn = new AdsIcons.Icon(this, AdsIcons.MIC, 0xFFFFFFFF);
+        act.setBackground(CigramUI.round(0xFFFFFFFF, 24, this));
+        sendBtn = new AdsIcons.Icon(this, AdsIcons.SEND, 0xFF000000);
+        micBtn = new AdsIcons.Icon(this, AdsIcons.MIC, 0xFF000000);
         act.addView(sendBtn, new FrameLayout.LayoutParams(AdsUi.dp(this, 24), AdsUi.dp(this, 24), Gravity.CENTER));
         act.addView(micBtn, new FrameLayout.LayoutParams(AdsUi.dp(this, 24), AdsUi.dp(this, 24), Gravity.CENTER));
         act.setContentDescription("إرسال أو تسجيل رسالة صوتية");
@@ -325,11 +388,18 @@ public class AdsChatActivity extends Activity {
         composer.addView(act, new LinearLayout.LayoutParams(AdsUi.dp(this, 48), AdsUi.dp(this, 48)));
         composer.addView(videoBtn, new LinearLayout.LayoutParams(AdsUi.dp(this, 42), AdsUi.dp(this, 48)));
         composer.addView(attachBtn, new LinearLayout.LayoutParams(AdsUi.dp(this, 42), AdsUi.dp(this, 48)));
+        composer.addView(emojiBtn, new LinearLayout.LayoutParams(AdsUi.dp(this, 42), AdsUi.dp(this, 48)));
         composer.addView(inputBox, il);
         act.setOnTouchListener(new View.OnTouchListener() {
             @Override public boolean onTouch(View v, MotionEvent e) { return onActionTouch(e); }
         });
+        View compLine = new View(this);
+        compLine.setBackgroundColor(CigramSupport.HAIRLINE);
+        col.addView(compLine, new LinearLayout.LayoutParams(-1, Math.max(1, AdsUi.dp(this, 0.5f))));
         col.addView(composer, new LinearLayout.LayoutParams(-1, -2));
+        emojiPanel = buildEmojiPanel();
+        emojiPanel.setVisibility(View.GONE);
+        col.addView(emojiPanel, new LinearLayout.LayoutParams(-1, AdsUi.dp(this, 252)));
 
         input.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
@@ -350,7 +420,7 @@ public class AdsChatActivity extends Activity {
         f.setFocusable(true);
         f.setContentDescription(desc);
         f.setBackground(CigramGlass.ripple(this, new GradientDrawable(), 24));
-        f.addView(new AdsIcons.Icon(this, icon, CigramGlass.text(this)), new FrameLayout.LayoutParams(AdsUi.dp(this, 24), AdsUi.dp(this, 24), Gravity.CENTER));
+        f.addView(new AdsIcons.Icon(this, icon, CigramSupport.TEXT), new FrameLayout.LayoutParams(AdsUi.dp(this, 24), AdsUi.dp(this, 24), Gravity.CENTER));
         f.setOnClickListener(click);
         return f;
     }
@@ -364,11 +434,13 @@ public class AdsChatActivity extends Activity {
     private void updateSubtitle() {
         if (destroyed) return;
         String s;
-        int color = CigramGlass.muted(this);
+        int color = CigramSupport.MUTED;
+        CigramSupport.Developer dev = CigramSupport.developer(this);
+        if (devName != null) devName.setText(dev.name);
         if (banned) { s = "المحادثة مقيّدة"; }
-        else if (adminTyping) { s = "الإدارة تكتب..."; color = CigramUI.TEAL; }
-        else if (adminOnline) { s = "● متصل الآن"; color = CigramUI.GREEN; }
-        else { s = presenceText; }
+        else if (adminTyping) { s = "يكتب الآن…"; color = CigramSupport.TEXT; }
+        else if (adminOnline) { s = "● متصل الآن"; color = CigramSupport.ONLINE; }
+        else { s = presenceText.length() > 0 ? presenceText : CigramSupport.lastSeen(dev.lastActive); }
         subtitle.setText(s == null ? "" : s);
         subtitle.setTextColor(color);
         subtitle.setVisibility(s == null || s.length() == 0 ? View.GONE : View.VISIBLE);
@@ -386,7 +458,11 @@ public class AdsChatActivity extends Activity {
                 if (destroyed || !r.ok) return;
                 String st = r.json.optString("state");
                 adminOnline = "online".equals(st);
-                presenceText = "off_hours".equals(st) ? "خارج ساعات العمل — سنرد عند عودتنا" : "offline".equals(st) ? "غير متصل — اترك رسالتك" : "";
+                JSONObject dv = r.json.optJSONObject("developer");
+                if (dv != null) { CigramSupport.learn(AdsChatActivity.this, dv); setDevAvatar(CigramSupport.developer(AdsChatActivity.this)); }
+                long la = r.json.optLong("last_active", dv == null ? 0 : dv.optLong("last_active"));
+                String seen = CigramSupport.lastSeen(la);
+                presenceText = "off_hours".equals(st) ? "خارج ساعات العمل — سنرد عند عودتنا" : "offline".equals(st) ? (seen.length() > 0 ? seen : "غير متصل — اترك رسالتك") : "";
                 updateSubtitle();
             }
         });
@@ -451,8 +527,8 @@ public class AdsChatActivity extends Activity {
                 if (destroyed) return;
                 if (!r.ok) {
                     if ("consent_required".equals(r.error)) {
-                        AdsUi.toast(AdsChatActivity.this, "يلزم الموافقة على السياسات من صفحة «أعلن هنا».");
-                        finish();
+                        askConsent(null);
+                        loaded = true;
                         return;
                     }
                     setBanner(r.offline ? "لا يوجد اتصال — يعرض آخر محادثة محفوظة" : r.message);
@@ -548,6 +624,7 @@ public class AdsChatActivity extends Activity {
             items.add(pos, n);
             if (firstShown > 0 && n.seq < firstShown) addedBefore++;
             if ("admin".equals(n.from) && n.seq > lastSeq) incoming = true;
+            if ("admin".equals(n.from) && n.dev != null) CigramSupport.learn(this, n.dev);
             lastSeq = Math.max(lastSeq, n.seq);
         }
         adapter.notifyDataSetChanged();
@@ -697,13 +774,22 @@ public class AdsChatActivity extends Activity {
                         JSONObject auto = r.json.optJSONObject("auto");
                         if (auto != null) a.put(auto);
                         if (m.localPath != null) new File(m.localPath).delete();
+                        retryDelayMs = 2000;
                         applyServer(a, false);
                         scrollToEnd();
                     } else {
                         m.state = 2;
                         m.failMsg = r.message;
+                        // 18.2: no connection / busy server → stays queued (never shown as sent) and is retried with backoff
+                        boolean transientFail = r.offline || r.code == 0 || r.code == 408 || r.code == 429 || r.code >= 500;
+                        if (transientFail && !"banned".equals(r.error)) {
+                            m.failMsg = "";
+                            h.removeCallbacks(retryRun);
+                            h.postDelayed(retryRun, retryDelayMs);
+                            retryDelayMs = Math.min(60000, retryDelayMs * 2);
+                        }
                         if ("banned".equals(r.error)) { banned = true; updateSubtitle(); }
-                        if ("consent_required".equals(r.error)) AdsUi.toast(AdsChatActivity.this, "يلزم الموافقة على السياسات الحالية من صفحة «أعلن هنا».");
+                        if ("consent_required".equals(r.error)) { m.failMsg = ""; askConsent(m); }
                         if (r.error != null && ("banned".equals(r.error) || "empty_message".equals(r.error) || "media_not_ready".equals(r.error))) m.localPath = m.localPath;
                         adapter.notifyDataSetChanged();
                         persist();
@@ -901,9 +987,7 @@ public class AdsChatActivity extends Activity {
             input.setVisibility(View.VISIBLE);
             timerText.setTextColor(CigramGlass.text(this));
             if (r != null) {
-                AdsMedia.Prepared p = new AdsMedia.Prepared();
-                p.file = r.file; p.kind = "voice"; p.name = "voice.m4a"; p.size = r.file.length();
-                startUpload(p, "voice", r.durMs, r.wave);
+                showVoicePreview(r);   // 18.2: listen, delete or send — nothing leaves the phone before «إرسال»
             } else if (!cancel && dur < 1000) {
                 AdsUi.toast(this, "اضغط مطولاً للتسجيل");
             }
@@ -1063,7 +1147,8 @@ public class AdsChatActivity extends Activity {
         fab.setText(newBelow > 0 ? "↓ " + newBelow : "↓");
     }
 
-    private final SimpleDateFormat timeFmt = new SimpleDateFormat("hh:mm a", new Locale("ar"));
+    /** 18.2: 24-hour clock in the device's time zone ("19:45"); the server keeps UTC epoch milliseconds. */
+    private final SimpleDateFormat timeFmt = new SimpleDateFormat("HH:mm", Locale.US);
     private final SimpleDateFormat dayFmt = new SimpleDateFormat("d MMMM yyyy", new Locale("ar"));
 
     private String dayLabel(long ts) {
@@ -1084,6 +1169,212 @@ public class AdsChatActivity extends Activity {
         return x.get(Calendar.YEAR) == y.get(Calendar.YEAR) && x.get(Calendar.DAY_OF_YEAR) == y.get(Calendar.DAY_OF_YEAR);
     }
 
+    // ------------------------------------------------------------------ 18.2 Private Support helpers
+
+    private void setDevAvatar(CigramSupport.Developer d) {
+        if (devAvatar == null) return;
+        int res = getResources().getIdentifier("cigram_logo", "drawable", getPackageName());
+        if (res != 0) devAvatar.setImageResource(res);
+        if (d.avatar.length() > 0) AdsMedia.loadInto(this, devAvatar, d.avatar, 128, false);
+    }
+
+    private void showMenu() {
+        final CharSequence[] items = {"حملاتي الإعلانية", "إعدادات الإشعارات"};
+        new android.app.AlertDialog.Builder(this).setItems(items, new android.content.DialogInterface.OnClickListener() {
+            @Override public void onClick(android.content.DialogInterface d, int w) {
+                try {
+                    if (w == 0) startActivity(new Intent(AdsChatActivity.this, MyAdsActivity.class));
+                    else {
+                        Intent i = new Intent("android.settings.APP_NOTIFICATION_SETTINGS");
+                        i.putExtra("android.provider.extra.APP_PACKAGE", getPackageName());
+                        startActivity(i);
+                    }
+                } catch (Throwable ignored) { }
+            }
+        }).show();
+    }
+
+    /**
+     * The current server still asks for the policy consent before the first message. The viewer sees the policies the
+     * server publishes and agrees explicitly — nothing is accepted on their behalf. A message waiting for it is sent after.
+     */
+    private boolean consentAsked;
+
+    private void askConsent(final Msg waiting) {
+        if (consentAsked || destroyed) return;
+        consentAsked = true;
+        CigramAds.loadConfig(this, false, new CigramAds.Callback() {
+            @Override public void onResult(CigramAds.Result r) {
+                if (destroyed) return;
+                JSONObject cfg = r.json == null ? null : r.json.optJSONObject("settings");
+                final int version = cfg == null ? 1 : Math.max(1, cfg.optInt("policies_version", 1));
+                StringBuilder txt = new StringBuilder("قبل أول رسالة يطلب الخادم الموافقة على سياسة التواصل (النسخة " + version + "):\n\n");
+                org.json.JSONArray pol = cfg == null ? null : cfg.optJSONArray("policies");
+                for (int i = 0; pol != null && i < pol.length(); i++) {
+                    JSONObject p = pol.optJSONObject(i);
+                    String line = p != null ? (p.optString("title") + (p.optString("body").length() > 0 ? ": " + p.optString("body") : "")) : pol.optString(i);
+                    if (line.trim().length() > 0) txt.append("• ").append(line.trim()).append("\n");
+                }
+                if (pol == null || pol.length() == 0) txt.append("• تُستخدم المحادثة للتواصل الخاص بينك وبين مطوّر Cigram فقط.\n");
+                new android.app.AlertDialog.Builder(AdsChatActivity.this).setTitle("سياسة التواصل").setMessage(txt.toString())
+                        .setNegativeButton("ليس الآن", new android.content.DialogInterface.OnClickListener() {
+                            @Override public void onClick(android.content.DialogInterface d, int w) { consentAsked = false; }
+                        })
+                        .setPositiveButton("أوافق", new android.content.DialogInterface.OnClickListener() {
+                            @Override public void onClick(android.content.DialogInterface d, int w) {
+                                CigramAds.saveLocalConsent(AdsChatActivity.this, version);
+                                CigramAds.pushConsent(AdsChatActivity.this, version, new CigramAds.Callback() {
+                                    @Override public void onResult(CigramAds.Result r2) {
+                                        consentAsked = false;
+                                        if (destroyed) return;
+                                        if (!r2.ok) { AdsUi.toast(AdsChatActivity.this, r2.message); return; }
+                                        if (waiting != null) dispatch(waiting); else flushPending();
+                                        bootstrapAgainIfNeeded();
+                                    }
+                                });
+                            }
+                        }).show();
+            }
+        });
+    }
+
+    private void bootstrapAgainIfNeeded() {
+        if (lastSeq == 0) bootstrap();
+    }
+
+    private void toggleEmoji() {
+        if (emojiPanel == null || banned) return;
+        boolean show = emojiPanel.getVisibility() != View.VISIBLE;
+        emojiPanel.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (show) {
+            try {
+                android.view.inputmethod.InputMethodManager im = (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                if (im != null) im.hideSoftInputFromWindow(input.getWindowToken(), 0);
+            } catch (Throwable ignored) { }
+        }
+    }
+
+    private LinearLayout buildEmojiPanel() {
+        final LinearLayout panel = AdsUi.vbox(this);
+        panel.setBackgroundColor(0xFF0A0A0B);
+        final LinearLayout tabs = AdsUi.hbox(this);
+        tabs.setGravity(Gravity.CENTER);
+        final android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        final LinearLayout grid = AdsUi.vbox(this);
+        grid.setPadding(AdsUi.dp(this, 6), AdsUi.dp(this, 4), AdsUi.dp(this, 6), AdsUi.dp(this, 4));
+        sv.addView(grid);
+        final TextView[] tabViews = new TextView[CigramSupport.EMOJI_TABS.length];
+        for (int t = 0; t < CigramSupport.EMOJI_TABS.length; t++) {
+            final int tab = t;
+            TextView tv = AdsUi.text(this, CigramSupport.EMOJI_TABS[t], 20f, CigramSupport.TEXT, false);
+            tv.setGravity(Gravity.CENTER);
+            tv.setContentDescription("مجموعة رموز " + (t + 1));
+            tv.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { fillEmoji(grid, tab); for (int k = 0; k < tabViews.length; k++) tabViews[k].setAlpha(k == tab ? 1f : 0.45f); }
+            });
+            tabViews[t] = tv;
+            tabs.addView(tv, new LinearLayout.LayoutParams(0, AdsUi.dp(this, 44), 1f));
+        }
+        panel.addView(tabs, new LinearLayout.LayoutParams(-1, AdsUi.dp(this, 44)));
+        View line = new View(this);
+        line.setBackgroundColor(CigramSupport.HAIRLINE);
+        panel.addView(line, new LinearLayout.LayoutParams(-1, 1));
+        panel.addView(sv, new LinearLayout.LayoutParams(-1, 0, 1f));
+        fillEmoji(grid, 0);
+        for (int k = 0; k < tabViews.length; k++) tabViews[k].setAlpha(k == 0 ? 1f : 0.45f);
+        return panel;
+    }
+
+    private void fillEmoji(LinearLayout grid, int tab) {
+        grid.removeAllViews();
+        String[] all = CigramSupport.EMOJI[tab];
+        int cols = 8;
+        LinearLayout row = null;
+        for (int i = 0; i < all.length; i++) {
+            if (i % cols == 0) { row = AdsUi.hbox(this); grid.addView(row, new LinearLayout.LayoutParams(-1, AdsUi.dp(this, 46))); }
+            final String e = all[i];
+            TextView tv = AdsUi.text(this, e, 24f, CigramSupport.TEXT, false);
+            tv.setGravity(Gravity.CENTER);
+            tv.setContentDescription(e);
+            tv.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    int a = Math.max(0, input.getSelectionStart()), b = Math.max(0, input.getSelectionEnd());
+                    input.getText().replace(Math.min(a, b), Math.max(a, b), e, 0, e.length());
+                }
+            });
+            row.addView(tv, new LinearLayout.LayoutParams(0, -1, 1f));
+        }
+        while (row != null && row.getChildCount() < cols) row.addView(new View(this), new LinearLayout.LayoutParams(0, -1, 1f));
+    }
+
+    private View buildVoicePreview() {
+        voicePreview = AdsUi.hbox(this);
+        voicePreview.setGravity(Gravity.CENTER_VERTICAL);
+        voicePreview.setBackground(CigramUI.round(0xFF141416, 24, this));
+        voicePreview.setPadding(AdsUi.dp(this, 6), 0, AdsUi.dp(this, 6), 0);
+        View del = iconBtn(AdsIcons.TRASH, "حذف التسجيل", new View.OnClickListener() {
+            @Override public void onClick(View v) { discardVoice(); }
+        });
+        voicePreview.addView(del, new LinearLayout.LayoutParams(AdsUi.dp(this, 40), AdsUi.dp(this, 40)));
+        voicePreviewTime = AdsUi.text(this, "0:00", 15f, CigramSupport.TEXT, true);
+        voicePreviewTime.setGravity(Gravity.CENTER);
+        voicePreview.addView(voicePreviewTime, new LinearLayout.LayoutParams(0, -2, 1f));
+        FrameLayout play = new FrameLayout(this);
+        play.setContentDescription("الاستماع قبل الإرسال");
+        voicePreviewIcon = new AdsIcons.Icon(this, AdsIcons.PLAY, CigramSupport.TEXT);
+        play.addView(voicePreviewIcon, new FrameLayout.LayoutParams(AdsUi.dp(this, 22), AdsUi.dp(this, 22), Gravity.CENTER));
+        play.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                if (pendingVoice == null) return;
+                AdsVoice.setListener(new AdsVoice.PlayListener() {
+                    @Override public void onState(String pid, boolean playing, int pos, int total) {
+                        if (destroyed || voicePreviewTime == null) return;
+                        voicePreviewTime.setText(playing ? AdsMedia.durLabel(pos) + " / " + AdsMedia.durLabel(pendingVoice == null ? total : pendingVoice.durMs) : AdsMedia.durLabel(pendingVoice == null ? 0 : pendingVoice.durMs));
+                    }
+                });
+                AdsVoice.toggle("voice-preview", pendingVoice.file.getAbsolutePath());
+            }
+        });
+        voicePreview.addView(play, new LinearLayout.LayoutParams(AdsUi.dp(this, 44), AdsUi.dp(this, 44)));
+        TextView send = AdsUi.text(this, "إرسال", 14f, 0xFF000000, true);
+        send.setGravity(Gravity.CENTER);
+        send.setBackground(CigramUI.round(0xFFFFFFFF, 18, this));
+        send.setPadding(AdsUi.dp(this, 14), 0, AdsUi.dp(this, 14), 0);
+        send.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { sendVoice(); }
+        });
+        voicePreview.addView(send, new LinearLayout.LayoutParams(-2, AdsUi.dp(this, 36)));
+        voicePreview.setVisibility(View.GONE);
+        return voicePreview;
+    }
+
+    private void showVoicePreview(AdsVoice.Recorder.Result r) {
+        pendingVoice = r;
+        voicePreviewTime.setText(AdsMedia.durLabel(r.durMs));
+        input.setVisibility(View.INVISIBLE);
+        voicePreview.setVisibility(View.VISIBLE);
+    }
+
+    private void discardVoice() {
+        AdsVoice.stop();
+        if (pendingVoice != null && pendingVoice.file != null) pendingVoice.file.delete();
+        pendingVoice = null;
+        voicePreview.setVisibility(View.GONE);
+        input.setVisibility(View.VISIBLE);
+    }
+
+    private void sendVoice() {
+        AdsVoice.stop();
+        AdsVoice.Recorder.Result r = pendingVoice;
+        pendingVoice = null;
+        voicePreview.setVisibility(View.GONE);
+        input.setVisibility(View.VISIBLE);
+        if (r == null) return;
+        AdsMedia.Prepared p = new AdsMedia.Prepared();
+        p.file = r.file; p.kind = "voice"; p.name = "voice.m4a"; p.size = r.file.length();
+        startUpload(p, "voice", r.durMs, r.wave);
+    }
+
     private final class ChatAdapter extends BaseAdapter {
         @Override public int getCount() { return items.size(); }
         @Override public Object getItem(int i) { return items.get(i); }
@@ -1099,8 +1390,7 @@ public class AdsChatActivity extends Activity {
             root.setPadding(AdsUi.dp(AdsChatActivity.this, 10), AdsUi.dp(AdsChatActivity.this, 3), AdsUi.dp(AdsChatActivity.this, 10), AdsUi.dp(AdsChatActivity.this, 3));
             Msg m = items.get(pos);
             if (pos == 0 || !sameDay(items.get(pos - 1).ts, m.ts)) {
-                TextView d = AdsUi.text(AdsChatActivity.this, dayLabel(m.ts), 12f, CigramGlass.muted(AdsChatActivity.this), false);
-                d.setBackground(CigramUI.round(CigramGlass.soft(AdsChatActivity.this), 12, AdsChatActivity.this));
+                TextView d = AdsUi.text(AdsChatActivity.this, dayLabel(m.ts), 12f, CigramSupport.FAINT, false);
                 d.setPadding(AdsUi.dp(AdsChatActivity.this, 12), AdsUi.dp(AdsChatActivity.this, 4), AdsUi.dp(AdsChatActivity.this, 12), AdsUi.dp(AdsChatActivity.this, 4));
                 LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(-2, -2);
                 dl.gravity = Gravity.CENTER_HORIZONTAL;
@@ -1115,9 +1405,9 @@ public class AdsChatActivity extends Activity {
     private void buildRow(LinearLayout root, final Msg m) {
         final Context c = this;
         if ("system".equals(m.type)) {
-            TextView t = AdsUi.text(c, m.text, 13f, CigramGlass.muted(c), false);
+            TextView t = AdsUi.text(c, m.text, 13f, CigramSupport.MUTED, false);
             t.setGravity(Gravity.CENTER);
-            t.setBackground(CigramUI.round(CigramGlass.soft(c), 14, c));
+            t.setBackground(CigramUI.round(0xFF0E0E10, CigramSupport.HAIRLINE, 14, c));
             t.setPadding(AdsUi.dp(c, 12), AdsUi.dp(c, 6), AdsUi.dp(c, 12), AdsUi.dp(c, 6));
             LinearLayout.LayoutParams l = new LinearLayout.LayoutParams(-2, -2);
             l.gravity = Gravity.CENTER_HORIZONTAL;
@@ -1125,17 +1415,31 @@ public class AdsChatActivity extends Activity {
             return;
         }
         boolean mine = "user".equals(m.from);
+        // 18.2: the developer's public name above the first message of each run (several developers may answer)
+        if (!mine) {
+            int pos = items.indexOf(m);
+            Msg prev = pos > 0 ? items.get(pos - 1) : null;
+            String who = m.dev != null && m.dev.optString("name").length() > 0 ? m.dev.optString("name") : CigramSupport.developer(c).name;
+            String prevWho = prev == null || !"admin".equals(prev.from) ? null : prev.dev != null && prev.dev.optString("name").length() > 0 ? prev.dev.optString("name") : CigramSupport.developer(c).name;
+            if (prevWho == null || !prevWho.equals(who) || "system".equals(prev.type)) {
+                TextView wl = AdsUi.text(c, who, 11.5f, CigramSupport.FAINT, true);
+                LinearLayout.LayoutParams wll = new LinearLayout.LayoutParams(-2, -2);
+                wll.gravity = Gravity.LEFT;
+                wll.setMargins(AdsUi.dp(c, 6), AdsUi.dp(c, 6), 0, AdsUi.dp(c, 2));
+                root.addView(wl, wll);
+            }
+        }
         LinearLayout bubble = AdsUi.vbox(c);
-        bubble.setPadding(AdsUi.dp(c, 10), AdsUi.dp(c, 8), AdsUi.dp(c, 10), AdsUi.dp(c, 6));
-        bubble.setBackground(CigramUI.round(mine ? 0xFF1E8794 : CigramGlass.soft(c), mine ? 0 : CigramGlass.stroke(c), 16, c));
-        int tx = mine ? 0xFFFFFFFF : CigramGlass.text(c);
-        int sub = mine ? 0xCCFFFFFF : CigramGlass.muted(c);
+        bubble.setPadding(AdsUi.dp(c, 12), AdsUi.dp(c, 8), AdsUi.dp(c, 12), AdsUi.dp(c, 6));
+        bubble.setBackground(CigramUI.round(mine ? CigramSupport.MINE : CigramSupport.THEIRS, mine ? 0 : CigramSupport.THEIRS_STROKE, 18, c));
+        int tx = CigramSupport.TEXT;
+        int sub = CigramSupport.MUTED;
 
         if (m.reply != null && !m.deleted) {
             LinearLayout rp = AdsUi.vbox(c);
             rp.setPadding(AdsUi.dp(c, 8), AdsUi.dp(c, 4), AdsUi.dp(c, 8), AdsUi.dp(c, 4));
             rp.setBackground(CigramUI.round(mine ? 0x33000000 : 0x22000000, 8, c));
-            rp.addView(AdsUi.text(c, "رد على: " + ("user".equals(m.reply.optString("from")) ? "أنت" : "الإدارة"), 11f, sub, true));
+            rp.addView(AdsUi.text(c, "رد على: " + ("user".equals(m.reply.optString("from")) ? "أنت" : CigramSupport.developer(c).name), 11f, sub, true));
             TextView pv = AdsUi.text(c, m.reply.optString("preview"), 13f, tx, false);
             pv.setMaxLines(2);
             rp.addView(pv);
@@ -1162,8 +1466,10 @@ public class AdsChatActivity extends Activity {
         if (!m.deleted && m.text != null && m.text.length() > 0 && !cardOnly && !"voice".equals(m.type)) {
             TextView t = AdsUi.text(c, m.text, 15f, tx, false);
             t.setLineSpacing(0f, 1.15f);
+            // Arabic right-aligned, English left-aligned and never reversed (paragraph direction = first strong letter)
+            t.setGravity(CigramSupport.startsRtl(m.text) ? Gravity.RIGHT : Gravity.LEFT);
             t.setAutoLinkMask(android.text.util.Linkify.WEB_URLS | android.text.util.Linkify.PHONE_NUMBERS);
-            t.setLinkTextColor(mine ? 0xFFFFFFFF : CigramUI.TEAL);
+            t.setLinkTextColor(0xFFFFFFFF);
             t.setTextIsSelectable(false);
             bubble.addView(t, AdsUi.lp(-2, -2, 0, ("image".equals(m.type) || "video".equals(m.type)) ? AdsUi.dp(c, 6) : 0, 0, 0));
         }
@@ -1171,15 +1477,15 @@ public class AdsChatActivity extends Activity {
         LinearLayout foot = AdsUi.hbox(c);
         foot.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
         String status = "";
-        if (m.state == 2) status = m.failMsg.length() > 0 ? m.failMsg : "فشل الإرسال — اضغط مطولاً";
+        if (m.state == 2) status = m.failMsg.length() > 0 ? m.failMsg : "بانتظار الاتصال — سيُرسل تلقائياً";
         TextView tm = AdsUi.text(c, status.length() > 0 ? status : timeFmt.format(new Date(m.ts)), 11f, m.state == 2 ? 0xFFFFB4AB : sub, false);
         foot.addView(tm);
         if (mine) {
             int icon = AdsIcons.CHECK;
             int col = sub;
-            if (m.state == 1) icon = AdsIcons.CLOCK;
-            else if (m.state == 2) { icon = AdsIcons.ALERT; col = 0xFFFFB4AB; }
-            else if (m.read > 0) { icon = AdsIcons.DOUBLE_CHECK; col = 0xFF7FE9F5; }
+            if (m.state == 1 || (m.state == 2 && m.failMsg.length() == 0)) { icon = AdsIcons.CLOCK; col = CigramSupport.FAINT; }
+            else if (m.state == 2) { icon = AdsIcons.ALERT; col = CigramSupport.ERROR; }
+            else if (m.read > 0) { icon = AdsIcons.DOUBLE_CHECK; col = 0xFFFFFFFF; }
             else if (m.delivered > 0) icon = AdsIcons.DOUBLE_CHECK;
             foot.addView(new AdsIcons.Icon(c, icon, col), AdsUi.lp(AdsUi.dp(c, 14), AdsUi.dp(c, 14), AdsUi.dp(c, 4), 0, 0, 0));
         }

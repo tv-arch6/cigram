@@ -125,9 +125,10 @@ final class CigramAccountDash {
                 new View.OnClickListener() {
                     @Override public void onClick(View v) { showSwitchDialog(a); }
                 });
-        View adRequest = ensureRow(a, host, TAG_AD_REQUEST, "أريد إعلاناً", "اطلب حملة إعلانية وتحدّث مع فريق الإعلانات",
-                AdsIcons.MEGAPHONE, 0, new View.OnClickListener() {
-                    @Override public void onClick(View v) { openPage(a, AdvertiseActivity.class); }
+        // 18.2: same entry, new experience — Cigram Private Support (the private conversation with the developer)
+        View adRequest = ensureRow(a, host, TAG_AD_REQUEST, "أريد إعلاناً", "الدعم الخاص: تواصل مباشرة مع مطوّر Cigram",
+                AdsIcons.CHAT, 0, new View.OnClickListener() {
+                    @Override public void onClick(View v) { CigramSupport.open(a); }
                 });
         View about = ensureRow(a, host, TAG_ABOUT, "حول التطبيق", "ما هو Cigram ومن يقف خلفه", AdsIcons.INFO, 0,
                 new View.OnClickListener() {

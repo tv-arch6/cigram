@@ -83,7 +83,7 @@ public class AdChatActivity extends CgBase {
         }
     };
 
-    @Override protected String screenTitle() { return "محادثة"; }
+    @Override protected String screenTitle() { return "محادثة خاصة"; }
 
     @Override protected void onBuild() {
         thread = getIntent().getStringExtra("thread");
@@ -94,6 +94,7 @@ public class AdChatActivity extends CgBase {
         bar.titleView.setText(name);
         bar.action("إدارة", new Runnable() { @Override public void run() { showManage(); } });
         bar.action("قوالب", new Runnable() { @Override public void run() { showTemplates(); } });
+        bar.action("بحث", new Runnable() { @Override public void run() { searchHistory(); } });
         bannerText = CgUi.text(this, "", 13, 0xFF1B1B1B, true);
         bannerText.setGravity(Gravity.CENTER);
         bannerText.setBackgroundColor(CgCfg.WARN);
@@ -222,7 +223,8 @@ public class AdChatActivity extends CgBase {
     }
 
     private void updateSub() {
-        String s = userTyping ? "يكتب الآن..." : userOnline ? "● متصل الآن" : "";
+        long seen = threadInfo.optLong("user_seen");
+        String s = userTyping ? "يكتب الآن..." : userOnline ? "● متصل الآن" : seen > 0 ? "آخر ظهور " + new SimpleDateFormat("d/M HH:mm", Locale.US).format(new Date(seen)) : "";
         String st = AdApi.threadStatusLabel(threadInfo.optString("status"));
         if (threadInfo.optBoolean("banned")) st += " • محظور";
         bar.subtitle((s.length() > 0 ? s + " • " : "") + st);
@@ -260,24 +262,98 @@ public class AdChatActivity extends CgBase {
     }
 
     private void loadOlder() {
+        loadOlder(null);
+    }
+
+    /** 18.2: with a callback (history search loads older pages until it finds the text). */
+    private void loadOlder(final Runnable after) {
         long first = 0;
         for (Msg m : items) if (m.seq > 0) { first = m.seq; break; }
-        if (first <= 1) { hasMore = false; return; }
+        if (first <= 1) { hasMore = false; if (after != null) after.run(); return; }
         loadingOlder = true;
         AdApi.get(this, "/admin/chat/messages?thread=" + AdApi.enc(thread) + "&before=" + first + "&limit=40", new AdApi.Cb() {
             @Override public void on(AdApi.Result r) {
                 loadingOlder = false;
-                if (!alive() || !r.ok) return;
+                if (!alive()) return;
+                if (!r.ok) { if (after != null) after.run(); return; }
                 JSONArray a = r.json.optJSONArray("messages");
-                if (a == null || a.length() == 0) { hasMore = false; return; }
+                if (a == null || a.length() == 0) { hasMore = false; if (after != null) after.run(); return; }
                 int before = list.getFirstVisiblePosition();
                 View v0 = list.getChildAt(0);
                 int top = v0 == null ? 0 : v0.getTop();
                 int added = apply(a, false);
                 list.setSelectionFromTop(before + added, top);
                 if (a.length() < 40) hasMore = false;
+                if (after != null) after.run();
             }
         });
+    }
+
+    // ------------------------------------------------------------------ 18.2 history search + identity
+
+    private String searchQuery = "";
+    private int searchFrom = Integer.MAX_VALUE;
+
+    private void searchHistory() {
+        CgUi.input(this, "بحث في المحادثة", "كلمة أو جملة", searchQuery, false, new CgUi.Callback<String>() {
+            @Override public void run(String v) {
+                String q = v.trim();
+                if (q.length() == 0) return;
+                if (!q.equals(searchQuery)) searchFrom = Integer.MAX_VALUE;
+                searchQuery = q;
+                doSearch(0);
+            }
+        });
+    }
+
+    private void doSearch(final int pages) {
+        String q = searchQuery.toLowerCase(Locale.ROOT);
+        for (int i = Math.min(items.size(), searchFrom) - 1; i >= 0; i--) {
+            Msg m = items.get(i);
+            if (m.text != null && m.text.toLowerCase(Locale.ROOT).contains(q)) {
+                searchFrom = i;
+                list.setSelection(i);
+                CgUi.toast(this, "وُجدت — اضغط «بحث» مرة أخرى للنتيجة الأقدم.");
+                return;
+            }
+        }
+        if (!hasMore || pages >= 10) {
+            CgUi.toast(this, "لا توجد نتائج أخرى" + (hasMore ? " في آخر " + items.size() + " رسالة." : "."));
+            searchFrom = Integer.MAX_VALUE;
+            return;
+        }
+        final int sizeBefore = items.size();
+        loadOlder(new Runnable() {
+            @Override public void run() {
+                if (!alive()) return;
+                int added = items.size() - sizeBefore;
+                searchFrom = added > 0 ? added : 0;   // search only the newly loaded (older) part next
+                if (added <= 0) { CgUi.toast(AdChatActivity.this, "لا توجد نتائج."); searchFrom = Integer.MAX_VALUE; return; }
+                doSearch(pages + 1);
+            }
+        });
+    }
+
+    /** Internal ids — shown only here, in the authenticated admin app. */
+    private void showIdentity() {
+        final String uid = threadInfo.optString("user_id", "");
+        StringBuilder b = new StringBuilder();
+        b.append("المعرّف الداخلي للمحادثة:\n").append(thread).append("\n\n");
+        if (uid.length() > 0) b.append("معرّف الحساب (auth):\n").append(uid).append("\n\n");
+        if (threadInfo.optString("email").length() > 0) b.append("البريد: ").append(threadInfo.optString("email")).append("\n");
+        long created = threadInfo.optLong("created");
+        if (created > 0) b.append("بدأت المحادثة: ").append(new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date(created))).append("\n");
+        b.append("\nلا تظهر هذه المعرّفات للمستخدم ولا في إشعاراته.");
+        CgUi.dialog(this).setTitle("هوية المستخدم").setMessage(b.toString())
+                .setPositiveButton("نسخ المعرّف", new android.content.DialogInterface.OnClickListener() {
+                    @Override public void onClick(android.content.DialogInterface d, int w) {
+                        try {
+                            android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                            cm.setPrimaryClip(android.content.ClipData.newPlainText("id", uid.length() > 0 ? uid : thread));
+                            CgUi.toast(AdChatActivity.this, "نُسخ.");
+                        } catch (Throwable ignored) { }
+                    }
+                }).setNegativeButton("إغلاق", null).show();
     }
 
     private static Msg parse(JSONObject o) {
@@ -650,11 +726,13 @@ public class AdChatActivity extends CgBase {
 
     private void showManage() {
         final boolean banned = threadInfo.optBoolean("banned");
-        final CharSequence[] labels = {"تغيير الحالة", "الوسوم", "ملاحظات داخلية (لا يراها المعلن)", "تعيين مسؤول", "تحويل طلب المعلن إلى حملة (مسودة)",
-                "فتح ملف المعلن", banned ? "رفع الحظر" : "حظر المعلن من المحادثة", threadInfo.optBoolean("archived") ? "إلغاء الأرشفة" : "أرشفة المحادثة", "تصدير المحادثة (نص)", "حذف المحادثة نهائياً"};
+        final CharSequence[] labels = {"تغيير الحالة", "الوسوم", "ملاحظات داخلية (لا يراها المستخدم)", "تعيين مسؤول", "تحويل طلب إعلان إلى حملة (مسودة)",
+                "فتح ملف المعلن", banned ? "رفع التقييد" : "تقييد الحساب في المحادثة (إساءة)", threadInfo.optBoolean("archived") ? "إلغاء الأرشفة" : "أرشفة المحادثة", "تصدير المحادثة (نص)", "حذف المحادثة نهائياً",
+                "المعرّف الداخلي للمستخدم"};
         CgUi.choose(this, "إدارة المحادثة", labels, new CgUi.IntCb() {
             @Override public void run(int i) {
                 try {
+                    if (i == 10) { showIdentity(); return; }
                     if (i == 0) {
                         final String[] st = {"open", "pending", "quoted", "won", "closed"};
                         CharSequence[] ls = new CharSequence[st.length];
@@ -746,7 +824,8 @@ public class AdChatActivity extends CgBase {
 
     // ------------------------------------------------------------------ القائمة
 
-    private final SimpleDateFormat timeFmt = new SimpleDateFormat("hh:mm a", new Locale("ar"));
+    /** 18.2: 24-hour clock ("19:45"), device time zone; the server stores UTC epoch ms. */
+    private final SimpleDateFormat timeFmt = new SimpleDateFormat("HH:mm", Locale.US);
 
     private static boolean sameDay(long a, long b) {
         Calendar x = Calendar.getInstance(), y = Calendar.getInstance();

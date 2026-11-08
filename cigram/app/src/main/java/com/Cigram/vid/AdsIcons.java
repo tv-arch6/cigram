@@ -28,7 +28,9 @@ public final class AdsIcons {
             // 2026 Cigram / Cigram Plus collection (same 24-unit grid, 1.9 stroke, round caps as every icon above)
             SWITCH = 72, BOOKMARK = 73, CROWN = 74, CIGRAM = 75, TV = 76, CAST = 77, QUALITY = 78, SUBTITLES = 79,
             AUDIO = 80, SPEED = 81, APPS = 82, REPLAY10 = 83, FORWARD10 = 84, SKIP_NEXT = 85, PALETTE = 86,
-            DOC = 87, SKIP_PREV = 88;
+            DOC = 87, SKIP_PREV = 88,
+            // 18.2 Private Support
+            SMILE = 89;
 
     public static final class Icon extends View {
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -244,6 +246,8 @@ public final class AdsIcons {
                     ring(c, 10.5f, 10.5f, 6.5f); ln(c, 15.5f, 15.5f, 20.5f, 20.5f); break;
                 case MORE:
                     dot(c, 12f, 5f, 1.8f); dot(c, 12f, 12f, 1.8f); dot(c, 12f, 19f, 1.8f); break;
+                case SMILE:
+                    ring(c, 12f, 12f, 9f); dot(c, 9f, 10f, 1.2f); dot(c, 15f, 10f, 1.2f); arc(c, 8f, 9.5f, 16f, 17f, 20f, 140f); break;
                 case BACK:
                     ln(c, 20f, 12f, 4f, 12f); path.moveTo(10f, 6f); path.lineTo(4f, 12f); path.lineTo(10f, 18f); pth(c, false); break;
                 case EDIT:

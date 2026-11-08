@@ -304,44 +304,9 @@ public final class CigramAccountUI {
         if (row != null && row.getParent() instanceof ViewGroup) ((ViewGroup) row.getParent()).removeView(row);
     }
 
-    private static void installAdsRow(final Activity a, LinearLayout host) {
-        View existing = host.findViewWithTag(TAG_ADS);
-        LinearLayout row;
-        if (existing instanceof LinearLayout) {
-            row = (LinearLayout) existing;
-        } else {
-            row = new LinearLayout(a);
-            row.setTag(TAG_ADS);
-            row.setClickable(true);
-            row.setFocusable(true);
-            row.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View v) {
-                    try {
-                        a.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_BADGE_SEEN, true).apply();
-                        a.startActivity(new Intent(a, AdvertiseActivity.class));
-                    } catch (Throwable error) {
-                        android.util.Log.w("CigramAccountUI", "open ads page failed", error);
-                    }
-                }
-            });
-            boolean seen = a.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_BADGE_SEEN, false);
-            rebuild(a, row, "أعلن هنا", "اعرض إعلانك أمام جمهور التطبيق", AdsIcons.MEGAPHONE, CigramUI.RED, !seen);
-        }
-        // آخر عنصر في القائمة: بعد «تواصل معنا» (أو بعد آخر صف) وقبل زر تسجيل الخروج
-        if (row.getParent() instanceof ViewGroup) ((ViewGroup) row.getParent()).removeView(row);
-        int at = host.getChildCount();
-        View logout = byId(a, "button_logout");
-        if (logout != null) {
-            View cur = logout;
-            while (cur != null && cur.getParent() != host) {
-                cur = cur.getParent() instanceof View ? (View) cur.getParent() : null;
-            }
-            if (cur != null) at = host.indexOfChild(cur);
-        }
-        if (at < 0 || at > host.getChildCount()) at = host.getChildCount();
-        host.addView(row, at, new LinearLayout.LayoutParams(-1, CigramUI.dp(a, 64)));
-        applyRowParams(a, row);
-    }
+    // 18.2: the «أعلن هنا» row installer was removed with the old advertise page (the row was already hidden
+    // since v5.29; removeAdsRow above still cleans it from screens built by older versions).
+
 
     // ------------------------------------------------------------------ بناء الصف
 

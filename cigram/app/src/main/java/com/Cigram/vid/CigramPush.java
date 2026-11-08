@@ -95,6 +95,11 @@ public final class CigramPush {
             try { CigramRequests.refresh(app, true, null); } catch (Throwable ignored) { }
             return;
         }
+        if ("chat".equals(kind)) {
+            // 18.2: a developer message in the viewer's private conversation (no internal id is shown)
+            AdsNotifier.showPush(app, data, nTitle, nBody);
+            return;
+        }
         if ("app_update".equals(type) || "app_update".equals(kind)) {
             showUpdate(app, data, nTitle, nBody);
             return;

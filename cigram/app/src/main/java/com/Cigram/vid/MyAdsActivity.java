@@ -127,7 +127,7 @@ public class MyAdsActivity extends Activity {
     private void showEmpty() {
         page.addView(new AdsIcons.Icon(this, AdsIcons.MEGAPHONE, CigramUI.TEAL), AdsUi.lp(AdsUi.dp(this, 56), AdsUi.dp(this, 56), 0, AdsUi.dp(this, 48), 0, AdsUi.dp(this, 12)));
         ((LinearLayout.LayoutParams) page.getChildAt(0).getLayoutParams()).gravity = Gravity.CENTER_HORIZONTAL;
-        TextView t = AdsUi.text(this, "لا توجد حملات بعد.\nابدأ من «أعلن هنا» ثم تواصل مع الإدارة لتأكيد طلبك.", 15f, CigramGlass.muted(this), false);
+        TextView t = AdsUi.text(this, "لا توجد حملات بعد.\nتواصل مع المطوّر من «أريد إعلاناً» لتأكيد طلبك.", 15f, CigramGlass.muted(this), false);
         t.setGravity(Gravity.CENTER);
         t.setLineSpacing(0f, 1.2f);
         page.addView(t, new LinearLayout.LayoutParams(-1, -2));
