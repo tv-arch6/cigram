@@ -58,6 +58,7 @@ public abstract class CgBase extends Activity {
         column.addView(body, new LinearLayout.LayoutParams(CgUi.MATCH, 0, 1f));
         frame.addView(column, new FrameLayout.LayoutParams(CgUi.MATCH, CgUi.MATCH));
         setContentView(frame);
+        CgSystemBars.fit(this);           // Android 15+ / targetSdk 35+: keep the page between the bars and above the keyboard
         CgUi.applyTree(frame);            // the app font on every text, including views added later
         try {
             getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_RTL);

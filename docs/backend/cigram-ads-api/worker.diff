@@ -1,5 +1,5 @@
---- live/cigram-ads-api/worker.js
-+++ patched/cigram-ads-api/worker.js
+--- /tmp/claude-0/-home-user-cigram/00ab601a-7933-5033-89f1-28dfc3bf56ee/scratchpad/backend_live/ads-api/worker.js	2026-11-08 16:36:39.706486859 +0000
++++ /home/user/cigram/docs/backend/deploy/cigram-ads-api/worker.js	2026-11-08 22:53:06.326714509 +0000
 @@ -1583,10 +1583,41 @@
    return body;
  }

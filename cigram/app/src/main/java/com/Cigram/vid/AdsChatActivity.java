@@ -148,6 +148,13 @@ public class AdsChatActivity extends Activity {
             getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
             getWindow().setStatusBarColor(CigramSupport.BG);
             getWindow().setNavigationBarColor(CigramSupport.BAR);
+            // Android 15+ draws edge-to-edge and ignores the bar colours: what shows behind the transparent bars is the
+            // window background, so it must be the screen's own black (also in the phone's Light mode)
+            getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(CigramSupport.BG));
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                android.view.WindowInsetsController wc = getWindow().getInsetsController();
+                if (wc != null) wc.setSystemBarsAppearance(0, android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS | android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+            }
         } catch (Throwable ignored) { }
         if (!CigramAds.isLoggedIn(this)) {
             AdsUi.toast(this, "سجّل الدخول أولاً.");

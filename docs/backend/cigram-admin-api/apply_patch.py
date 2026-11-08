@@ -9,9 +9,11 @@ and refuses to match a LIBRARY title to subtitles by its name alone.
 Usage:  python3 apply_patch.py <live worker.js> <output worker.js>   (every anchor must match exactly once)
 Not deployed by the delivery: review the diff, run the tests in ../tests, then deploy yourself.
 """
+import os
 import sys
 
 src, dst = sys.argv[1], sys.argv[2]
+HUB_JS = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "subhub_providers.js"), encoding="utf-8").read()
 s = open(src, encoding="utf-8").read()
 
 
@@ -24,6 +26,24 @@ def rep(old, new, count=1):
         raise SystemExit("anchor found %d times (expected %d): %r" % (n, count, old[:90]))
     s = s.replace(old, new)
 
+
+# ---------------------------------------------------------------- remove the v10 OpenSubtitles token + search (re-written in subhub_providers.js)
+def drop(start, end_marker="\n}\n"):
+    """Removes one top-level function (start = its first line); it must exist exactly once."""
+    global s
+    n = s.count(start)
+    if n != 1:
+        raise SystemExit("function anchor found %d times: %r" % (n, start[:80]))
+    i = s.index(start)
+    j = s.index(end_marker, i) + len(end_marker)
+    s = s[:i] + s[j:]
+
+
+rep('''let subsOsToken = { value: "", at: 0 };
+
+''', "")
+drop("async function subsOpenSubsToken(env) {")
+drop("async function subsSearchOpenSubs(env, t) {")
 
 # ---------------------------------------------------------------- discovery feeds
 rep('''const WN_FEED_KEYS = [
@@ -80,85 +100,7 @@ async function handleWnDecisions(request, env) {
   return okResponse({ items: doc.items || {} });
 }
 
-// ----------------------------------------------------------------------------- 18.2 CigramSubtitleHub (translation)
-// Provider adapters. None is implemented in this delivery: the official translation endpoints could not be verified
-// from this environment, and endpoints are never guessed. A provider answers 501 until its adapter is written from
-// the provider's documentation and tested with real credentials (secrets stay in Cloudflare, never in an APK).
-
-const SUBHUB_PROVIDERS = {
-  opensubtitles_ai: {
-    label: "OpenSubtitles AI",
-    docs: "https://ai.opensubtitles.com/api-docs",
-    implemented: false,
-    secrets: ["OPENSUBTITLES_AI_API_KEY"],
-    reason: "مسارات الترجمة في OpenSubtitles AI لم تُتحقق من الوثائق الرسمية بعد؛ لم يُكتب الموصل ولن يُخمَّن.",
-  },
-  subdl_translate: {
-    label: "SubDL translation",
-    docs: "https://subdl.com/api-doc",
-    implemented: false,
-    secrets: ["SUBDL_API_KEY"],
-    reason: "الترجمة عبر SubDL تتطلب اشتراكاً وتأكيداً أن العربية لغة هدف مدعومة.",
-  },
-};
-const SUBHUB_MAX_SOURCE = 2 * 1024 * 1024;
-
-function subhubProvider(name) {
-  const p = SUBHUB_PROVIDERS[cleanString(name)];
-  if (!p) throw new AdminError("unknown_provider", "مزوّد ترجمة غير معروف.", 400);
-  if (!p.implemented) {
-    throw new AdminError("provider_not_implemented", p.label + ": " + p.reason + " لم يُرسل أي شيء ولم تُحجز أي تكلفة.", 501, { provider: cleanString(name), docs: p.docs });
-  }
-  return p;
-}
-
-async function handleSubhubProviders(request, env) {
-  const out = Object.entries(SUBHUB_PROVIDERS).map(([id, p]) => ({
-    id, label: p.label, docs: p.docs, implemented: p.implemented, configured: p.secrets.every((k) => Boolean(cleanString(env[k]))), reason: p.implemented ? "" : p.reason,
-  }));
-  return okResponse({ providers: out, target_languages: ["ar"] });
-}
-
-async function handleSubhubTranslate(request, env) {
-  wnRate("subhub_translate", 60);
-  const input = await readRequestData(request);
-  const id = cleanString(input.content_id);
-  if (!id) throw new AdminError("missing_id", "معرّف المحتوى مطلوب.", 400);
-  if (cleanString(input.target || "ar") !== "ar") throw new AdminError("invalid_target", "اللغة الهدف المدعومة: العربية فقط.", 400);
-  const src = String(input.source_file || "");
-  if (!src || src.length > SUBHUB_MAX_SOURCE) throw new AdminError("invalid_source", "ملف المصدر مفقود أو أكبر من 2 ميغابايت.", 400);
-  const parsed = subsToSrt(src);
-  if (parsed.cues < 1) throw new AdminError("invalid_source", "ملف المصدر لا يحتوي مقاطع صالحة.", 400);
-  const list = await readMoviesList(env);
-  if (!findById(list, id)) throw new AdminError("item_not_found", "العنوان غير موجود في المكتبة.", 404);
-  subhubProvider(input.provider);   // 501 while no adapter is implemented — nothing below runs
-  throw new AdminError("provider_not_implemented", "لا يوجد موصل ترجمة.", 501);
-}
-
-async function handleSubhubBatch(request, env) {
-  wnRate("subhub_batch", 10);
-  const input = await readRequestData(request);
-  const ids = Array.isArray(input.ids) ? input.ids.map(cleanString).filter(Boolean) : [];
-  if (!ids.length || ids.length > 5000) throw new AdminError("invalid_batch", "الدفعة فارغة أو أكبر من 5000 عنوان.", 400);
-  if (new Set(ids).size !== ids.length) throw new AdminError("duplicate_ids", "الدفعة تحتوي عناوين مكررة.", 400);
-  const budget = Number(input.budget), estimate = Number(input.estimate);
-  if (!(budget > 0) || !(estimate >= 0)) throw new AdminError("budget_required", "الميزانية المعتمدة مطلوبة.", 400);
-  if (budget < estimate) throw new AdminError("budget_too_low", "الميزانية أقل من التكلفة المقدّرة.", 400);
-  if (!cleanString(input.approved_at)) throw new AdminError("approval_required", "موافقة الإدارة على الدفعة مطلوبة.", 400);
-  if (cleanString(input.target || "ar") !== "ar") throw new AdminError("invalid_target", "اللغة الهدف المدعومة: العربية فقط.", 400);
-  subhubProvider(input.provider);
-  throw new AdminError("provider_not_implemented", "لا يوجد موصل ترجمة.", 501);
-}
-
-const SUBHUB_ROUTES = (() => {
-  const A = adminRoute;
-  return {
-    "GET /admin/subhub/providers": A(handleSubhubProviders),
-    "POST /admin/subhub/translate": A(handleSubhubTranslate),
-    "POST /admin/subhub/translate/batch": A(handleSubhubBatch),
-  };
-})();
-
+''' + HUB_JS + '''
 // ----------------------------------------------------------------------------- route table
 ''')
 rep('''    "POST /admin/discover/collection": A(handleWnCollection),''', '''    "POST /admin/discover/collection": A(handleWnCollection),
@@ -186,6 +128,33 @@ rep('''    } else if (!t.imdb_id && !t.tmdb_id && t.title) {
 rep('''  if (!t.imdb_id && !t.tmdb_id && !t.title && !t.original) throw new AdminError("subs_missing_target",''', '''  // 18.2: a library title is never matched to subtitles by its name alone
   if (t.item && !t.imdb_id && !t.tmdb_id) throw new AdminError("subs_ids_required", "هذا العنوان بلا معرّف TMDB أو IMDb. أضف المعرّف أولاً: لا تُربط الترجمة بالاسم وحده.", 400);
   if (!t.imdb_id && !t.tmdb_id && !t.title && !t.original) throw new AdminError("subs_missing_target",''')
+
+# ---------------------------------------------------------------- providers (stage 2): hardened OpenSubtitles, health, guards
+rep("""    const token = await subsOpenSubsToken(env);
+    if (!token) throw new AdminError("subs_login_missing", "التحميل من OpenSubtitles يحتاج OPENSUBTITLES_USERNAME و OPENSUBTITLES_PASSWORD.", 400);
+    const r = await subsFetch("https://api.opensubtitles.com/api/v1/download", {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json", "api-key": cleanString(env.OPENSUBTITLES_API_KEY), authorization: "Bearer " + token, "user-agent": SUBS_UA },
+      body: JSON.stringify({ file_id: numOf(c.id), sub_format: "srt" }),
+    });
+    const d = await r.json().catch(() => null);
+    if (!r.ok || !d || !d.link) throw new AdminError("subs_download_failed", (d && d.message) || "OpenSubtitles " + r.status, 502);
+    const f = await subsFetch(d.link, { headers: { "user-agent": SUBS_UA } });
+    if (!f.ok) throw new AdminError("subs_download_failed", "OpenSubtitles " + f.status, 502);
+    bytes = new Uint8Array(await f.arrayBuffer());""", """    bytes = await osDownloadBytes(env, c.id);   // 18.2: session + base_url + quota handling (see subhub_providers.js)""", count=2)   # subsDownload + the discovery module's copy
+# human subtitles first: AI-translated uploads are ranked below them (they are included by OpenSubtitles by default)
+rep("  if (c.hi) s -= 6;\n", "  if (c.hi) s -= 6;\n  if (c.ai_translated) s -= 8;\n")
+rep("score: c.score, dl: c.dl.startsWith(\"http\") ? \"\" : c.dl };", "score: c.score, ai_translated: Boolean(c.ai_translated), trusted: Boolean(c.trusted), dl: c.dl.startsWith(\"http\") ? \"\" : c.dl };")
+# SubDL: record whether a real request worked
+rep("""    if (!res.ok || !data || data.status === false) { lastError = (data && (data.error || data.message)) || "SubDL " + res.status; continue; }""",
+    """    if (!res.ok || !data || data.status === false) { lastError = (data && (data.error || data.message)) || "SubDL " + res.status; await subhubNote(env, "subdl", false, lastError); continue; }
+    await subhubNote(env, "subdl", true, "search");""")
+# never replace an existing subtitle silently
+rep("""  out.key = key;
+  out.url = await subsStore(env, key, got.srt);""", """  out.key = key;
+  await subsGuardOverwrite(env, t.item, key, input);   // 18.2: existing / approved subtitles are never replaced silently
+  out.url = await subsStore(env, key, got.srt);""")
+rep("""      const r = await subsDoFetch(env, { item_id: ep.id, mode: "upload" }, list);""", """      const r = await subsDoFetch(env, { item_id: ep.id, mode: "upload", overwrite: overwrite }, list);""")
 
 open(dst, "w", encoding="utf-8").write(s)
 print("patched:", dst)

@@ -3,18 +3,9 @@ package com.Cigram.vid;
 import com.google.gson.Gson;
 
 import java.io.IOException;
-import java.security.SecureRandom;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
-import javax.net.ssl.HostnameVerifier;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLSession;
-import javax.net.ssl.SSLSocketFactory;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -54,41 +45,13 @@ public class RequestNetworkController {
 		if (client == null) {
 			OkHttpClient.Builder builder = new OkHttpClient.Builder();
 			
-			try {
-				final TrustManager[] trustAllCerts = new TrustManager[]{
-					new X509TrustManager() {
-						@Override
-						public void checkClientTrusted(X509Certificate[] chain, String authType)
-						throws CertificateException {
-						}
-						
-						@Override
-						public void checkServerTrusted(X509Certificate[] chain, String authType)
-						throws CertificateException {
-						}
-						
-						@Override
-						public X509Certificate[] getAcceptedIssuers() {
-							return new X509Certificate[]{};
-						}
-					}
-				};
-				
-				final SSLContext sslContext = SSLContext.getInstance("TLS");
-				sslContext.init(null, trustAllCerts, new SecureRandom());
-				final SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
-				builder.sslSocketFactory(sslSocketFactory, (X509TrustManager) trustAllCerts[0]);
-				builder.connectTimeout(SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);
-				builder.readTimeout(READ_TIMEOUT, TimeUnit.MILLISECONDS);
-				builder.writeTimeout(READ_TIMEOUT, TimeUnit.MILLISECONDS);
-				builder.hostnameVerifier(new HostnameVerifier() {
-					@Override
-					public boolean verify(String hostname, SSLSession session) {
-						return true;
-					}
-				});
-			} catch (Exception e) {
-			}
+			// 18.2 security fix: the generated template installed a trust-all X509TrustManager and a HostnameVerifier that
+			// always answered true, so every request through this client (catalogue, account register / login, search)
+			// could be read or altered by anyone on the network path. The platform's default certificate and hostname
+			// validation is used instead; only the timeouts are configured here.
+			builder.connectTimeout(SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);
+			builder.readTimeout(READ_TIMEOUT, TimeUnit.MILLISECONDS);
+			builder.writeTimeout(READ_TIMEOUT, TimeUnit.MILLISECONDS);
 			
 			client = builder.build();
 		}

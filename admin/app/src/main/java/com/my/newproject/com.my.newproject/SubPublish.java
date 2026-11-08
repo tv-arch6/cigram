@@ -76,6 +76,7 @@ final class SubPublish {
                     .put("url", url).put("previous", current).put("source", j.sourceProvider).put("cues", j.cues).put("quality", j.quality)
                     .put("offset_ms", j.approvedOffsetMs).put("undo_id", o.undoId));
             try { d.replaceItem(new JSONObject(item.toString()).put("subtitle", url)); } catch (Throwable ignored) { }
+            SubTranslate.recordApproval(j.contentId, true, url, "admin");   // from now on the Worker's automatic routes never replace this file
         } catch (CxApi.Failure f) {
             o.error = f.getMessage();
         } catch (Throwable t) {

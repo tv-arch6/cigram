@@ -60,6 +60,7 @@ public class SubCenterActivity extends CgBase implements SubCenterRunner.Listene
 
     @Override
     protected void onBuild() {
+        bar.action("المصادر", new Runnable() { @Override public void run() { providers(); } });
         bar.action("الإعدادات", new Runnable() { @Override public void run() { settings(); } });
         bar.action("السجل", new Runnable() { @Override public void run() { history(); } });
         ScrollView sv = new ScrollView(this);
@@ -254,6 +255,7 @@ public class SubCenterActivity extends CgBase implements SubCenterRunner.Listene
         }
         addBatchButton("إعادة محاولة الفاشلة", 1, new Runnable() { @Override public void run() { retryFailed(); } });
         addBatchButton("ترجمة جماعية إلى العربية (تقدير التكلفة أولاً)", 1, new Runnable() { @Override public void run() { askTranslateBatch(); } });
+        addBatchButton("تحديث حالات الترجمة الآلية", 1, new Runnable() { @Override public void run() { pollAllTranslations(); } });
     }
 
     private void addBatchButton(String label, int style, final Runnable r) {
@@ -334,80 +336,237 @@ public class SubCenterActivity extends CgBase implements SubCenterRunner.Listene
     }
 
     /**
-     * Translation campaign: estimate first (exact characters for titles whose source file is known), then the admin
-     * confirms provider + price + budget + batch together. The request goes to the Worker's translation route; if the
-     * Worker does not have it yet, the admin is told and NOTHING changes state.
+     * Translation campaign (OpenSubtitles AI through the Worker). Only titles whose ORIGINAL subtitle file is already
+     * stored can be sent; the others are listed as "need a source" and are never sent. The admin picks a service from the
+     * provider's live catalogue (price per character), sees the estimate, and types the budget in credits; the Worker opens
+     * a spending envelope with that budget and debits every title from it - when it is used up nothing more is sent.
      */
     private void askTranslateBatch() {
         final List<SubQueue.Job> cand = new ArrayList<SubQueue.Job>();
-        for (SubQueue.Job j : filtered()) if (j.state == SubQueue.State.NOT_TRANSLATED || j.state == SubQueue.State.SOURCE_FOUND && !"ar".equals(j.sourceLanguage)) cand.add(j);
-        if (cand.isEmpty()) { CgUi.info(this, "لا يوجد ما يُترجم", "لا توجد عناوين «غير مترجمة» ضمن الفلتر الحالي."); return; }
-        final float price = SubCenterStore.pricePer1000(this);
-        SubQueue.Estimate e = SubQueue.estimate(cand, price);
-        final String cur = SubCenterStore.currency(this);
-        StringBuilder m = new StringBuilder();
-        m.append("العناوين: ").append(e.jobs).append("\n");
-        m.append("معروف حجم ملفها الأصلي: ").append(e.known).append(" (").append(e.chars).append(" حرفاً)\n");
-        m.append("غير معروف بعد: ").append(e.unknown).append(" — يُعرف بعد جلب الملف الأصلي، ولا يُقدَّر تخميناً.\n\n");
-        if (price <= 0) {
-            m.append("لم يُدخل سعر المزوّد بعد. أدخل سعر كل 1000 حرف من عقد المزوّد في «الإعدادات» أولاً.");
-            CgUi.info(this, "تقدير تكلفة الترجمة", m.toString());
+        int noSource = 0;
+        for (SubQueue.Job j : filtered()) {
+            boolean eligible = j.state == SubQueue.State.NOT_TRANSLATED || j.state == SubQueue.State.SOURCE_FOUND && !"ar".equals(j.sourceLanguage);
+            if (!eligible) continue;
+            if (j.originalFile.length() == 0) { noSource++; continue; }
+            cand.add(j);
+        }
+        if (cand.isEmpty()) {
+            CgUi.info(this, "لا يوجد ما يُترجم", "لا توجد عناوين ضمن الفلتر الحالي لها ملف أصلي محفوظ" + (noSource > 0 ? " (" + noSource + " عنواناً بلا ملف أصلي: ارفع الملف الأصلي من صفحة كل عنوان أولاً)." : "."));
             return;
         }
-        m.append(String.format(Locale.US, "التكلفة المقدّرة للمعروف: %.2f %s (بسعر %.4f لكل 1000 حرف).\n", e.cost, cur, price));
-        m.append("المزوّد: OpenSubtitles AI (عبر الخادم). أدخل الميزانية القصوى للموافقة:");
-        final double estimate = e.cost;
-        CgUi.input(this, "الموافقة على حملة الترجمة", m.toString(), "", false, new CgUi.Callback<String>() {
-            @Override public void run(String v) {
-                double budget = 0;
-                try { budget = Double.parseDouble(v.trim().replace(',', '.')); } catch (Exception ignored) { }
-                if (budget <= 0) { CgUi.toast(SubCenterActivity.this, "أدخل ميزانية صحيحة."); return; }
-                if (budget < estimate) { CgUi.info(SubCenterActivity.this, "الميزانية أقل من التقدير", "قلّل الدفعة (فلتر) أو ارفع الميزانية."); return; }
-                sendTranslateBatch(cand, budget, estimate);
-            }
-        });
-    }
-
-    private void sendTranslateBatch(final List<SubQueue.Job> cand, final double budget, final double estimate) {
-        showLoading("جارٍ إرسال الدفعة إلى الخادم...");
+        final int skipped = noSource;
+        showLoading("جارٍ قراءة خدمات الترجمة...");
         CgHttp.bg(new Runnable() {
             @Override public void run() {
                 String err = null;
-                JSONObject res = null;
-                try {
-                    JSONArray ids = new JSONArray();
-                    for (SubQueue.Job j : cand) ids.put(j.contentId);
-                    res = CxApi.post("/admin/subhub/translate/batch", new JSONObject().put("ids", ids).put("target", "ar").put("provider", "opensubtitles_ai")
-                            .put("budget", budget).put("estimate", estimate).put("approved_at", SubCenterStore.nowIso()));
-                } catch (CxApi.Failure f) {
-                    err = "ROUTE_MISSING".equals(f.code)
-                            ? "الخادم الحالي لا يحتوي مسار الترجمة الآلية (/admin/subhub/translate/batch). العقد المطلوب ومصدره موجودان في docs/backend من المشروع، ولم يُنفَّذ أي شيء ولم تتغير حالة أي عنوان."
-                            : f.getMessage();
-                } catch (Throwable t) {
-                    err = "تعذر إرسال الدفعة.";
-                }
+                List<SubTranslate.Api> apis = null;
+                try { apis = SubTranslate.options(); } catch (CxApi.Failure f) { err = f.getMessage(); } catch (Throwable t) { err = "تعذر قراءة خدمات الترجمة."; }
                 final String fe = err;
-                final JSONObject fr = res;
+                final List<SubTranslate.Api> fa = apis;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         if (!alive()) return;
                         hideLoading();
                         if (fe != null) { CgUi.info(SubCenterActivity.this, "لم تبدأ الترجمة", fe); return; }
-                        SubQueue q = SubCenterStore.queue(SubCenterActivity.this);
-                        JSONArray accepted = fr == null ? null : fr.optJSONArray("accepted");
-                        int n = 0;
-                        for (int i = 0; accepted != null && i < accepted.length(); i++) {
-                            JSONObject a = accepted.optJSONObject(i);
-                            SubQueue.Job j = a == null ? null : q.get(a.optString("content_id"));
-                            if (j == null || !SubQueue.canMove(j.state, SubQueue.State.TRANSLATION_QUEUED)) continue;
-                            q.move(j, SubQueue.State.TRANSLATION_QUEUED, "قبله الخادم", System.currentTimeMillis());
-                            j.translationProvider = a.optString("provider", "opensubtitles_ai");
-                            j.providerJobId = a.optString("job_id");
-                            n++;
+                        if (fa == null || fa.isEmpty()) { CgUi.info(SubCenterActivity.this, "لا توجد خدمة", "لا توجد خدمة ترجمة تدعم العربية عند المزوّد حالياً."); return; }
+                        CharSequence[] labels = new CharSequence[fa.size()];
+                        for (int i = 0; i < labels.length; i++) labels[i] = fa.get(i).describe();
+                        CgUi.choose(SubCenterActivity.this, "خدمة الترجمة للدفعة (" + cand.size() + " عنواناً)", labels, new CgUi.IntCb() {
+                            @Override public void run(int w) { confirmTranslateBatch(cand, fa.get(w), skipped); }
+                        });
+                    }
+                });
+            }
+        });
+    }
+
+    private void confirmTranslateBatch(final List<SubQueue.Job> cand, final SubTranslate.Api api, int skipped) {
+        long chars = 0;
+        for (SubQueue.Job j : cand) {
+            byte[] b = SubCenterStore.getText(this, j.originalFile);
+            chars += b == null ? 0 : b.length;
+        }
+        final double estimate = Math.ceil(chars * api.price);
+        StringBuilder m = new StringBuilder();
+        m.append("العناوين: ").append(cand.size()).append("  (").append(chars).append(" حرفاً من ملفاتها الأصلية)\n");
+        if (skipped > 0) m.append("بلا ملف أصلي ولن تُرسل: ").append(skipped).append("\n");
+        m.append("الخدمة: ").append(api.label).append(String.format(Locale.US, " — %.4f رصيد/حرف\n", api.price));
+        m.append("التقدير التقريبي: ").append((long) estimate).append(" رصيد. الخادم يحسب كل عنوان بدقة ويخصمه من الميزانية، ويتوقف عند نفادها.\n\n");
+        m.append("أدخل الميزانية القصوى التي توافق عليها (بالرصيد):");
+        CgUi.input(this, "الموافقة على حملة الترجمة", m.toString(), "", false, new CgUi.Callback<String>() {
+            @Override public void run(String v) {
+                double budget = 0;
+                try { budget = Double.parseDouble(v.trim().replace(',', '.')); } catch (Exception ignored) { }
+                if (budget <= 0) { CgUi.toast(SubCenterActivity.this, "أدخل ميزانية صحيحة."); return; }
+                if (budget < estimate) { CgUi.info(SubCenterActivity.this, "الميزانية أقل من التقدير", "قلّل الدفعة (فلتر) أو ارفع الميزانية. لم يُرسل شيء."); return; }
+                runTranslateBatch(cand, api, budget, estimate);
+            }
+        });
+    }
+
+    private volatile boolean translating;
+    private volatile String storageWarning = "";
+
+    private void runTranslateBatch(final List<SubQueue.Job> cand, final SubTranslate.Api api, final double budget, final double estimate) {
+        if (translating) { CgUi.toast(this, "دفعة ترجمة تعمل الآن."); return; }
+        translating = true;
+        showLoading("جارٍ فتح ميزانية الدفعة...");
+        CgHttp.bg(new Runnable() {
+            @Override public void run() {
+                int sent = 0, failed = 0;
+                String stop = "";
+                try {
+                    List<String> ids = new ArrayList<String>();
+                    for (SubQueue.Job j : cand) ids.add(j.contentId);
+                    String batchId = SubTranslate.beginBatch(ids, api.name, budget, estimate, "admin");
+                    SubQueue q = SubCenterStore.queue(SubCenterActivity.this);
+                    for (SubQueue.Job j : cand) {
+                        try {
+                            JSONObject r = SubTranslate.submit(j.contentId, api.name, new String(SubCenterStore.getText(SubCenterActivity.this, j.originalFile), "UTF-8"),
+                                    j.sourceLanguage, null, batchId);
+                            if (j.state != SubQueue.State.TRANSLATION_QUEUED && SubQueue.canMove(j.state, SubQueue.State.TRANSLATION_QUEUED)) {
+                                q.move(j, SubQueue.State.TRANSLATION_QUEUED, "قبله المزوّد (" + api.label + ") ضمن دفعة", System.currentTimeMillis());
+                            }
+                            j.translationProvider = "opensubtitles_ai:" + api.name;
+                            j.providerJobId = r.optString("correlation_id");
+                            sent++;
+                            if (sent % 5 == 0) SubCenterStore.save(SubCenterActivity.this);
+                        } catch (CxApi.Failure f) {
+                            failed++;
+                            j.lastError = f.getMessage();
+                            if (f.is("batch_budget_exceeded")) { stop = "نفدت الميزانية المعتمدة: توقفت الدفعة."; break; }
+                            if (f.is("provider_rate_limited")) { stop = "حدّ المزوّد للطلبات: توقفت الدفعة، أعد المحاولة لاحقاً."; break; }
+                            if (f.is("os_login_failed") || f.is("os_login_blocked") || f.is("os_login_missing") || f.is("os_no_key")) { stop = f.getMessage(); break; }
                         }
-                        SubCenterStore.save(SubCenterActivity.this);
-                        CgUi.info(SubCenterActivity.this, "أُرسلت الدفعة", "قبل الخادم " + n + " عنواناً للترجمة. تتابع الحالة من هنا.");
+                        try { Thread.sleep(1200); } catch (InterruptedException ie) { break; }   // stays far below the provider's request limits
+                    }
+                    SubCenterStore.save(SubCenterActivity.this);
+                } catch (CxApi.Failure f) {
+                    stop = f.getMessage();
+                } catch (Throwable t) {
+                    stop = "تعذر إكمال الدفعة: " + t.getClass().getSimpleName();
+                }
+                final int fs = sent, ff = failed;
+                final String fstop = stop;
+                translating = false;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (!alive()) return;
+                        hideLoading();
+                        CgUi.info(SubCenterActivity.this, "نتيجة إرسال الدفعة", "أُرسل " + fs + " عنواناً، وتعذّر " + ff + (fstop.length() > 0 ? "\n" + fstop : "") + "\n\nتابع الحالة بزر «تحديث حالات الترجمة الآلية».");
                         changed();
+                    }
+                });
+            }
+        });
+    }
+
+    /** Polls every queued translation (max 40 per press), one request at a time. Results go to «مراجعة الجودة»; nothing is approved. */
+    private void pollAllTranslations() {
+        final List<SubQueue.Job> jobs = new ArrayList<SubQueue.Job>();
+        for (SubQueue.Job j : SubCenterStore.queue(this).all()) {
+            if ((j.state == SubQueue.State.TRANSLATION_QUEUED || j.state == SubQueue.State.TRANSLATING) && j.providerJobId.length() > 0 && jobs.size() < 40) jobs.add(j);
+        }
+        if (jobs.isEmpty()) { CgUi.toast(this, "لا توجد ترجمات قيد الانتظار."); return; }
+        showLoading("جارٍ قراءة حالات " + jobs.size() + " ترجمة...");
+        CgHttp.bg(new Runnable() {
+            @Override public void run() {
+                int done = 0, pending = 0, bad = 0;
+                String firstError = "";
+                SubQueue q = SubCenterStore.queue(SubCenterActivity.this);
+                for (SubQueue.Job j : jobs) {
+                    SubTranslate.Polled p = SubTranslate.poll(SubCenterActivity.this, q, j);
+                    if ("QUALITY_REVIEW".equals(p.state)) done++;
+                    else if ("TRANSLATING".equals(p.state)) pending++;
+                    else { bad++; if (firstError.length() == 0) firstError = p.detail; }
+                    try { Thread.sleep(300); } catch (InterruptedException ie) { break; }
+                }
+                final String msg = "اكتمل واستُلم: " + done + " · قيد الترجمة: " + pending + " · فشل/خطأ: " + bad + (firstError.length() > 0 ? "\n" + firstError : "");
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (!alive()) return;
+                        hideLoading();
+                        CgUi.info(SubCenterActivity.this, "حالات الترجمة الآلية", msg);
+                        changed();
+                    }
+                });
+            }
+        });
+    }
+
+    // ------------------------------------------------------------------ providers (live state, real verification)
+
+    private static String stateLabel(String s) {
+        switch (s) {
+            case "connected": return "متصل ✓ (نجح طلب حقيقي)";
+            case "configured_unverified": return "مضبوط — لم يُتحقق بعد";
+            case "not_configured": return "غير مضبوط في Cloudflare";
+            case "error": return "خطأ في آخر طلب";
+            default: return s;
+        }
+    }
+
+    /** Which sources the Worker really reaches. «متصل» appears only after a real request succeeded (never because a key exists). */
+    private void providers() {
+        showLoading("جارٍ قراءة حالة المصادر...");
+        CgHttp.bg(new Runnable() {
+            @Override public void run() {
+                String err = null;
+                JSONArray rows = null;
+                try { JSONObject resp = CxApi.get("/admin/subhub/providers"); rows = resp.optJSONArray("providers"); JSONObject st = resp.optJSONObject("storage"); storageWarning = st == null ? "" : st.optString("warning"); }
+                catch (CxApi.Failure f) { err = "ROUTE_MISSING".equals(f.code) ? "الخادم الحالي لا يحتوي مسار حالة المصادر. انشر تعديلات docs/backend أولاً." : f.getMessage(); }
+                catch (Throwable t) { err = "تعذر قراءة حالة المصادر."; }
+                final String fe = err;
+                final JSONArray fr = rows;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (!alive()) return;
+                        hideLoading();
+                        if (fe != null) { CgUi.info(SubCenterActivity.this, "المصادر", fe); return; }
+                        final List<JSONObject> ps = new ArrayList<JSONObject>();
+                        List<CharSequence> labels = new ArrayList<CharSequence>();
+                        if (storageWarning.length() > 0) { ps.add(null); labels.add("⚠ " + storageWarning); }
+                        for (int i = 0; fr != null && i < fr.length(); i++) {
+                            JSONObject p = fr.optJSONObject(i);
+                            if (p == null) continue;
+                            ps.add(p);
+                            String t = p.optString("label") + " — " + stateLabel(p.optString("state"));
+                            if (p.optString("verified_at").length() > 0) t += "\n   آخر نجاح: " + CgUi.localText(p.optString("verified_at"));
+                            if ("error".equals(p.optString("state")) && p.optString("last_error").length() > 0) t += "\n   " + p.optString("last_error");
+                            if (!p.optBoolean("docs_checked")) t += "\n   (وثائق المزوّد لم تُقرأ: لا يُعتمد إلا بطلب حقيقي)";
+                            labels.add(t);
+                        }
+                        CgUi.choose(SubCenterActivity.this, "المصادر — اضغط مصدراً لاختبار طلب حقيقي", labels.toArray(new CharSequence[0]), new CgUi.IntCb() {
+                            @Override public void run(int w) {
+                                if (ps.get(w) == null) { CgUi.info(SubCenterActivity.this, "تحذير أمني", storageWarning + "\nراجع docs/backend/DEPLOY.md (خطوة تأمين التخزين)."); return; }
+                                verifyProvider(ps.get(w).optString("id"), ps.get(w).optString("label"));
+                            }
+                        });
+                    }
+                });
+            }
+        });
+    }
+
+    private void verifyProvider(final String id, final String label) {
+        showLoading("جارٍ اختبار " + label + "...");
+        CgHttp.bg(new Runnable() {
+            @Override public void run() {
+                String msg;
+                try {
+                    JSONObject r = CxApi.post("/admin/subhub/providers/verify", new JSONObject().put("provider", id));
+                    msg = (r.optBoolean("ok") ? "نجح الطلب الحقيقي.\n" : "فشل الطلب.\n") + r.optString("detail");
+                } catch (CxApi.Failure f) {
+                    msg = f.getMessage();
+                } catch (Throwable t) {
+                    msg = "تعذر الاختبار.";
+                }
+                final String fm = msg;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (!alive()) return;
+                        hideLoading();
+                        CgUi.info(SubCenterActivity.this, label, fm);
                     }
                 });
             }
