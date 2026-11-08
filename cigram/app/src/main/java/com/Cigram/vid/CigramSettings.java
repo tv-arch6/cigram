@@ -304,7 +304,28 @@ public final class CigramSettings {
                         CigramTvMode.setMode(a, next);
                         a.recreate();   // يُطبّق فوراً
                     } }));
+            // 2026: Cigram Plus customisation lives here (was on the account page): the launcher icon picker
+            app.addView(divider(a));
+            app.addView(row(a, CigramUI.ICON_IMAGE, CigramUI.TEAL, "أيقونة التطبيق",
+                    CigramPlus.isPlus(a) ? "اختر شكل Cigram على شاشتك الرئيسية" : "الكلاسيكية للجميع، والأشكال المميزة لمشتركي Plus",
+                    false, new View.OnClickListener() {
+                        @Override public void onClick(View v) { CigramAppIconUI.openDialog(a); }
+                    }));
             col.addView(app);
+
+            // ---------------------------------------------------------- about
+            col.addView(heading(a, "عن Cigram"));
+            LinearLayout aboutCard = card(a);
+            aboutCard.addView(row(a, CigramUI.ICON_INFO, CigramUI.TEAL, "حول التطبيق", "ما هو Cigram ومن يقف خلفه", false,
+                    new View.OnClickListener() {
+                        @Override public void onClick(View v) { a.startActivity(new android.content.Intent(a, CigramAboutActivity.class)); }
+                    }));
+            aboutCard.addView(divider(a));
+            aboutCard.addView(row(a, CigramUI.ICON_FLAG, CigramUI.TEAL, "الشروط والأحكام", "شروط استخدام Cigram", false,
+                    new View.OnClickListener() {
+                        @Override public void onClick(View v) { a.startActivity(new android.content.Intent(a, CigramTermsActivity.class)); }
+                    }));
+            col.addView(aboutCard);
 
             // ---------------------------------------------------------- storage
             col.addView(heading(a, "التخزين"));

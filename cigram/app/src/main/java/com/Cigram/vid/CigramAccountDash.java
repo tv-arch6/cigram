@@ -53,6 +53,12 @@ final class CigramAccountDash {
     private static final String TAG_CONTACT = "cigram_contact_us";
     private static final String TAG_WIDGET = "cigram_widget_row";
     private static final String TAG_PLUS_CODE = "cigram_plus_code";
+    // 2026 entries
+    private static final String TAG_PLUS = "cigram_row_plus";
+    private static final String TAG_SWITCH = "cigram_row_switch";
+    private static final String TAG_AD_REQUEST = "cigram_row_ad_request";
+    private static final String TAG_ABOUT = "cigram_row_about";
+    private static final String TAG_TERMS = "cigram_row_terms";
 
     /** Row positions inside a group. */
     private static final int SINGLE = 0, FIRST = 1, MIDDLE = 2, LAST = 3;
@@ -75,12 +81,13 @@ final class CigramAccountDash {
         final CigramPalette pal = CigramPalette.of(a);
         final boolean logged = CigramUserData.isLoggedIn(a);
 
-        // one page colour from the cover's edge to the bottom (the layout file used a slightly different tone)
-        host.setBackgroundColor(pal.page);
+        // 2026: a restrained four-stage charcoal gradient behind the whole page (light: four soft greys); the
+        // content column itself is transparent so the gradient reads from top to bottom
+        host.setBackgroundColor(0);
         View scrollView = byId(a, "vscroll_account");
         if (scrollView != null) {
-            scrollView.setBackgroundColor(pal.page);
-            if (scrollView.getParent() instanceof View) ((View) scrollView.getParent()).setBackgroundColor(pal.page);
+            scrollView.setBackgroundColor(0);
+            if (scrollView.getParent() instanceof View) ((View) scrollView.getParent()).setBackground(pageGradient(pal));
         }
 
         View profile = byId(a, "linear_profile");
@@ -96,27 +103,54 @@ final class CigramAccountDash {
         View plusBox = host.findViewWithTag(CigramPlusUI.TAG_BOX);
 
         // the rows that are not built by the old code: shortcuts into flows that already exist
-        View edit = ensureRow(a, host, TAG_EDIT, "تعديل الملف الشخصي", "الاسم والصورة والبريد الإلكتروني",
-                AdsIcons.EDIT, CigramUI.TEAL, new View.OnClickListener() {
+        View edit = ensureRow(a, host, TAG_EDIT, "الحساب الشخصي", "الاسم والصورة والبريد الإلكتروني",
+                AdsIcons.USER, 0, new View.OnClickListener() {
                     @Override public void onClick(View v) { openSettings(a, "edit_profile"); }
                 });
-        View theme = ensureRow(a, host, TAG_THEME, "المظهر", themeLabel(a), AdsIcons.SUN, 0xFFE9A23B,
+        View theme = ensureRow(a, host, TAG_THEME, "المظهر", themeLabel(a), AdsIcons.SUN, 0,
                 new View.OnClickListener() {
                     @Override public void onClick(View v) { showThemeDialog(a); }
                 });
-        View logout = ensureRow(a, host, TAG_LOGOUT, "تسجيل الخروج", "من هذا الجهاز فقط", AdsIcons.LOGOUT, CigramUI.RED,
+        View logout = ensureRow(a, host, TAG_LOGOUT, "تسجيل الخروج", "من هذا الجهاز فقط", AdsIcons.LOGOUT, 0,
                 new View.OnClickListener() {
                     @Override public void onClick(View v) { openSettings(a, "logout"); }
                 });
+        View plus = ensureRow(a, host, TAG_PLUS, "Cigram Plus", plusLabel(a), AdsIcons.CROWN, 0,
+                new View.OnClickListener() {
+                    @Override public void onClick(View v) {
+                        CigramPlusUI.openPage(a, CigramPlus.salesEnabled() && !CigramPlus.isPlus(a) ? "pay" : "code");
+                    }
+                });
+        View switchRow = ensureRow(a, host, TAG_SWITCH, "تبديل", switchLabel(a), AdsIcons.SWITCH, 0,
+                new View.OnClickListener() {
+                    @Override public void onClick(View v) { showSwitchDialog(a); }
+                });
+        View adRequest = ensureRow(a, host, TAG_AD_REQUEST, "أريد إعلاناً", "اطلب حملة إعلانية وتحدّث مع فريق الإعلانات",
+                AdsIcons.MEGAPHONE, 0, new View.OnClickListener() {
+                    @Override public void onClick(View v) { openPage(a, AdvertiseActivity.class); }
+                });
+        View about = ensureRow(a, host, TAG_ABOUT, "حول التطبيق", "ما هو Cigram ومن يقف خلفه", AdsIcons.INFO, 0,
+                new View.OnClickListener() {
+                    @Override public void onClick(View v) { openPage(a, CigramAboutActivity.class); }
+                });
+        View terms = ensureRow(a, host, TAG_TERMS, "الشروط والأحكام", "شروط استخدام Cigram", AdsIcons.DOC, 0,
+                new View.OnClickListener() {
+                    @Override public void onClick(View v) { openPage(a, CigramTermsActivity.class); }
+                });
         setSubtitle(theme, themeLabel(a));
+        setSubtitle(plus, plusLabel(a));
+        setSubtitle(switchRow, switchLabel(a));
+        plus.setVisibility(logged ? View.VISIBLE : View.GONE);
+        // the app-icon picker lives in Settings now (all customisation in one place)
+        if (appIcon != null) { detach(appIcon); appIcon = null; }
         // a visitor has no profile to edit and nothing to sign out of; the appearance row is for the signed-in page
         // (a visitor has the same choice as a small link on the welcome card, which disappears with the form)
         edit.setVisibility(logged ? View.VISIBLE : View.GONE);
         logout.setVisibility(logged ? View.VISIBLE : View.GONE);
         theme.setVisibility(logged ? View.VISIBLE : View.GONE);
         // rows built by CigramAccountExtras have an arrow and a label only: give them the same face as the others
-        if (widget != null) CigramAccountUI.restyleRow(a, widget, AdsIcons.IMAGE, 0xFF4DA3FF, "على الشاشة الرئيسية");
-        if (plusCode != null) CigramAccountUI.restyleRowAs(a, plusCode, "ضع كود التفعيل", "Cigram Plus", AdsIcons.STAR, pal.gold);
+        if (widget != null) CigramAccountUI.restyleRow(a, widget, AdsIcons.IMAGE, 0, "على الشاشة الرئيسية");
+        if (plusCode != null) CigramAccountUI.restyleRowAs(a, plusCode, "ضع كود التفعيل", "Cigram Plus", AdsIcons.STAR, 0);
 
         // ---- group «حسابي»: lives inside the profile block, right under the stats
         ArrayList<View> accountRows = new ArrayList<View>();
@@ -126,27 +160,42 @@ final class CigramAccountDash {
                 detach(edit);
                 p.addView(edit, p.indexOfChild(settings), rowParams(a));
             }
+            // «قائمة المشاهدة» joins the personal group, between the profile and the settings
+            if (mine != null && mine.getParent() != p) {
+                ViewGroup.LayoutParams keep = mine.getLayoutParams();
+                detach(mine);
+                p.addView(mine, p.indexOfChild(settings), keep instanceof LinearLayout.LayoutParams ? keep : rowParams(a));
+            }
             setTitle(a, p, "account", "حسابي", edit);
             accountRows.add(edit);
+            if (mine != null) accountRows.add(mine);
             accountRows.add(settings);
         }
 
         // ---- the groups of the page itself, in this order, right before the external link (if any)
+        ArrayList<View> plusRows = new ArrayList<View>();
+        add(plusRows, plus, plusCode);
         ArrayList<View> experience = new ArrayList<View>();
-        add(experience, mine, fonts, theme, widget, plusCode);
+        if (mine != null && !accountRows.contains(mine)) experience.add(mine);
+        add(experience, switchRow, theme, fonts, widget);
         ArrayList<View> support = new ArrayList<View>();
-        add(support, help, contact, update);
+        add(support, adRequest, contact, help, update);
+        ArrayList<View> info = new ArrayList<View>();
+        add(info, about, terms);
         ArrayList<View> actions = new ArrayList<View>();
         add(actions, logout);
 
         View link = host.findViewWithTag(CigramExternalLink.TAG);
         ArrayList<View> sequence = new ArrayList<View>();
-        sequence.add(title(a, "experience", "تجربتي"));
-        sequence.addAll(experience);
-        if (appIcon != null) sequence.add(appIcon);
+        sequence.add(title(a, "plus", "Cigram Plus"));
+        sequence.addAll(plusRows);
         if (plusBox != null) sequence.add(plusBox);
-        sequence.add(title(a, "support", "الدعم والمعلومات"));
+        sequence.add(title(a, "experience", "التطبيق"));
+        sequence.addAll(experience);
+        sequence.add(title(a, "support", "الدعم والتواصل"));
         sequence.addAll(support);
+        sequence.add(title(a, "info", "عن Cigram"));
+        sequence.addAll(info);
         sequence.add(title(a, "actions", "إجراءات الحساب"));
         sequence.addAll(actions);
         for (int i = 0; i < sequence.size(); i++) detach(sequence.get(i));
@@ -162,12 +211,108 @@ final class CigramAccountDash {
 
         // ---- shapes + visibility of every group
         style(a, pal, accountRows, host.findViewWithTag(TAG_TITLE + "account"));
+        style(a, pal, plusRows, host.findViewWithTag(TAG_TITLE + "plus"));
         style(a, pal, experience, host.findViewWithTag(TAG_TITLE + "experience"));
         style(a, pal, support, host.findViewWithTag(TAG_TITLE + "support"));
+        style(a, pal, info, host.findViewWithTag(TAG_TITLE + "info"));
         style(a, pal, actions, host.findViewWithTag(TAG_TITLE + "actions"));
         // the custom boxes keep their own content, but sit on the page with the same margins and colours
-        if (appIcon != null) CigramAccountUI.sideMargins(a, appIcon);
         if (plusBox != null) CigramAccountUI.sideMargins(a, plusBox);
+    }
+
+    /** Four graduated stops, top to bottom: the page brightens very slightly under the header and settles. */
+    static Drawable pageGradient(CigramPalette pal) {
+        int[] stops = pal.light
+                ? new int[]{0xFFFFFFFF, 0xFFF7F7F9, 0xFFF1F1F4, 0xFFECECEF}
+                : new int[]{0xFF19191C, 0xFF131315, 0xFF0F0F11, 0xFF0B0B0C};
+        return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, stops);
+    }
+
+    private static String plusLabel(Context c) {
+        try {
+            if (CigramPlus.isPlus(c)) return "مفعّل · " + CigramPlus.periodText(c);
+            return CigramPlus.salesEnabled() ? "اشترك أو أدخل كود التفعيل" : "أدخل كود التفعيل";
+        } catch (Throwable t) {
+            return "مزايا المشتركين";
+        }
+    }
+
+    private static void openPage(Activity a, Class<?> page) {
+        try {
+            a.startActivity(new Intent(a, page));
+        } catch (RuntimeException error) {
+            Log.w("CigramAccountDash", "open " + page.getSimpleName() + " failed", error);
+        }
+    }
+
+    // ================================================================== «تبديل» (phone / TV interface)
+
+    /** Current interface, as the subtitle of the «تبديل» row. */
+    static String switchLabel(Context c) {
+        int m = CigramTvMode.mode(c);
+        if (m == CigramTvMode.ON) return "الواجهة الحالية: Cigram TV";
+        if (m == CigramTvMode.OFF) return "الواجهة الحالية: الجوال";
+        return CigramTvMode.isTv(c) ? "تلقائي · Cigram TV" : "تلقائي · واجهة الجوال";
+    }
+
+    /**
+     * «تبديل»: switches between the phone interface and the Cigram TV edition. It is the app's existing TV-mode
+     * setting (CigramTvMode, also in Settings → «وضع التلفاز»); the app restarts on its Home so the chosen interface
+     * is built from scratch (the TV edition replaces the phone Home, see MainActivity / CigramTvActivity).
+     */
+    static void showSwitchDialog(final Activity a) {
+        final CigramPalette pal = CigramPalette.of(a);
+        final Dialog d = new Dialog(a);
+        d.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        LinearLayout box = new LinearLayout(a);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        box.setBackground(CigramPalette.round(a, pal.surface, pal.stroke, 22));
+        box.setPadding(dp(a, 8), dp(a, 18), dp(a, 8), dp(a, 10));
+        TextView head = CigramUI.label(a, "تبديل الواجهة", 18f, pal.text, true);
+        head.setGravity(Gravity.RIGHT);
+        head.setPadding(dp(a, 16), 0, dp(a, 16), dp(a, 2));
+        box.addView(head, new LinearLayout.LayoutParams(-1, -2));
+        TextView sub = CigramUI.label(a, "اختر الواجهة التي تناسب جهازك", 12.5f, pal.text3, false);
+        sub.setGravity(Gravity.RIGHT);
+        sub.setPadding(dp(a, 16), 0, dp(a, 16), dp(a, 10));
+        box.addView(sub, new LinearLayout.LayoutParams(-1, -2));
+        final int current = CigramTvMode.mode(a);
+        final int[] modes = {CigramTvMode.OFF, CigramTvMode.ON, CigramTvMode.AUTO};
+        final String[][] texts = {
+                {"واجهة الجوال", "اللمس والتمرير، للجوال والتابلت"},
+                {"Cigram TV", "واجهة التلفاز: جهاز التحكم والشاشة الكبيرة"},
+                {"تلقائي", "يكتشف Cigram نوع الجهاز بنفسه"}};
+        for (int i = 0; i < modes.length; i++) {
+            final int mode = modes[i];
+            box.addView(optionRow(a, pal, texts[i][0], texts[i][1], mode == current, new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    d.dismiss();
+                    if (mode == current) return;
+                    CigramTvMode.setMode(a, mode);
+                    restartOnHome(a);
+                }
+            }), new LinearLayout.LayoutParams(-1, dp(a, 62)));
+        }
+        d.setContentView(box);
+        if (d.getWindow() != null) {
+            d.getWindow().setBackgroundDrawable(new ColorDrawable(0));
+            d.getWindow().setLayout(Math.min(dp(a, 360), a.getResources().getDisplayMetrics().widthPixels - dp(a, 40)),
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        d.show();
+    }
+
+    /** Starts the app again on its Home in a fresh task (the interface is chosen when Home is created). */
+    static void restartOnHome(Activity a) {
+        try {
+            Intent i = new Intent(a, MainActivity.class);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            a.startActivity(i);
+            a.overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+        } catch (RuntimeException error) {
+            Log.w("CigramAccountDash", "restart failed", error);
+        }
     }
 
     private static void add(ArrayList<View> out, View... views) {

@@ -49,6 +49,7 @@ public final class CigramAuthPolish {
     }
 
     public static void apply(final Activity a) {
+        try { CigramTerms.install(a); } catch (Throwable ignored) { }   // 2026: terms consent above «إنشاء حساب»
         if (a == null || a.isFinishing()) return;
         try {
             final View tabsView = byId(a, "linear_auth_tabs");

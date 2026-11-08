@@ -75,12 +75,13 @@ public final class CigramAccountUI {
             if (!(hostView instanceof LinearLayout)) return;
             LinearLayout host = (LinearLayout) hostView;
 
-            restyleExisting(a, byId(a, "linear_account_settings"), AdsIcons.GEAR, CigramUI.TEAL, "تخصيص التطبيق والإشعارات");
-            restyleExisting(a, byId(a, "linear_account_subtitle_font"), AdsIcons.FONT, CigramUI.AMBER, "شكل وحجم الخط");
-            restyleExisting(a, byId(a, "linear_my_content"), AdsIcons.FOLDER, CigramUI.GREEN, "ما أضفته إلى مكتبتك");
-            restyleExisting(a, byId(a, "linear_help_support"), AdsIcons.HELP, 0xFF8E7CFF, "مساعدة وأسئلة عن التطبيق");
-            restyleExisting(a, host.findViewWithTag(TAG_UPDATE), AdsIcons.REFRESH, CigramUI.TEAL, "");
-            restyleExisting(a, host.findViewWithTag(TAG_CONTACT), AdsIcons.HEADSET, 0xFF4DA3FF, "راسل فريق الدعم");
+            // 2026 CIGRAM ID entries: the same views (ids + listeners), with the requested names and one icon set
+            restyleRowAs(a, byId(a, "linear_account_settings"), "الإعدادات", "التطبيق والإشعارات وأيقونة التطبيق", AdsIcons.GEAR, 0);
+            restyleExisting(a, byId(a, "linear_account_subtitle_font"), AdsIcons.FONT, 0, "شكل وحجم الخط");
+            restyleRowAs(a, byId(a, "linear_my_content"), "قائمة المشاهدة", "المفضلة والمشاهدة لاحقاً وما شاهدته", AdsIcons.BOOKMARK, 0);
+            restyleRowAs(a, byId(a, "linear_help_support"), "المساعدة", "أسئلة شائعة عن التطبيق", AdsIcons.HELP, 0);
+            restyleExisting(a, host.findViewWithTag(TAG_UPDATE), AdsIcons.REFRESH, 0, "");
+            restyleRowAs(a, host.findViewWithTag(TAG_CONTACT), "الدعم والتواصل", "راسل فريق Cigram أو اطلب عنواناً", AdsIcons.HEADSET, 0);
             removeAdsRow(host); // v5.29: «أعلن هنا» is no longer shown anywhere in the app
             CigramAccountDesign.guest(a);   // v10.71: the guest hero + the brand action button
             CigramAuthPolish.apply(a); // v10.29: صفحة الدخول/إنشاء الحساب (التصميم «أ»)
@@ -441,11 +442,9 @@ public final class CigramAccountUI {
         cl.rightMargin = CigramUI.dp(c, 12);
         row.addView(col, cl);
 
-        // the icon tile: the accent as a soft tint (darker ink on the light page so it keeps its contrast)
-        int ink = pal.light ? CigramDepth.shade(accent, 0.82f) : accent;
+        // 2026: one monochrome line icon per row (white on the dark page, ink on the light one), no coloured tile
         FrameLayout box = new FrameLayout(c);
-        box.setBackground(CigramPalette.round(c, CigramPalette.alpha(accent, pal.light ? 0x1F : 0x2B), 0, 11));
-        box.addView(new AdsIcons.Icon(c, icon, ink), new FrameLayout.LayoutParams(CigramUI.dp(c, 20), CigramUI.dp(c, 20), Gravity.CENTER));
-        row.addView(box, new LinearLayout.LayoutParams(CigramUI.dp(c, 38), CigramUI.dp(c, 38)));
+        box.addView(new AdsIcons.Icon(c, icon, pal.text), new FrameLayout.LayoutParams(CigramUI.dp(c, 22), CigramUI.dp(c, 22), Gravity.CENTER));
+        row.addView(box, new LinearLayout.LayoutParams(CigramUI.dp(c, 30), CigramUI.dp(c, 30)));
     }
 }

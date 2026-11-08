@@ -114,21 +114,11 @@ public final class CigramAccountExtras {
                 android.util.Log.w("CigramAccount", "widget row failed", widgetError);
             }
 
-            // App icon section (logged-in accounts): after the Plus rows, optional so it can never remove the rows above
+            // 2026: the app-icon picker moved to Settings («أيقونة التطبيق»), with the other customisation options
             try {
-                if (CigramUserData.isLoggedIn(activity)) {
-                    int pos = host.indexOfChild(update);
-                    CigramAppIconUI.install(activity, host, pos < 0 ? host.getChildCount() : pos);
-                    CigramPlus.refresh(activity, false, new Runnable() {
-                        @Override public void run() {
-                            if (activity.isFinishing()) return;
-                            try { CigramAppIconUI.install(activity, (LinearLayout) host, host.indexOfChild(host.findViewWithTag(CigramAppIconUI.TAG))); } catch (Throwable ignored) { }
-                        }
-                    });
-                }
-            } catch (Throwable iconError) {
-                android.util.Log.w("CigramAccount", "app icon section failed", iconError);
-            }
+                View oldIcons = host.findViewWithTag(CigramAppIconUI.TAG);
+                if (oldIcons != null && oldIcons.getParent() instanceof ViewGroup) ((ViewGroup) oldIcons.getParent()).removeView(oldIcons);
+            } catch (Throwable ignored) { }
 
             // v3.6: تصميم موحّد لكل عناصر الحساب + عنصر «أعلن هنا» (لا يغيّر وظيفة أي عنصر)
             CigramAccountUI.polish(activity);

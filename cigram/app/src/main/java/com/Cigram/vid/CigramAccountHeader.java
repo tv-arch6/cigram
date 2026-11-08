@@ -376,10 +376,7 @@ public final class CigramAccountHeader {
             backdrop.setLayoutParams(new LayoutParams(-1, coverH, Gravity.TOP));
             video.setLayoutParams(new LayoutParams(-1, coverH, Gravity.TOP));
 
-            View fade = new View(a);
-            fade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{fadeEdge(a, 0x00), fadeEdge(a, 0x00), fadeEdge(a, 0x73), fadeEdge(a, 0xE6), CigramTheme.page(a)}));
-            addView(fade, new LayoutParams(-1, coverH, Gravity.TOP));
+            // 2026: the user's banner is shown as it is: no fade / gradient painted over it any more
 
             TextView cover = CigramUI.label(a, "الغلاف", 12f, 0xFFFFFFFF, false);
             cover.setGravity(Gravity.CENTER);

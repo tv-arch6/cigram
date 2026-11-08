@@ -24,7 +24,11 @@ public final class AdsIcons {
             CAMERA = 41, PLAY = 42, PAUSE = 43, DOUBLE_CHECK = 44, ALERT = 45, USER = 46, LOGOUT = 47, RECEIPT = 48,
             TAG = 49, BAN = 50, ARCHIVE = 51, NOTE = 52, FILTER = 53, SEARCH = 54, MORE = 55, BACK = 56, EDIT = 57,
             CALENDAR = 58, CHART = 59, WALLET = 60, STOP = 61, STAR_FILL = 62, BOLT = 63, LINK = 64, PHONE = 65,
-            EXPORT = 66, ASSIGN = 67, FLAG = 68, SPARK = 69, SUN = 70, EYE_OFF = 71;
+            EXPORT = 66, ASSIGN = 67, FLAG = 68, SPARK = 69, SUN = 70, EYE_OFF = 71,
+            // 2026 Cigram / Cigram Plus collection (same 24-unit grid, 1.9 stroke, round caps as every icon above)
+            SWITCH = 72, BOOKMARK = 73, CROWN = 74, CIGRAM = 75, TV = 76, CAST = 77, QUALITY = 78, SUBTITLES = 79,
+            AUDIO = 80, SPEED = 81, APPS = 82, REPLAY10 = 83, FORWARD10 = 84, SKIP_NEXT = 85, PALETTE = 86,
+            DOC = 87, SKIP_PREV = 88;
 
     public static final class Icon extends View {
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -277,6 +281,53 @@ public final class AdsIcons {
                         ln(c, 12f + cs * 7f, 12f + sn * 7f, 12f + cs * 9.5f, 12f + sn * 9.5f);
                     }
                     break;
+                case SWITCH:
+                    ln(c, 4.5f, 8f, 18.5f, 8f); path.moveTo(15f, 4.5f); path.lineTo(18.5f, 8f); path.lineTo(15f, 11.5f); pth(c, false);
+                    path.reset(); ln(c, 19.5f, 16f, 5.5f, 16f); path.moveTo(9f, 12.5f); path.lineTo(5.5f, 16f); path.lineTo(9f, 19.5f); pth(c, false); break;
+                case BOOKMARK:
+                    path.moveTo(6.5f, 4f); path.lineTo(17.5f, 4f); path.lineTo(17.5f, 20.5f); path.lineTo(12f, 16.5f); path.lineTo(6.5f, 20.5f); path.close(); pth(c, false); break;
+                case CROWN:
+                    path.moveTo(4f, 17f); path.lineTo(4.8f, 7.5f); path.lineTo(9.2f, 11.5f); path.lineTo(12f, 5.5f); path.lineTo(14.8f, 11.5f); path.lineTo(19.2f, 7.5f); path.lineTo(20f, 17f); path.close(); pth(c, false);
+                    ln(c, 5f, 20.5f, 19f, 20.5f); break;
+                case CIGRAM:
+                    // the Cigram mark: a ring opened on the right, the solid "D" inside
+                    arc(c, 3.5f, 3.5f, 20.5f, 20.5f, 28f, 304f);
+                    path.moveTo(9.6f, 8.6f); path.lineTo(12.3f, 8.6f); path.quadTo(15.6f, 8.6f, 15.6f, 12f); path.quadTo(15.6f, 15.4f, 12.3f, 15.4f); path.lineTo(9.6f, 15.4f); path.close(); pth(c, true); break;
+                case TV:
+                    rr(c, 3f, 5f, 21f, 17f, 2.2f); ln(c, 8.5f, 20.5f, 15.5f, 20.5f); ln(c, 12f, 17f, 12f, 20.5f); break;
+                case CAST:
+                    path.moveTo(3f, 9f); path.lineTo(3f, 6.5f); path.quadTo(3f, 5f, 4.5f, 5f); path.lineTo(19.5f, 5f); path.quadTo(21f, 5f, 21f, 6.5f);
+                    path.lineTo(21f, 17.5f); path.quadTo(21f, 19f, 19.5f, 19f); path.lineTo(14.5f, 19f); pth(c, false);
+                    arc(c, -1f, 15f, 7f, 23f, 270f, 90f); arc(c, -5f, 11f, 11f, 27f, 270f, 90f); dot(c, 3.6f, 18.4f, 1.3f); break;
+                case QUALITY:
+                    rr(c, 2.8f, 6f, 21.2f, 18f, 2.6f); txt(c, "HD", 12f, 14.9f, 7.2f); break;
+                case SUBTITLES:
+                    rr(c, 2.8f, 5f, 21.2f, 19f, 2.6f); ln(c, 6.5f, 12.5f, 10.5f, 12.5f); ln(c, 13f, 12.5f, 17.5f, 12.5f); ln(c, 6.5f, 15.8f, 14.5f, 15.8f); break;
+                case AUDIO:
+                    path.moveTo(3.5f, 9.5f); path.lineTo(7.5f, 9.5f); path.lineTo(12f, 5.5f); path.lineTo(12f, 18.5f); path.lineTo(7.5f, 14.5f); path.lineTo(3.5f, 14.5f); path.close(); pth(c, false);
+                    arc(c, 11.5f, 8.5f, 17.5f, 15.5f, -55f, 110f); arc(c, 11f, 5f, 21.5f, 19f, -55f, 110f); break;
+                case SPEED:
+                    arc(c, 3f, 5f, 21f, 23f, 195f, 150f); ln(c, 12f, 14f, 16.2f, 9.2f); dot(c, 12f, 14f, 1.5f); break;
+                case APPS:
+                    rr(c, 3.5f, 3.5f, 10.5f, 10.5f, 2.2f); rr(c, 13.5f, 3.5f, 20.5f, 10.5f, 2.2f);
+                    rr(c, 3.5f, 13.5f, 10.5f, 20.5f, 2.2f); rr(c, 13.5f, 13.5f, 20.5f, 20.5f, 2.2f); break;
+                case REPLAY10:
+                    arc(c, 4f, 4.5f, 20f, 20.5f, 280f, 290f); path.moveTo(12.6f, 1.9f); path.lineTo(9.6f, 4.5f); path.lineTo(12.6f, 7.1f); pth(c, false);
+                    txt(c, "10", 12f, 15.3f, 6.6f); break;
+                case FORWARD10:
+                    arc(c, 4f, 4.5f, 20f, 20.5f, -30f, 290f); path.moveTo(11.4f, 1.9f); path.lineTo(14.4f, 4.5f); path.lineTo(11.4f, 7.1f); pth(c, false);
+                    txt(c, "10", 12f, 15.3f, 6.6f); break;
+                case SKIP_NEXT:
+                    path.moveTo(5.5f, 6f); path.lineTo(14f, 12f); path.lineTo(5.5f, 18f); path.close(); pth(c, false); ln(c, 17.5f, 6f, 17.5f, 18f); break;
+                case SKIP_PREV:
+                    path.moveTo(18.5f, 6f); path.lineTo(10f, 12f); path.lineTo(18.5f, 18f); path.close(); pth(c, false); ln(c, 6.5f, 6f, 6.5f, 18f); break;
+                case PALETTE:
+                    path.moveTo(12f, 3.5f); path.quadTo(20.5f, 3.5f, 20.5f, 11f); path.quadTo(20.5f, 15f, 16.5f, 15f); path.lineTo(14.5f, 15f);
+                    path.quadTo(12.8f, 15f, 13.3f, 16.8f); path.quadTo(14f, 20.5f, 12f, 20.5f); path.quadTo(3.5f, 20.5f, 3.5f, 12f); path.quadTo(3.5f, 3.5f, 12f, 3.5f); pth(c, false);
+                    dot(c, 8f, 11f, 1.3f); dot(c, 11f, 7.5f, 1.3f); dot(c, 15.5f, 8.5f, 1.3f); break;
+                case DOC:
+                    path.moveTo(6f, 3.5f); path.lineTo(14f, 3.5f); path.lineTo(18.5f, 8f); path.lineTo(18.5f, 20.5f); path.lineTo(6f, 20.5f); path.close(); pth(c, false);
+                    ln(c, 9f, 11.5f, 15.5f, 11.5f); ln(c, 9f, 14.5f, 15.5f, 14.5f); ln(c, 9f, 17.5f, 13.5f, 17.5f); break;
                 default: break;
             }
             c.restore();

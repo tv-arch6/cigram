@@ -201,6 +201,17 @@
 		<activity
 			android:name=".CommunicationActivity"
 			android:theme="@style/CigramDarkTheme" />
+		<!-- 2026: About Cigram (founder) and Terms and Conditions pages -->
+		<activity
+			android:name=".CigramAboutActivity"
+			android:theme="@style/CigramDarkTheme"
+			android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
+			android:exported="false" />
+		<activity
+			android:name=".CigramTermsActivity"
+			android:theme="@style/CigramDarkTheme"
+			android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
+			android:exported="false" />
 		<activity
 			android:name="com.google.android.gms.ads.AdActivity"
 			android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize|smallestScreenSize"

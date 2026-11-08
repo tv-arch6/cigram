@@ -207,6 +207,10 @@ public class AccountActivity extends AppCompatActivity {
 					return;
 				}
 				
+				// 2026: no account without an explicit tick on «أوافق على الشروط والأحكام» (never pre-selected)
+				if (!CigramTerms.checkBeforeRegister(AccountActivity.this)) return;
+				CigramTerms.recordAcceptance(getApplicationContext(), regEmail);
+				
 				// CIGRAM: تُحفظ مشفّرة بعد نجاح إنشاء الحساب فقط لتجديد الجلسة تلقائياً.
 				CigramSession.pending(regEmail, regPassword);
 				
@@ -215,6 +219,9 @@ public class AccountActivity extends AppCompatActivity {
 				register_params.put("email", binding.edittextRegisterEmail.getText().toString());
 				register_params.put("password", binding.edittextRegisterPassword.getText().toString());
 				register_params.put("gender", "unspecified");
+				// accepted terms version + time, so the auth worker can keep its own record of the consent
+				register_params.put("terms_version", String.valueOf(CigramTerms.VERSION));
+				register_params.put("terms_accepted_at", String.valueOf(System.currentTimeMillis()));
 				req_register.setParams(register_params, RequestNetworkController.REQUEST_PARAM);
 				req_register.startRequestNetwork(RequestNetworkController.POST, "https://cigram-auth-api.wwq-mixtv.workers.dev/register", "register", _req_register_request_listener);
 			}

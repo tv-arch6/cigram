@@ -41,6 +41,46 @@ final class CigramAppIconUI {
         return id == 0 ? null : a.getResources().getDrawable(id);
     }
 
+    /** 2026: the picker as a sheet opened from Settings → «أيقونة التطبيق» (same section, same rules). */
+    static void openDialog(final Activity a) {
+        try {
+            final Dialog d = new Dialog(a);
+            d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+            android.widget.ScrollView scroll = new android.widget.ScrollView(a);
+            final LinearLayout host = new LinearLayout(a);
+            host.setOrientation(LinearLayout.VERTICAL);
+            host.setPadding(0, CigramUI.dp(a, 6), 0, CigramUI.dp(a, 6));
+            scroll.addView(host, new FrameLayout.LayoutParams(-1, -2));
+            install(a, host, 0);
+            TextView close = CigramUI.label(a, "إغلاق", 14f, CigramPalette.of(a).text2, true);
+            close.setGravity(Gravity.CENTER);
+            close.setMinHeight(CigramUI.dp(a, 48));
+            close.setClickable(true);
+            close.setFocusable(true);
+            close.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { d.dismiss(); }
+            });
+            host.addView(close, new LinearLayout.LayoutParams(-1, -2));
+            d.setContentView(scroll);
+            if (d.getWindow() != null) {
+                d.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
+                d.getWindow().setLayout(Math.min(CigramUI.dp(a, 460), a.getResources().getDisplayMetrics().widthPixels - CigramUI.dp(a, 24)),
+                        ViewGroup.LayoutParams.WRAP_CONTENT);
+            }
+            d.show();
+            // the server may change the plan while the sheet is open: rebuild the section with the answer
+            CigramPlus.refresh(a, false, new Runnable() {
+                @Override public void run() {
+                    if (!a.isFinishing() && d.isShowing()) {
+                        try { install(a, host, 0); } catch (Throwable ignored) { }
+                    }
+                }
+            });
+        } catch (Throwable error) {
+            android.util.Log.w("CigramAppIcon", "picker dialog failed", error);
+        }
+    }
+
     /** Adds (or rebuilds) the section into {@code host} at {@code index}. */
     static void install(final Activity a, final LinearLayout host, int index) {
         View old = host.findViewWithTag(TAG);
