@@ -213,6 +213,27 @@ cue (`00:00:02,5`), a `.`-separated SRT cue, an italic Arabic + English cue and 
 | Emoji panel with 4 tabs, insertion at the cursor | ✅ (`07_`) |
 | Sending a message → **crash** «The specified child already has a parent» in `AdsChatActivity.buildRow` | ❌ found → fixed. The bug is in the supplied source: every bubble render crashed |
 | ANR dialogs (System UI, phone, Cigram) | Emulator CPU starvation; the Cigram trace shows the pre-existing `CigramStage1InitProvider$PlayerMonitor.stage4PatchVisibleSpeedRow` text layout on the main thread, not 18.2 code |
+| Private Support in the phone's **Light** mode: bubbles turned white with white text (the app's `CigramUI.round` / `CigramGlass` recolour dark colours in Light mode) | ❌ found → fixed (`CigramSupport.round`, fixed support colours); re-checked ✅ (`08_`) |
+| Message sent without network stays in the conversation as «بانتظار الاتصال — سيُرسل تلقائياً» (queued, never shown as sent) | ✅ (`08_`); the automatic resend itself needs the live server (§6c) |
+| Admin «مركز الترجمة العربية»: counters, filters, categories, job list from a seeded queue | ✅ (`09_`, `10_`) |
+| Admin job screen: identity, state, QA report, cue-by-cue preview against the source timing | ✅ (`11_`, `12_`); identity rows were displayed in reversed order (mixed RTL / LTR) → fixed, re-checked ✅ |
+| Admin «ترجمات موسم كامل» with a real ZIP (S01E01, S01E02 ×2, S01E03, S02E01, a file without a number): E01 / E03 matched, both E02 files held back as «أكثر من ملف لنفس الحلقة», S02E01 «موسم آخر», the unnumbered file «بلا رقم حلقة»; upload button counts only the 2 matched files | ✅ (`13_`, `14_`). The upload itself was **not pressed** (it writes to the live R2 catalogue) |
+
+Screenshots (emulator, 1080×2280) — `docs/screenshots-18.2/` inside both archives, `qa-screens/18.2/` in the repository:
+| File | Shows |
+|---|---|
+| `01_player_subtitle_timing_cp1256_dot_mixed.png` | Windows-1256 Arabic cue on time; `.`-separated cue shown |
+| `02_player_subtitle_mixed_and_top_position.png` | Arabic + English italic cue; `{\an8}` cue at the top |
+| `03_player_gear_subtitle_timing_presets.png` | Gear sheet «توقيت الترجمة» presets |
+| `04_player_delay_panel_zero.png` / `05_player_delay_panel_plus_0_5s.png` | Fine-tune panel at 0 and after +0.5 s |
+| `06_private_support_chat.png` / `07_private_support_emoji_panel.png` | Private Support screen, emoji panel |
+| `08_private_support_queued_offline_message.png` | Offline message kept queued (Light-mode fix visible) |
+| `09_admin_subtitle_center.png` / `10_admin_subtitle_center_jobs.png` | Admin Arabic Subtitle Center, job list |
+| `11_admin_job_review.png` / `12_admin_job_qa_cue_preview.png` | Job identity / state / QA report / cue preview |
+| `13_admin_season_zip_matching.png` / `14_admin_season_zip_unmatched.png` | Full-season ZIP: matched, duplicate, other season, no number |
+
+Not captured: Developer Inbox and Discovery («ما الجديد؟») screens — both load their content from the live Workers,
+which this environment cannot reach, so a screenshot would only show the network error.
 
 ### 6c. Not tested live (needs real backend / credentials / devices)
 Login; live catalogue; real movies / series / episodes playback and episode selection; subtitle URLs from R2;
