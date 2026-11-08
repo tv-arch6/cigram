@@ -1063,6 +1063,19 @@ public class CigramTogetherPlayerActivity extends Activity implements CigramToge
     private void prepareMedia() {
         if (playable == null) return;
         showOverlay("جاري تجهيز الفيديو…");
+        // 18.2: the subtitle is read by CigramSubtitleHub first (correct milliseconds / encoding / SRT or VTT by content)
+        final String cgSub = playable.optString("subtitle", "");
+        if (cgSub.startsWith("http") && !playable.has("cg_subtitle_local")) {
+            final int epochAtStart = loadedEpoch;
+            CigramSubtitleSyncEngine.normalizeToFile(this, cgSub, new CigramSubtitleSyncEngine.FileCallback() {
+                @Override public void done(String fileUri) {
+                    if (isFinishing() || epochAtStart != loadedEpoch || playable == null) return;
+                    try { playable.put("cg_subtitle_local", fileUri == null ? "" : fileUri); } catch (Throwable ignored) { }
+                    prepareMedia();
+                }
+            });
+            return;
+        }
         try {
             if (player == null) {
                 readNetwork();
@@ -1085,7 +1098,12 @@ public class CigramTogetherPlayerActivity extends Activity implements CigramToge
             }
             MediaItem.Builder mb = CigramStreams.apply(new MediaItem.Builder(), playable.optString("video"));
             String sub = playable.optString("subtitle", "");
-            if (sub.startsWith("http")) {
+            String cgLocal = playable.optString("cg_subtitle_local", "");
+            if (cgLocal.startsWith("file:")) {
+                mb.setSubtitleConfigurations(Collections.singletonList(
+                        new MediaItem.SubtitleConfiguration.Builder(Uri.parse(cgLocal)).setMimeType(MimeTypes.APPLICATION_SUBRIP).setLanguage("ar")
+                                .setSelectionFlags(C.SELECTION_FLAG_DEFAULT).build()));
+            } else if (sub.startsWith("http")) {
                 String mime = sub.toLowerCase(java.util.Locale.US).contains(".srt") ? MimeTypes.APPLICATION_SUBRIP : MimeTypes.TEXT_VTT;
                 mb.setSubtitleConfigurations(Collections.singletonList(
                         new MediaItem.SubtitleConfiguration.Builder(Uri.parse(sub)).setMimeType(mime).setLanguage("ar")

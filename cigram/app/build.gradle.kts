@@ -66,4 +66,6 @@ dependencies {
     implementation("com.google.android.exoplayer:extension-cast:2.19.1")
     implementation("com.google.android.exoplayer:exoplayer-dash:2.19.1")
     implementation("com.google.android.exoplayer:exoplayer-rtsp:2.19.1")
+    // 18.2: JVM unit tests for CigramSubtitleHub / CigramSubtitleSyncEngine (test classpath only, not in the APK)
+    testImplementation("junit:junit:4.13.2")
 }

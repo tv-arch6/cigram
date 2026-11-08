@@ -715,6 +715,9 @@ public class PlayerActivity extends AppCompatActivity {
 		final com.google.android.exoplayer2.ui.SubtitleView subtitleView =
 		exoView.getSubtitleView();
 		
+		// 18.2: CigramSubtitleSyncEngine (created below, once the subtitle view sits in its final place)
+		final CigramSubtitleSyncEngine[] cgSubEngine = { null };
+		
 		final java.lang.Runnable applySubtitleStyle =
 		new java.lang.Runnable() {
 			@Override
@@ -742,13 +745,15 @@ public class PlayerActivity extends AppCompatActivity {
 				
 				subtitleView.setStyle(style);
 				// v10.68: «حجم الترجمة» من إعدادات المشغّل / صفحة الإعدادات
+				float cgSubSize = com.google.android.exoplayer2.ui.SubtitleView.DEFAULT_TEXT_SIZE_FRACTION;
 				try {
 					float cgSubScale = subtitlePrefs.getFloat("subtitle_scale", 1f);
 					if (cgSubScale < 0.5f || cgSubScale > 2f) cgSubScale = 1f;
-					subtitleView.setFractionalTextSize(
-					com.google.android.exoplayer2.ui.SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * cgSubScale
-					);
+					cgSubSize = com.google.android.exoplayer2.ui.SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * cgSubScale;
+					subtitleView.setFractionalTextSize(cgSubSize);
 				} catch (Throwable ignored) {}
+				// 18.2: the engine's overlay gets exactly the same look (same bottom position as below: 0.12)
+				if (cgSubEngine[0] != null) cgSubEngine[0].applyStyle(style, cgSubSize, 0.12f);
 			}
 		};
 		
@@ -780,6 +785,28 @@ public class PlayerActivity extends AppCompatActivity {
 				subtitleView.setBottomPaddingFraction(cgSubtitleBottomFraction);
 			}
 		} catch (Throwable ignored) {}
+		
+		// =====================================================
+		// 18.2 CIGRAM SUBTITLE SYNC ENGINE
+		// The subtitle file is parsed by CigramSubtitleHub (correct milliseconds, SRT and VTT, Arabic encodings) and
+		// drawn over ExoPlayer's own subtitle view, with the viewer's delay applied once at display time.
+		// =====================================================
+		try {
+			cgSubEngine[0] = CigramSubtitleSyncEngine.attach(PlayerActivity.this, exoPlayer, subtitleView);
+			if (cgSubEngine[0] != null) {
+				applySubtitleStyle.run();
+				cgSubEngine[0].setListener(new CigramSubtitleSyncEngine.Listener() {
+					@Override public void onLoaded(com.Cigram.subhub.SubDocument doc) { }
+					@Override public void onFailed(String message) {
+						if (isFinishing() || isDestroyed()) return;
+						android.widget.Toast.makeText(PlayerActivity.this, message, android.widget.Toast.LENGTH_SHORT).show();
+					}
+				});
+			}
+		} catch (Throwable cgSubError) {
+			android.util.Log.w("CigramPlayer", "subtitle engine unavailable, using ExoPlayer decoders", cgSubError);
+			cgSubEngine[0] = null;
+		}
 		
 		final android.os.Handler uiHandler =
 		new android.os.Handler(android.os.Looper.getMainLooper());
@@ -2552,7 +2579,14 @@ public class PlayerActivity extends AppCompatActivity {
 				android.net.Uri.parse(currentVideo[0])
 				);
 				
-				if (!currentSubtitle[0].equals("")) {
+				if (!currentSubtitle[0].equals("") && cgSubEngine[0] != null) {
+					// 18.2: CigramSubtitleSyncEngine owns the subtitle (no SubtitleConfiguration for ExoPlayer)
+					cgSubEngine[0].load(currentSubtitle[0]);
+					if (subtitleView != null) {
+						subtitleView.setVisibility(subtitlesEnabled[0]
+						? android.view.View.VISIBLE : android.view.View.GONE);
+					}
+				} else if (!currentSubtitle[0].equals("")) {
 					
 					String mime =
 					com.google.android.exoplayer2.util.MimeTypes.APPLICATION_SUBRIP;
@@ -2593,6 +2627,7 @@ public class PlayerActivity extends AppCompatActivity {
 					
 				} else {
 					
+					if (cgSubEngine[0] != null) cgSubEngine[0].clear();
 					if (subtitleView != null) {
 						subtitleView.setVisibility(android.view.View.GONE);
 					}
@@ -4370,6 +4405,29 @@ public class PlayerActivity extends AppCompatActivity {
 						return cgSubLabels[which];
 					}
 				});
+				// 18.2: «توقيت الترجمة» — the viewer's delay (CigramSubtitleSyncEngine), presets + fine tuning with preview
+				if(cgSubEngine[0]!=null&&cgSubEngine[0].isActive()){
+					final long[] cgDelayValues={Long.MIN_VALUE,-2000L,-1000L,-500L,-250L,0L,250L,500L,1000L,2000L};
+					final String[] cgDelayLabels={"تعديل دقيق مع معاينة…","\u22122 ث","\u22121 ث","\u22120.5 ث","\u22120.25 ث","0 (متزامنة)","+0.25 ث","+0.5 ث","+1 ث","+2 ث"};
+					long cgDelayNow=cgSubEngine[0].delayMs();
+					sheet.item("توقيت الترجمة",cgDelayNow==0?"متزامنة":com.Cigram.subhub.SubSync.delayLabel(cgDelayNow),new CigramPlayerSheet.Source(){
+						@Override public CigramPlayerSheet.Options load(){
+							int sel=-1;long now=cgSubEngine[0].delayMs();
+							for(int i=1;i<cgDelayValues.length;i++)if(cgDelayValues[i]==now)sel=i;
+							return new CigramPlayerSheet.Options(cgDelayLabels,sel,"إذا ظهر النص قبل الكلام اختر «+». يُطبَّق فوراً ويُحفظ لهذا الملف فقط.");
+						}
+						@Override public String pick(int which){
+							if(which==0){
+								try{sheet.dismiss();}catch(Throwable ignored){}
+								uiHandler.postDelayed(new java.lang.Runnable(){@Override public void run(){CigramSubtitleDelayPanel.show(PlayerActivity.this,cgSubEngine[0]);}},260L);
+								return null;
+							}
+							cgSubEngine[0].setDelayMs(cgDelayValues[which]);
+							long v=cgSubEngine[0].delayMs();
+							return v==0?"متزامنة":com.Cigram.subhub.SubSync.delayLabel(v);
+						}
+					});
+				}
 				
 				// ------------------------------------------------------------ التشغيل
 				sheet.section("التشغيل");
