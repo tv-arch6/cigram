@@ -313,7 +313,7 @@ public class CigramPlusCodeActivity extends Activity {
 
     private String catalogJson() {
         try {
-            return getSharedPreferences("cigram_catalog_cache", Context.MODE_PRIVATE).getString("json", "");
+            return CigramCatalogPrefs.of(this).getString("json", "");
         } catch (Throwable t) {
             return "";
         }

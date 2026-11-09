@@ -299,7 +299,7 @@ public final class CigramExternalLink {
 
     private static String catalogJson(Context c) {
         try {
-            return c.getSharedPreferences("cigram_catalog_cache", Context.MODE_PRIVATE).getString("json", "");
+            return CigramCatalogPrefs.of(c).getString("json", "");
         } catch (Throwable t) {
             return "";
         }

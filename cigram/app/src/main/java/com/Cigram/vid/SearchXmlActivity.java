@@ -1360,7 +1360,7 @@ public class SearchXmlActivity extends AppCompatActivity {
 		final CigramSearch cgSearch=new CigramSearch();
 		// One render callback shared by network response, typing, tabs and voice input.
 		cgInput.setTag(cgSearch);
-		search_json=getSharedPreferences("cigram_catalog_cache",MODE_PRIVATE).getString("json",search_json==null?"":search_json);
+		search_json=CigramCatalogPrefs.of(this).getString("json",search_json==null?"":search_json);
 		cgFilter.setOnClickListener(new android.view.View.OnClickListener(){@Override public void onClick(android.view.View v){cgSearch.filter();}});
 		findViewById(R.id.imageview_filter).setOnClickListener(new android.view.View.OnClickListener(){@Override public void onClick(android.view.View v){cgSearch.filter();}});
 		for(int i=0;i<cgTabViews.length;i++) {
@@ -2233,7 +2233,7 @@ public class SearchXmlActivity extends AppCompatActivity {
 		// nothing is saved yet or the saved copy is older than 10 minutes; opening the page, typing and tapping
 		// never trigger a request, and there is no loading / prep screen while a usable copy exists.
 		{
-			android.content.SharedPreferences cgCatalogPrefs = getSharedPreferences("cigram_catalog_cache", MODE_PRIVATE);
+			android.content.SharedPreferences cgCatalogPrefs = CigramCatalogPrefs.of(this);
 			long cgSavedAt = cgCatalogPrefs.getLong("updated_at", 0L);
 			boolean cgHasSaved = search_json != null && search_json.trim().length() > 2;
 			boolean cgFresh = cgHasSaved && cgSavedAt > 0L

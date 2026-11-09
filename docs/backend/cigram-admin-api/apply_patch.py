@@ -14,6 +14,7 @@ import sys
 
 src, dst = sys.argv[1], sys.argv[2]
 HUB_JS = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "subhub_providers.js"), encoding="utf-8").read()
+FEED_JS = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "catalog_feed.js"), encoding="utf-8").read()
 s = open(src, encoding="utf-8").read()
 
 
@@ -100,7 +101,7 @@ async function handleWnDecisions(request, env) {
   return okResponse({ items: doc.items || {} });
 }
 
-''' + HUB_JS + '''
+''' + HUB_JS + FEED_JS + '''
 // ----------------------------------------------------------------------------- route table
 ''')
 rep('''    "POST /admin/discover/collection": A(handleWnCollection),''', '''    "POST /admin/discover/collection": A(handleWnCollection),
@@ -160,6 +161,17 @@ rep("""      const r = await subsDoFetch(env, { item_id: ep.id, mode: "upload" }
 rep("""      if (request.method === "GET" && path === "/movies") {
         return returnR2JsonObject(env, MOVIES_OBJECT, []);""","""      if (request.method === "GET" && path === "/movies") {
         return returnR2JsonConditional(request, env, MOVIES_OBJECT, []);""")
+
+# 18.4) catalogue feed: revision tracking after every movies.json write (never fails the write) + the two public routes
+rep("""  pushAfterMoviesSave(env, records, getWritableMoviesArray(out.doc).list, options.op || "");""", """  await catalogFeedAfterWrite(env, getWritableMoviesArray(out.doc).list, options.op || "");   // 18.4: revision + change feed (never throws)
+  pushAfterMoviesSave(env, records, getWritableMoviesArray(out.doc).list, options.op || "");""")
+rep("""      // Movies
+      if (request.method === "GET" && path === "/movies") {""", """      // 18.4 incremental catalogue (public, conditional)
+      if (request.method === "GET" && path === "/catalog/manifest") return handleCatalogManifest(request, env);
+      if (request.method === "GET" && path === "/catalog/changes") return handleCatalogChanges(request, env, url);
+
+      // Movies
+      if (request.method === "GET" && path === "/movies") {""")
 
 open(dst, "w", encoding="utf-8").write(s)
 print("patched:", dst)

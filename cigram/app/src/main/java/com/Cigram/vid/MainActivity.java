@@ -2787,10 +2787,7 @@ public class MainActivity extends AppCompatActivity {
 				
 				// محاولة عرض آخر قائمة محفوظة.
 				String lastCatalog =
-				getSharedPreferences(
-				"cigram_catalog_cache",
-				MODE_PRIVATE
-				).getString("json", "");
+				CigramCatalogPrefs.of(MainActivity.this).getString("json", "");
 				
 				if (lastCatalog != null && !lastCatalog.trim().isEmpty()) {
 					try {
@@ -3593,7 +3590,7 @@ public class MainActivity extends AppCompatActivity {
 						}
 						final boolean cgAfterSnapshot = cgFromSnapshot;
 						try {
-							final String savedJson = cgCacheCtx.getSharedPreferences("cigram_catalog_cache", MODE_PRIVATE)
+							final String savedJson = CigramCatalogPrefs.of(cgCacheCtx)
 							.getString("json", "");
 							if (savedJson == null || savedJson.trim().isEmpty()) return;
 							Object rootJson = new org.json.JSONTokener(savedJson).nextValue();
@@ -3644,7 +3641,7 @@ public class MainActivity extends AppCompatActivity {
 					final android.content.Context cgCtx = getApplicationContext();
 					new Thread(new Runnable() {
 						@Override public void run() {
-							final String saved = cgCtx.getSharedPreferences("cigram_catalog_cache", MODE_PRIVATE).getString("json", "");
+							final String saved = CigramCatalogPrefs.of(cgCtx).getString("json", "");
 							if (saved == null || saved.trim().isEmpty()) return;
 							runOnUiThread(new Runnable() {
 								@Override public void run() {

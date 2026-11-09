@@ -170,7 +170,7 @@ public class CigramCarouselWidget extends AppWidgetProvider {
         if (carouselJson != null) prefs.edit().putString("json", carouselJson).apply();
         else carouselJson = prefs.getString("json", "");
 
-        SharedPreferences catalogPrefs = c.getSharedPreferences("cigram_catalog_cache", Context.MODE_PRIVATE);
+        SharedPreferences catalogPrefs = CigramCatalogPrefs.of(c);
         String catalog = catalogPrefs.getString("json", "");
         if (catalog == null || catalog.length() == 0) {              // the app was never opened: ask the server once
             String fresh = download(new String[]{MOVIES}, 6000, false);

@@ -889,60 +889,47 @@ public final class CigramStage1InitProvider extends ContentProvider {
             @Override public void run() {
                 try {
                     final long perfT0 = android.os.SystemClock.elapsedRealtime();
-                    FetchResult result = fetchCatalog(context);
-                    if (!result.ok) {
+                    final CigramCatalogPrefs facade = CigramCatalogPrefs.of(context);
+                    final String oldHash = facade.getString(KEY_JSON_HASH, "");
+                    final CigramCatalogSync.Config cfg = new CigramCatalogSync.Config();
+                    cfg.now = System.currentTimeMillis();
+                    cfg.forceFull = reason == CigramRefreshPolicy.Reason.FORCED;        // only an explicit pull-to-refresh forces a full compare
+                    try { cfg.metered = catalogPolicyState(context).metered; } catch (Throwable ignored) { }
+                    // 18.4: ONE manager decides: manifest (304) -> delta pages -> full download -> verify -> atomic commit.
+                    final CigramCatalogSync.Outcome out = CigramCatalogSync.syncOnce(facade.store, new CatalogTransport(context), CATALOG_PIPELINE, cfg);
+                    trace("catalogSync:" + out + ",req=" + out.requests);
+                    android.util.Log.i("CigramSync", "outcome=" + out + " requests=" + out.requests + " upserts=" + out.upserts + " removed=" + out.removed
+                            + " ms=" + (android.os.SystemClock.elapsedRealtime() - perfT0));
+                    if (out.kind == CigramCatalogSync.Kind.FAILED || out.kind == CigramCatalogSync.Kind.BUSY
+                            || out.kind == CigramCatalogSync.Kind.REJECTED || out.kind == CigramCatalogSync.Kind.HELD) {
+                        // the saved catalogue was NOT touched; the back-off of CigramRefreshPolicy keeps the next attempt away
                         CATALOG_FAILURES = Math.min(CATALOG_FAILURES + 1, 12);
-                        CATALOG_FAILURE_PERMANENT = !result.retryable && result.status >= 400 && result.status < 500 && result.status != 408 && result.status != 429;
+                        CATALOG_FAILURE_PERMANENT = out.permanent;
                         return;
                     }
-                    if (result.notModified) { confirmCatalogSnapshot(context); trace("catalog304"); return; }
-                    if (!isValidCatalog(result.body)) {
-                        CATALOG_FAILURES = Math.min(CATALOG_FAILURES + 1, 12);   // an error / empty body never replaces the saved snapshot
-                        return;
-                    }
-
-                    SharedPreferences prefs = catalogPrefs(context);
-                    final String rawHash = catalogHash(result.body);
-                    // 18.3: identical body (a server that ignores If-None-Match): nothing to parse, index, save or redraw
-                    if (rawHash.length() > 0 && rawHash.equals(prefs.getString(KEY_RAW_HASH, "")) && prefs.contains(KEY_JSON)) {
-                        if (result.etag.length() > 0) prefs.edit().putString(KEY_ETAG, result.etag).apply();
-                        confirmCatalogSnapshot(context);
-                        trace("catalogSame");
-                        return;
-                    }
-
-                    PreparedCatalog prepared = prepareCatalog(result.body);
-                    final String display = prepared.displayJson;
-                    final String index = prepared.searchIndexJson;
-                    final String hash = catalogHash(display);
+                    facade.reload();                                   // the manager committed through the store: refresh the prefs view
                     long now = System.currentTimeMillis();
-
-                    String oldHash = prefs.getString(KEY_JSON_HASH, "");
-                    if (oldHash.length() == 0) {
-                        oldHash = catalogHash(prefs.getString(KEY_JSON, ""));
-                    }
-
-                    installCatalogInMemory(display, index);
-                    prefs.edit()
-                            .putString(KEY_JSON, display)
-                            .putString(KEY_JSON_HASH, hash)
-                            .putString(KEY_RAW_HASH, rawHash)
-                            .putString(KEY_ETAG, result.etag)
-                            .putLong(KEY_UPDATED, now)
-                            .putString(KEY_SEARCH_JSON, index)
-                            .putLong(KEY_SEARCH_UPDATED, now)
-                            .apply();
                     LAST_CATALOG_NETWORK_SUCCESS_AT = now;
                     CATALOG_FAILURES = 0;
                     CATALOG_FAILURE_PERMANENT = false;
+                    if (out.kind != CigramCatalogSync.Kind.UPDATED || out.snapshot == null) return;
+
+                    final String display = out.snapshot.display;
+                    final String index = out.snapshot.index;
+                    final String hash = out.displayHash.length() > 0 ? out.displayHash : catalogHash(display);
+                    installCatalogInMemory(display, index);
                     preloadCatalogImages(context.getApplicationContext(), index);
                     CigramPerf.slow("catalog.refresh.apply", android.os.SystemClock.elapsedRealtime() - perfT0, 1500L);
 
-                    final boolean contentChanged = !hash.equals(oldHash);
+                    final boolean contentChanged = out.contentChanged || !hash.equals(oldHash);
+                    // 18.4: the redraw of Home (a rebuild of its rows) used to run the moment a refresh finished, in the middle of
+                    // the user's scroll: that is a visible hitch. It now waits until the finger rests (see homeBusyScrolling).
                     MAIN.post(new Runnable() {
+                        int waits;
                         @Override public void run() {
                             Activity main = ACTIVE_MAIN == null ? null : ACTIVE_MAIN.get();
                             if (!isAlive(main)) { trace("earlyNoMain"); return; }
+                            if (homeBusyScrolling() && waits++ < 40) { MAIN.postDelayed(this, 350L); return; }   // at most ~14 s, then apply anyway
                             removeTagged(main, "cigram_stage1_main_error");
                             removeTagged(main, "cigram_offline_screen");
                             removeTagged(main, "cigram_stage1_offline_banner");
@@ -953,6 +940,9 @@ public final class CigramStage1InitProvider extends ContentProvider {
                             }
                         }
                     });
+                } catch (Throwable error) {
+                    CATALOG_FAILURES = Math.min(CATALOG_FAILURES + 1, 12);
+                    android.util.Log.w("CigramSync", "refresh failed; the saved catalogue is untouched", error);
                 } finally {
                     synchronized (CATALOG_MEMORY_LOCK) {
                         CATALOG_NETWORK_RUNNING = false;
@@ -11605,6 +11595,10 @@ public final class CigramStage1InitProvider extends ContentProvider {
     private static final Object BLOCKING_LOAD_LOCK = new Object();
 
     private static FetchResult fetchCatalog(Context context) {
+        return fetchCatalog(context, true);
+    }
+
+    private static FetchResult fetchCatalog(Context context, boolean conditional) {
         if (!isOnline(context)) {
             FetchResult offline = new FetchResult();
             offline.userMessage = "لا يوجد اتصال بالإنترنت";
@@ -11612,7 +11606,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
         }
         FetchResult result = new FetchResult();
         for (int attempt = 1; attempt <= CATALOG_FETCH_ATTEMPTS; attempt++) {
-            result = fetchCatalogOnce(context);
+            result = fetchCatalogOnce(context, conditional);
             if (result.ok || !result.retryable) return result;
             if (attempt < CATALOG_FETCH_ATTEMPTS) {
                 if (!isOnline(context)) {
@@ -11632,7 +11626,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
         return result;
     }
 
-    private static FetchResult fetchCatalogOnce(Context context) {
+    private static FetchResult fetchCatalogOnce(Context context, boolean conditional) {
         FetchResult result = new FetchResult();
         HttpURLConnection connection = null;
         InputStream input = null;
@@ -11654,7 +11648,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             String sentEtag = "";
             try {
                 SharedPreferences cp = catalogPrefs(context);
-                if (cp.contains(KEY_JSON)) sentEtag = cp.getString(KEY_ETAG, "");
+                if (conditional && cp.contains(KEY_JSON)) sentEtag = cp.getString(KEY_ETAG, "");
             } catch (Throwable ignored) { }
             if (sentEtag != null && sentEtag.length() > 0) connection.setRequestProperty("If-None-Match", sentEtag);
 
@@ -11746,6 +11740,72 @@ public final class CigramStage1InitProvider extends ContentProvider {
         return result;
     }
 
+    // ------------------------------------------------------------------------------------------------ 18.4 sync glue
+
+    private static final String CATALOG_BASE = "https://cigram-admin-api.wwq-mixtv.workers.dev";
+
+    /** The existing section-ordering + search-index pipeline, as the sync manager's {@link CigramCatalogSync.Pipeline}. */
+    private static final CigramCatalogSync.Pipeline CATALOG_PIPELINE = new CigramCatalogSync.Pipeline() {
+        @Override public String normalizeRecords(String docJson) {
+            return CigramTitles.normalizeCatalog(docJson);
+        }
+        @Override public CigramCatalogSync.Prepared prepare(String docJson) {
+            PreparedCatalog p = prepareCatalog(docJson);
+            return new CigramCatalogSync.Prepared(p.displayJson, p.searchIndexJson);
+        }
+    };
+
+    /** HTTP for the manager: the small /catalog/* calls here, the legacy full download through the hardened {@link #fetchCatalog}. */
+    private static final class CatalogTransport implements CigramCatalogSync.Transport {
+        private final Context ctx;
+        CatalogTransport(Context ctx) { this.ctx = ctx.getApplicationContext(); }
+
+        @Override public CigramCatalogSync.Reply get(String path, String etag) throws java.io.IOException {
+            if (!isOnline(ctx)) throw new java.io.IOException("offline");
+            HttpURLConnection c = (HttpURLConnection) new URL(CATALOG_BASE + path).openConnection();
+            try {
+                c.setConnectTimeout(CONNECT_TIMEOUT_MS);
+                c.setReadTimeout(READ_TIMEOUT_MS);
+                c.setRequestMethod("GET");
+                c.setUseCaches(false);
+                c.setRequestProperty("Accept", "application/json");
+                c.setRequestProperty("User-Agent", "Cigram-Android/1.0");
+                if (etag != null && etag.length() > 0) c.setRequestProperty("If-None-Match", etag);
+                CigramPerf.request(path.startsWith("/catalog/manifest") ? "catalog-manifest" : "catalog-changes");
+                int status = c.getResponseCode();
+                String got = c.getHeaderField("ETag");
+                got = got == null ? "" : got.trim();
+                if (status == 304) return new CigramCatalogSync.Reply(304, got.length() > 0 ? got : etag, "");
+                if (status != 200) return new CigramCatalogSync.Reply(status, got, "");
+                InputStream in = new BufferedInputStream(c.getInputStream());
+                try {
+                    ByteArrayOutputStream out = new ByteArrayOutputStream(8 * 1024);
+                    byte[] buf = new byte[8 * 1024];
+                    int n, total = 0;
+                    while ((n = in.read(buf)) != -1) {
+                        total += n;
+                        if (total > 4 * 1024 * 1024) throw new java.io.IOException("answer too large");   // a delta page is a few hundred KB at most
+                        out.write(buf, 0, n);
+                    }
+                    return new CigramCatalogSync.Reply(200, got, new String(out.toByteArray(), Charset.forName("UTF-8")));
+                } finally {
+                    try { in.close(); } catch (Throwable ignored) { }
+                }
+            } finally {
+                try { c.disconnect(); } catch (Throwable ignored) { }
+            }
+        }
+
+        @Override public CigramCatalogSync.Reply getFull(String etag) throws java.io.IOException {
+            FetchResult r = fetchCatalog(ctx, etag != null && etag.length() > 0);
+            if (r.ok && r.notModified) return new CigramCatalogSync.Reply(304, r.etag, "");
+            if (r.ok) return new CigramCatalogSync.Reply(200, r.etag, r.body);
+            if (r.status >= 200 && r.status < 300) return new CigramCatalogSync.Reply(200, r.etag, "");   // reached the server, the body is not a usable catalogue
+            if (r.status == 0) throw new java.io.IOException(r.userMessage);                              // offline / timeout / DNS
+            return new CigramCatalogSync.Reply(r.status, "", "");
+        }
+    }
+
     private static boolean isValidCatalog(String json) {
         if (!looksLikeCatalogText(json)) return false;
         try {
@@ -11756,12 +11816,19 @@ public final class CigramStage1InitProvider extends ContentProvider {
             if (!(value instanceof JSONObject)) return false;
             JSONObject object = (JSONObject) value;
             if (object.length() == 0 || !object.optBoolean("ok", true)) return false;
+            boolean sawContainer = false;
             for (String key : new String[]{
                     "movies", "series", "items", "data", "results",
                     "content", "sections", "catalog"
             }) {
-                if (object.has(key)) return true;
+                if (!object.has(key)) continue;
+                sawContainer = true;
+                Object c = object.opt(key);
+                // 18.4: {"ok":true,"movies":[]} is an EMPTY catalogue, not a valid one. It used to pass and replace the saved catalogue.
+                if (c instanceof JSONArray && ((JSONArray) c).length() > 0) return true;
+                if (c instanceof JSONObject && ((JSONObject) c).length() > 0) return true;
             }
+            if (sawContainer) return false;
             return jsonText(object, "title", "series_title", "name").length() > 0
                     && (object.has("id") || object.has("series_id")
                         || object.has("poster") || object.has("video")
@@ -12906,8 +12973,9 @@ public final class CigramStage1InitProvider extends ContentProvider {
         showDetailsError(activity, "تعذر تحميل جزء من صفحة التفاصيل. يمكنك الرجوع والمحاولة مرة أخرى.");
     }
 
+    /** 18.4: the saved catalogue lives in {@link CigramCatalogStore} (atomic generations, checksums, recovery); same API as before. */
     private static SharedPreferences catalogPrefs(Context context) {
-        return context.getSharedPreferences(PREF_CATALOG, Context.MODE_PRIVATE);
+        return CigramCatalogPrefs.of(context);
     }
 
     private static boolean isOnline(Context context) {
