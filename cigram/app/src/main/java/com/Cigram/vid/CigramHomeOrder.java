@@ -79,22 +79,8 @@ final class CigramHomeOrder {
             if (json == null || json.length() == 0) return plan;
             JSONObject root = new JSONObject(json);
             if (!"registry".equals(root.optString("source"))) return plan;
-            JSONArray list = root.optJSONArray("sections");
-            if (list != null) {
-                for (int i = 0; i < list.length(); i++) {
-                    JSONObject s = list.optJSONObject(i);
-                    if (s == null) continue;
-                    int order = s.optInt("order", i + 1);
-                    boolean hide = s.optBoolean("show_home", true) == false || s.optBoolean("more_only", false);
-                    String[] names = {s.optString("id"), s.optString("slug"), s.optString("name")};
-                    for (String n : names) {
-                        String k = Plan.key(n);
-                        if (k.length() == 0) continue;
-                        plan.order.put(k, Integer.valueOf(order));
-                        plan.hidden.put(k, Boolean.valueOf(hide));
-                    }
-                }
-            }
+            // 18.3: first entry wins (a later duplicate of an id / slug / name no longer overwrites the admin's earlier position)
+            CigramSectionDedupe.buildOrder(root.optJSONArray("sections"), plan.order, plan.hidden);
             JSONArray off = root.optJSONArray("disabled");
             if (off != null) {
                 for (int i = 0; i < off.length(); i++) {
@@ -121,6 +107,7 @@ final class CigramHomeOrder {
             @Override public void run() {
                 HttpURLConnection c = null;
                 try {
+                    CigramPerf.request("home-sections");
                     c = (HttpURLConnection) new URL(URL).openConnection();
                     c.setConnectTimeout(8000);
                     c.setReadTimeout(8000);

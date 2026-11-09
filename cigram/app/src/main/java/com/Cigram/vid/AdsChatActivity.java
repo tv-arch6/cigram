@@ -186,7 +186,7 @@ public class AdsChatActivity extends Activity {
                 @Override public void onOpen() { setBanner(null); fetchNew(); flushPending(); loadPresence(); }
                 @Override public void onMessage(JSONObject m) { onEvent(m); }
                 @Override public void onClosed(boolean authFailed) {
-                    if (authFailed) setBanner("انتهت الجلسة. سجّل الدخول من جديد.");
+                    if (authFailed) setSessionBanner();    // 18.3: only after one silent renewal failed or none is possible
                 }
             });
         }
@@ -437,8 +437,37 @@ public class AdsChatActivity extends Activity {
 
     private void setBanner(String s) {
         if (destroyed) return;
+        banner.setOnClickListener(null);
+        banner.setClickable(false);
         if (s == null) banner.setVisibility(View.GONE);
         else { banner.setText(s); banner.setVisibility(View.VISIBLE); }
+    }
+
+    /**
+     * The account session is really over (the server refused the account even after a silent renewal, or no credentials
+     * are stored to renew with). Accurate text + a way out; the saved conversation and the unsent messages stay.
+     */
+    private void setSessionBanner() {
+        if (destroyed) return;
+        banner.setText("انتهت جلسة حسابك ولا يمكن تجديدها تلقائياً — اضغط هنا لتسجيل الدخول. محادثتك ورسائلك غير المرسلة محفوظة وستُرسل بعد الدخول.");
+        banner.setVisibility(View.VISIBLE);
+        banner.setClickable(true);
+        banner.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { openLogin(); }
+        });
+    }
+
+    /** Only on the user's own tap: the expired local session marker is removed and the login page opens. Chat data is untouched. */
+    private void openLogin() {
+        try {
+            getSharedPreferences("auth_session", MODE_PRIVATE).edit()
+                    .putBoolean("logged_in", false).remove("token").remove("expires_at").apply();
+            Intent i = new Intent(this, Class.forName("com.Cigram.vid.AccountActivity"));
+            i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(i);
+        } catch (Throwable t) {
+            android.util.Log.w("AdsChat", "open login failed", t);
+        }
     }
 
     private void updateSubtitle() {
@@ -541,7 +570,8 @@ public class AdsChatActivity extends Activity {
                         loaded = true;
                         return;
                     }
-                    setBanner(r.offline ? "لا يوجد اتصال — يعرض آخر محادثة محفوظة" : r.message);
+                    if (r.authExpired) setSessionBanner();
+                    else setBanner(r.offline ? "لا يوجد اتصال — يعرض آخر محادثة محفوظة" : r.message);
                     loaded = true;
                     return;
                 }
@@ -554,7 +584,7 @@ public class AdsChatActivity extends Activity {
                     @Override public void onResult(CigramAds.Result r2) {
                         if (destroyed) return;
                         loaded = true;
-                        if (!r2.ok) { setBanner(r2.message); return; }
+                        if (!r2.ok) { if (r2.authExpired) setSessionBanner(); else setBanner(r2.message); return; }
                         JSONArray arr = r2.json.optJSONArray("messages");
                         applyServer(arr, true);
                         hasMore = arr != null && arr.length() >= 40;
@@ -791,8 +821,12 @@ public class AdsChatActivity extends Activity {
                         m.state = 2;
                         m.failMsg = r.message;
                         // 18.2: no connection / busy server → stays queued (never shown as sent) and is retried with backoff
-                        boolean transientFail = r.offline || r.code == 0 || r.code == 408 || r.code == 429 || r.code >= 500;
-                        if (transientFail && !"banned".equals(r.error)) {
+                        boolean transientFail = r.offline || r.code == 0 || r.code == 408 || r.code == 429 || r.code >= 500 || r.authTransient;
+                        if (r.authExpired) {
+                            // 18.3: queued, never dropped and never retried in a loop: it is sent when the account signs in again
+                            m.failMsg = "";
+                            setSessionBanner();
+                        } else if (transientFail && !"banned".equals(r.error)) {
                             m.failMsg = "";
                             h.removeCallbacks(retryRun);
                             h.postDelayed(retryRun, retryDelayMs);

@@ -59,6 +59,69 @@ public final class CigramAds {
         public boolean offline;
         /** صحيح عندما جاءت البيانات من النسخة المحلية المخزّنة. */
         public boolean cached;
+        /** True when this answer came after one silent renewal of the session (18.3). */
+        public boolean renewed;
+        /** True ONLY when the server still refuses the account after a renewal, or no credentials exist to renew with. */
+        public boolean authExpired;
+        /** True when a 401 could not be resolved right now (renewal failed for a temporary reason): the session is NOT lost. */
+        public boolean authTransient;
+
+        /** An authentication answer: HTTP 401 from the Worker (never a timeout, an offline state, a 5xx or a 403). */
+        public boolean authRejected() {
+            return code == 401 && !offline;
+        }
+    }
+
+    // ------------------------------------------------------------------ session (18.3)
+
+    private static volatile Context APP;
+
+    /** The token source of the chat: the account token stored at login + the silent renewal of {@link CigramSession}. */
+    static volatile AdsAuthGateway.Auth AUTH = new AdsAuthGateway.Auth() {
+        @Override public String current() {
+            Context c = APP;
+            return c == null ? "" : CigramSession.token(c);
+        }
+        @Override public String renew() {
+            Context c = APP;
+            return c == null ? "" : CigramSession.renewBlocking(c);
+        }
+        @Override public boolean expiresSoon() {
+            Context c = APP;
+            return c != null && CigramSession.expiresSoon(c);
+        }
+        @Override public boolean canRenew() {
+            Context c = APP;
+            return c != null && CigramSession.canRenew(c);
+        }
+    };
+
+    /** Base URL of the chat Worker (a variable only so a JVM test can point it at a local server). */
+    static volatile String apiBase = API_BASE;
+
+    /** Gives the chat layer the application context that the silent renewal needs. Safe to call many times. */
+    public static void attach(Context c) {
+        if (c != null) APP = c.getApplicationContext();
+    }
+
+    /** The newest stored token (after another request renewed the session), else the one passed in. */
+    static String freshest(String used) {
+        try {
+            String cur = AUTH.current();
+            return cur != null && cur.length() > 0 ? cur : used;
+        } catch (Throwable ignored) {
+            return used;
+        }
+    }
+
+    /** For callers that run their own connection (chunk upload): one shared renewal after a 401. Returns "" when none is possible. */
+    static String refreshAfter401(String used) {
+        try {
+            String t = AdsAuthGateway.freshToken(AUTH, used);
+            return t != null && !t.equals(used) ? t : "";
+        } catch (Throwable ignored) {
+            return "";
+        }
     }
 
     // ------------------------------------------------------------------ هوية الجهاز والوقت
@@ -83,6 +146,7 @@ public final class CigramAds {
     }
 
     public static boolean isLoggedIn(Context c) {
+        attach(c);
         try {
             return CigramUserData.isLoggedIn(c) && CigramUserData.token(c).length() > 0;
         } catch (Throwable ignored) {
@@ -110,9 +174,11 @@ public final class CigramAds {
 
     private static void run(Context c, final String method, final String path, final JSONObject body, final boolean auth, final Callback cb) {
         final Context app = c.getApplicationContext();
-        final String token = auth ? CigramUserData.token(app) : "";
+        attach(app);
         POOL.execute(new Runnable() {
             @Override public void run() {
+                // the token is read on the worker thread (a SharedPreferences read does not belong on the UI thread)
+                final String token = auth ? CigramUserData.token(app) : "";
                 final Result r = request(method, path, body == null ? null : body.toString(), token);
                 if (cb != null) {
                     MAIN.post(new Runnable() {
@@ -125,12 +191,22 @@ public final class CigramAds {
         });
     }
 
-    /** طلب متزامن — لا يُستدعى أبداً من الخيط الرئيسي. */
-    public static Result request(String method, String path, String json, String bearer) {
+    /**
+     * طلب متزامن — لا يُستدعى أبداً من الخيط الرئيسي.
+     * With a bearer it goes through {@link AdsAuthGateway}: renewal before expiry, one renewal + one retry on a 401.
+     */
+    public static Result request(final String method, final String path, final String json, String bearer) {
+        return AdsAuthGateway.run(new AdsAuthGateway.Call() {
+            @Override public Result run(String b) { return requestOnce(method, path, json, b); }
+        }, AUTH, bearer);
+    }
+
+    /** One HTTP attempt, no renewal. */
+    static Result requestOnce(String method, String path, String json, String bearer) {
         Result r = new Result();
         HttpURLConnection conn = null;
         try {
-            conn = (HttpURLConnection) new URL(API_BASE + path).openConnection();
+            conn = (HttpURLConnection) new URL(apiBase + path).openConnection();
             conn.setConnectTimeout(10000);
             conn.setReadTimeout(20000);
             conn.setRequestMethod(method);
@@ -189,6 +265,7 @@ public final class CigramAds {
     }
 
     public static String friendlyCode(int code, String error) {
+        if ("auth_unavailable".equals(error)) return "تعذر التحقق من الجلسة الآن. حاول بعد قليل — حسابك ما زال مسجّلاً.";
         if ("login_required".equals(error) || "invalid_token".equals(error) || code == 401) return "انتهت الجلسة. سجّل الدخول من جديد.";
         if ("consent_required".equals(error)) return "يلزم الموافقة على السياسات أولاً.";
         if (code == 429 || "rate_limited".equals(error)) return "طلبات كثيرة. انتظر قليلاً ثم حاول.";

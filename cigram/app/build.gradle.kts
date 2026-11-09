@@ -11,8 +11,8 @@ android {
     defaultConfig {
         minSdk = 24
         targetSdk = 36
-        versionCode = 89
-        versionName = "18.2.0"
+        versionCode = 90
+        versionName = "18.2.1"
     }
 
     buildTypes {
@@ -47,6 +47,10 @@ android {
         viewBinding = true
         buildConfig = true
     }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true   // android.* calls (Handler, Looper, Log) return defaults in JVM tests
+    }
 }
 
 dependencies {
@@ -68,6 +72,7 @@ dependencies {
     implementation("com.google.android.exoplayer:exoplayer-rtsp:2.19.1")
     // 18.2: JVM unit tests for CigramSubtitleHub / CigramSubtitleSyncEngine (test classpath only, not in the APK)
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20231013")      // real org.json for JVM tests (the android.jar one is a stub)
 }
 
 // ViewBinding base interface, one definition per tool:

@@ -58,6 +58,18 @@ final class CigramSegmentAccel {
     private static final long BUDGET = 64L * 1024L * 1024L;
     private static final long KEEP_MS = 4L * 60L * 1000L;
 
+    // 18.3: how aggressive the accelerator may be follows the connection (see CigramAccelPolicy); fed by the player's load control
+    private static volatile CigramAccelPolicy policy = CigramAccelPolicy.decide(0, false, false, PARTS, 4, BUDGET);
+
+    /** Called (about once a second) by the adaptive load control: level 0 good .. 2 very weak, device class, metered. */
+    static void applyLevel(int level, boolean lowRam, boolean metered) {
+        policy = CigramAccelPolicy.decide(level, lowRam, metered, PARTS, 4, BUDGET);
+    }
+
+    private static long budget() {
+        return policy.budgetBytes;
+    }
+
     private static final Pattern NUMBERED = Pattern.compile("^(.*?)(\\d+)(\\.[A-Za-z0-9]{1,5})?$");
 
     private static final ExecutorService POOL = Executors.newCachedThreadPool(new ThreadFactory() {
@@ -328,9 +340,8 @@ final class CigramSegmentAccel {
     /** How many pieces to fetch ahead: more on a fast line. */
     private static int lookAhead() {
         double s = speedBps;
-        if (s > 4_000_000d) return 4;
-        if (s > 1_500_000d) return 3;
-        return 2;
+        int n = s > 4_000_000d ? 4 : s > 1_500_000d ? 3 : 2;
+        return Math.min(n, policy.maxAhead);
     }
 
     /** Starts the next missing piece after the focus (one at a time per series, so the current one is never starved). */
@@ -346,8 +357,8 @@ final class CigramSegmentAccel {
                 if (p == null) p = e.parts;
             }
             if (p == null) return;
-            if (bytesInStore() > BUDGET * 3 / 4) trim();
-            if (bytesInStore() > BUDGET * 3 / 4) return;
+            if (bytesInStore() > budget() * 3 / 4) trim();
+            if (bytesInStore() > budget() * 3 / 4) return;
             int ahead = lookAhead();
             for (int i = f.intValue(); i <= f.intValue() + ahead; i++) {
                 Parts q = new Parts();
@@ -382,7 +393,7 @@ final class CigramSegmentAccel {
         for (Iterator<Entry> it = ENTRIES.values().iterator(); it.hasNext(); ) {
             Entry e = it.next();
             boolean idle = e.readers == 0 && !e.downloading();
-            if (idle && (size > BUDGET / 2 || now - e.lastUse > KEEP_MS)) {
+            if (idle && (size > budget() / 2 || now - e.lastUse > KEEP_MS)) {
                 size -= e.data.length;
                 it.remove();
             }
@@ -476,7 +487,8 @@ final class CigramSegmentAccel {
             }
             int parts = 1;
             if (code == 206 && total >= MIN_SPLIT) {
-                parts = (int) Math.max(2, Math.min(PARTS, total / (256 * 1024)));
+                int cap = policy.maxParts;       // 18.3: one connection per piece on a very weak link
+                parts = cap <= 1 ? 1 : (int) Math.max(2, Math.min(cap, total / (256 * 1024)));
             }
             synchronized (e) {
                 e.total = total;

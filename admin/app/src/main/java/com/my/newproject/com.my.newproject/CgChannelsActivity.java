@@ -56,14 +56,31 @@ public class CgChannelsActivity extends CgBase {
         load();
     }
 
+    /** 18.3: one load at a time; a request made while one runs is repeated once afterwards (it may follow an edit). */
+    private boolean loading;
+    private boolean loadAgain;
+    private long loadedAt;
+    private String lastSignature = "";
+
     @Override
     protected void onResume() {
         super.onResume();
-        if (!channels.isEmpty() && list != null) load();
+        // 18.3: coming back from another screen used to repeat the whole load behind a blocking dialog. Now: nothing within 30 s,
+        // otherwise a silent refresh that redraws only when the list really changed.
+        if (!channels.isEmpty() && list != null && System.currentTimeMillis() - loadedAt > 30000L) load(true);
     }
 
     private void load() {
-        showLoading("جارٍ تحميل القنوات...");
+        load(false);
+    }
+
+    private void load(final boolean silent) {
+        if (loading) {
+            if (!silent) loadAgain = true;
+            return;
+        }
+        loading = true;
+        if (!silent) showLoading("جارٍ تحميل القنوات...");
         CgHttp.async(this, new CgHttp.Work<Object[]>() {
             @Override
             public Object[] run() throws Exception {
@@ -75,15 +92,26 @@ public class CgChannelsActivity extends CgBase {
         }, new CgHttp.Done<Object[]>() {
             @Override
             public void ok(Object[] r) {
-                hideLoading();
-                parse((JSONObject) r[0]);
-                JSONObject m = (JSONObject) r[1];
-                overlay = m == null || m.optJSONObject("channels") == null ? new JSONObject() : m.optJSONObject("channels");
-                render();
+                loading = false;
+                loadedAt = System.currentTimeMillis();
+                if (!silent) hideLoading();
+                String signature = String.valueOf(r[0]) + "|" + String.valueOf(r[1]);
+                boolean again = loadAgain;
+                loadAgain = false;
+                if (!(silent && signature.equals(lastSignature))) {
+                    lastSignature = signature;
+                    parse((JSONObject) r[0]);
+                    JSONObject m = (JSONObject) r[1];
+                    overlay = m == null || m.optJSONObject("channels") == null ? new JSONObject() : m.optJSONObject("channels");
+                    render();
+                }
+                if (again) load(false);
             }
 
             @Override
             public void fail(String message) {
+                loading = false;
+                if (silent) return;                // a failed background refresh keeps what is on screen
                 hideLoading();
                 body.removeAllViews();
                 LinearLayout box = CgUi.vbox(CgChannelsActivity.this);

@@ -2990,6 +2990,9 @@ public class MainActivity extends AppCompatActivity {
 				req_movies.startRequestNetwork(RequestNetworkController.GET, "https://cigram-admin-api.wwq-mixtv.workers.dev/movies", "movies", _req_movies_request_listener);
 			}
 		};
+		// 18.3: a catalogue confirmed within the last minutes is already on its way to the screen from the saved copy; a second
+		// 5 MB download here (state 0 only means "the early download finished more than 2 minutes ago") is not needed.
+		if (CigramStage1InitProvider.catalogSnapshotFresh(getApplicationContext())) return;
 		if (CigramStage1InitProvider.earlyCatalogState() == 0) { own.run(); return; }
 		final android.os.Handler cgHandler = new android.os.Handler(android.os.Looper.getMainLooper());
 		final long cgDeadline = android.os.SystemClock.uptimeMillis() + 3000L;
@@ -4991,7 +4994,27 @@ public class MainActivity extends AppCompatActivity {
 						startProgress();
 					}
 					
+					/** 18.3: signature of what is on screen; an identical payload (cache, then the same answer from the server) is not rebuilt. */
+					String cgRenderedSignature = "";
+					
 					void render(org.json.JSONObject payload) {
+						// every slide once (by id, else link + image) and only when the payload really changed
+						try {
+							if (payload != null) {
+								org.json.JSONArray rawItems = payload.optJSONArray("items");
+								if (rawItems == null) rawItems = payload.optJSONArray("carousel");
+								if (rawItems != null) {
+									org.json.JSONArray unique = CigramSectionDedupe.dedupeCarouselItems(rawItems);
+									if (unique.length() != rawItems.length()) {
+										payload = new org.json.JSONObject(payload.toString());
+										payload.put(payload.has("items") ? "items" : "carousel", unique);
+									}
+								}
+							}
+							String signature = payload == null ? "" : payload.toString();
+							if (signature.equals(cgRenderedSignature) && !cgHeroPages.isEmpty()) return;
+							cgRenderedSignature = signature;
+						} catch (Exception ignored) { }
 						stopProgress();
 						cgHeroItems.clear();
 						cgHeroPages.clear();
@@ -5058,6 +5081,13 @@ public class MainActivity extends AppCompatActivity {
 					}
 					
 					void loadRemote() {
+						// 18.3: Home used to fetch /carousel (with a cache-busting query) on every creation; within two minutes of the
+						// last successful fetch the saved slides are enough
+						try {
+							long fetchedAt = getSharedPreferences("cigram_carousel_cache", MODE_PRIVATE).getLong("fetched_at", 0L);
+							long age = System.currentTimeMillis() - fetchedAt;
+							if (fetchedAt > 0L && age >= 0L && age < 120000L) return;
+						} catch (Exception ignored) { }
 						new java.lang.Thread(new java.lang.Runnable() {
 							@Override public void run() {
 								String raw = null;
@@ -5083,8 +5113,10 @@ public class MainActivity extends AppCompatActivity {
 									} else {
 										payload = new org.json.JSONObject(trimmed);
 									}
+									String previousJson = getSharedPreferences("cigram_carousel_cache", MODE_PRIVATE).getString("json", "");
 									getSharedPreferences("cigram_carousel_cache", MODE_PRIVATE)
-									.edit().putString("json", payload.toString()).apply();
+									.edit().putString("json", payload.toString()).putLong("fetched_at", System.currentTimeMillis()).apply();
+									if (payload.toString().equals(previousJson)) return;   // unchanged: no widget refresh, no re-render
 									CigramCarouselWidget.refreshAll(getApplicationContext());   // the home-screen widget shows the same slides
 									MainActivity.this.runOnUiThread(new java.lang.Runnable() {
 										@Override public void run() {

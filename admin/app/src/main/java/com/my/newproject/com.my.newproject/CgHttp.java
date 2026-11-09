@@ -218,11 +218,15 @@ final class CgHttp {
      * backoff, before the caller ever sees a failure. This is the main fix for "data fails to load" reports
      * that are really just one slow or dropped request on a shaky connection.
      */
+    private static final java.util.Random JITTER = new java.util.Random();
+
     static Res apiGet(String path) {
         int[] backoffMs = {300, 900};
         Res r = api("GET", path, null);
         for (int attempt = 0; attempt < backoffMs.length && isTransient(r); attempt++) {
-            try { Thread.sleep(backoffMs[attempt]); } catch (InterruptedException ignored) { }
+            // 18.3: +-25 % jitter so screens that fail together do not retry in lock-step; a 4xx (not transient) is never retried
+            long wait = backoffMs[attempt] + (long) ((JITTER.nextDouble() - 0.5) * 0.5 * backoffMs[attempt]);
+            try { Thread.sleep(Math.max(100L, wait)); } catch (InterruptedException ignored) { }
             r = api("GET", path, null);
         }
         return r;

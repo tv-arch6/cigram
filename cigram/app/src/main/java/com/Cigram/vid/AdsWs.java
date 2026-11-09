@@ -103,20 +103,33 @@ public final class AdsWs {
 
     private void loop(long gen) {
         int attempt = 0;
+        boolean renewedRecently = false;
+        CigramAds.attach(app);
         while (alive(gen)) {
             boolean authFailed = false;
             boolean everOpen = false;
+            boolean retryNow = false;
             try {
                 String token = CigramUserData.token(app);
                 if (token == null || token.length() == 0) { authFailed = true; throw new IOException("no token"); }
                 connect(token);
                 everOpen = true;
                 attempt = 0;
+                renewedRecently = false;
                 open = true;
                 post(gen, 0, null, false);
                 readLoop(gen);
             } catch (AuthException e) {
-                authFailed = true;
+                // 18.3: a refused token is first answered by ONE shared silent renewal and an immediate reconnect.
+                // The session is reported lost only when the account cannot be renewed (no sealed credentials) or the
+                // renewed token is refused as well; a renewal that failed for a temporary reason just retries later.
+                String fresh = renewedRecently ? "" : CigramAds.refreshAfter401(CigramUserData.token(app));
+                if (fresh.length() > 0) {
+                    renewedRecently = true;
+                    retryNow = true;
+                } else {
+                    authFailed = renewedRecently || !CigramAds.AUTH.canRenew();
+                }
             } catch (Throwable ignored) {
                 // أي فشل شبكة: نعيد المحاولة
             } finally {
@@ -126,6 +139,7 @@ public final class AdsWs {
                 if (wasOpen || everOpen || authFailed) post(gen, 2, null, authFailed);
             }
             if (!alive(gen)) break;
+            if (retryNow) continue;
             attempt++;
             long delay = authFailed ? 60000L : Math.min(30000L, 1000L << Math.min(attempt, 5)) + RNG.nextInt(700);
             long until = System.currentTimeMillis() + delay;
@@ -157,7 +171,7 @@ public final class AdsWs {
     // ------------------------------------------------------------------ المصافحة
 
     private void connect(String token) throws IOException {
-        URL u = new URL(CigramAds.API_BASE + path);
+        URL u = new URL(CigramAds.apiBase + path);
         String host = u.getHost();
         int port = u.getPort() > 0 ? u.getPort() : 443;
         SSLSocketFactory f = (SSLSocketFactory) SSLSocketFactory.getDefault();
@@ -195,7 +209,7 @@ public final class AdsWs {
         }
         String h = head.toString("UTF-8");
         String first = h.indexOf("\r\n") > 0 ? h.substring(0, h.indexOf("\r\n")) : h;
-        if (first.contains(" 401") || first.contains(" 403")) throw new AuthException(first);
+        if (first.contains(" 401")) throw new AuthException(first);     // 403 is a refusal of the action (e.g. restricted chat), not a lost session
         if (!first.contains(" 101")) throw new IOException("handshake failed: " + first);
         s.setSoTimeout(70000);
     }

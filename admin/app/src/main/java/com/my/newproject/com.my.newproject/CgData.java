@@ -84,11 +84,96 @@ final class CgData {
     private final HashMap<String, ArrayList<Issue>> issueCache = new HashMap<String, ArrayList<Issue>>();
     private final HashMap<String, String> hayCache = new HashMap<String, String>();
 
-    /** Loads everything in parallel on background threads, then installs the snapshot. */
+    // ------------------------------------------------------------ 18.3: one load at a time, fresh-enough snapshots, no stale overwrite
+    //
+    // Before: every screen / timer called load() on its own, each one downloaded /movies (5 MB) + /admin/meta + /admin/sections, and
+    // an answer that started before an edit could replace the edited snapshot. Now: a call while a load runs JOINS it (one request
+    // set, every caller is answered), loadIfStale() skips the request when the snapshot is young, and an answer that was requested
+    // before an edit finished never replaces the edited snapshot.
+
+    private static final CgFlight<Waiter> FLIGHT = new CgFlight<Waiter>();
+    private static final java.util.concurrent.atomic.AtomicInteger EDITS = new java.util.concurrent.atomic.AtomicInteger();
+    private static volatile int loadFailures;
+
+    private static final class Waiter {
+        final Activity a;
+        final CgHttp.Done<CgData> done;
+
+        Waiter(Activity a, CgHttp.Done<CgData> done) {
+            this.a = a;
+            this.done = done;
+        }
+    }
+
+    /** A local edit (replaceItem) happened: a load that started earlier must not overwrite it. */
+    static void noteEdit() {
+        EDITS.incrementAndGet();
+    }
+
+    /** True when the snapshot came from the server less than {@code maxAgeMs} ago (the on-device cache never counts as fresh). */
+    static boolean freshWithin(long maxAgeMs) {
+        CgData d = cur;
+        return CgFlight.isFresh(d != null, d != null && d.fromCache, d == null ? 0L : d.loadedAt, System.currentTimeMillis(), maxAgeMs);
+    }
+
+    /** Number of consecutive failed loads (drives the back-off of background refreshes). */
+    static int failures() {
+        return loadFailures;
+    }
+
+    /** The current snapshot when it is young enough, otherwise one (shared) load. */
+    static void loadIfStale(Activity a, long maxAgeMs, CgHttp.Done<CgData> done) {
+        if (freshWithin(maxAgeMs)) {
+            done.ok(cur);
+            return;
+        }
+        load(a, done);
+    }
+
+    /** Loads everything in parallel on background threads, then installs the snapshot. A call during a running load joins it. */
     static void load(final Activity a, final CgHttp.Done<CgData> done) {
-        CgHttp.async(a, new CgHttp.Work<CgData>() {
+        if (!FLIGHT.joinOrStart(new Waiter(a, done))) return;     // a load is running: this caller is answered by it
+        final int editsAtStart = EDITS.get();
+        CgHttp.bg(new Runnable() {
             @Override
-            public CgData run() throws Exception {
+            public void run() {
+                CgData result = null;
+                String err = null;
+                try {
+                    result = fetchSnapshot(a);
+                } catch (Throwable e) {
+                    err = CgHttp.friendly(e.getMessage() == null ? "" : e.getMessage());
+                }
+                if (result != null) {
+                    CgData current = cur;
+                    if (CgFlight.staleAfterEdit(editsAtStart, EDITS.get(), current != null, result.fromCache)) {
+                        result = current;               // an edit finished meanwhile: keep it (the next refresh brings the server's view)
+                    } else {
+                        cur = result;
+                        loadFailures = 0;
+                    }
+                } else {
+                    loadFailures = Math.min(loadFailures + 1, 8);
+                }
+                for (Waiter w : FLIGHT.finish()) deliver(w, result, err);
+            }
+        });
+    }
+
+    private static void deliver(final Waiter w, final CgData d, final String err) {
+        final Activity a = w.a;
+        if (a == null || a.isFinishing()) return;
+        a.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (a.isFinishing()) return;
+                if (err != null) w.done.fail(err);
+                else w.done.ok(d);
+            }
+        });
+    }
+
+    private static CgData fetchSnapshot(final Activity a) throws Exception {
                 final CgHttp.Res[] r = new CgHttp.Res[3];
                 Thread t0 = new Thread(new Runnable() {
                     @Override
@@ -154,19 +239,6 @@ final class CgData {
                 d.reindex();
                 saveCache(a, d);
                 return d;
-            }
-        }, new CgHttp.Done<CgData>() {
-            @Override
-            public void ok(CgData result) {
-                cur = result;
-                done.ok(result);
-            }
-
-            @Override
-            public void fail(String message) {
-                done.fail(message);
-            }
-        });
     }
 
     // ------------------------------------------------------------ on-device cache
@@ -415,6 +487,7 @@ final class CgData {
     }
 
     void replaceItem(JSONObject updated) {
+        noteEdit();                                    // a load that started before this edit must not overwrite it
         String id = s(updated, "id");
         for (int i = 0; i < items.size(); i++) {
             if (s(items.get(i), "id").equals(id)) {

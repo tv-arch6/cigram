@@ -444,17 +444,19 @@ public final class AdsMedia {
 
     private static void putPartWithRetry(String basePath, String query, String id, int n, byte[] data, String bearer, AtomicBoolean cancel) throws Exception {
         Exception last = null;
+        String useBearer = CigramAds.freshest(bearer);       // 18.3: a long upload keeps working after the session was renewed
+        boolean renewedOnce = false;
         for (int attempt = 0; attempt < 4; attempt++) {
             if (cancel != null && cancel.get()) throw new IllegalStateException("أُلغي الرفع.");
             HttpURLConnection conn = null;
             try {
-                conn = (HttpURLConnection) new URL(CigramAds.API_BASE + q(query, basePath + "/part?id=" + id + "&n=" + n)).openConnection();
+                conn = (HttpURLConnection) new URL(CigramAds.apiBase + q(query, basePath + "/part?id=" + id + "&n=" + n)).openConnection();
                 conn.setRequestMethod("PUT");
                 conn.setConnectTimeout(12000);
                 conn.setReadTimeout(40000);
                 conn.setDoOutput(true);
                 conn.setFixedLengthStreamingMode(data.length);
-                conn.setRequestProperty("Authorization", "Bearer " + bearer);
+                conn.setRequestProperty("Authorization", "Bearer " + useBearer);
                 conn.setRequestProperty("Content-Type", "application/octet-stream");
                 OutputStream os = conn.getOutputStream();
                 os.write(data);
@@ -462,6 +464,11 @@ public final class AdsMedia {
                 os.close();
                 int code = conn.getResponseCode();
                 if (code >= 200 && code < 300) return;
+                if (code == 401 && !renewedOnce) {          // one shared silent renewal, then the same part again
+                    renewedOnce = true;
+                    String t = CigramAds.refreshAfter401(useBearer);
+                    if (t.length() > 0) { useBearer = t; attempt--; continue; }
+                }
                 if (code == 415 || code == 400 || code == 403 || code == 404 || code == 413) {
                     String msg = "الملف غير مقبول.";
                     if (code == 415) msg = "نوع الملف غير مدعوم.";

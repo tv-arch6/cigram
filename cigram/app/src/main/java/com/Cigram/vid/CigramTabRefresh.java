@@ -8,6 +8,10 @@ import android.os.Looper;
 import java.util.HashMap;
 
 /**
+ * 18.3: this class still decides WHAT each page asks for, but no longer forces anything: the catalogue and the channel list
+ * follow {@link CigramRefreshPolicy} (TTL per reason, one request at a time, exponential back-off after failures), so
+ * switching between Home, Search and Channels does not download the same data again.
+ *
  * Pulls the latest updates every time one of the four bottom-bar pages is shown (pressing its
  * button, or coming back to it), so a new film / series / episode, notification, announcement,
  * request answer or channel is there without pulling to refresh.
@@ -54,7 +58,8 @@ final class CigramTabRefresh {
 
         try {
             // New films / series / episodes / sections. The cold-start download already did this.
-            if ((home || search) && CigramStage1InitProvider.earlyCatalogState() == 0) {
+            if (home || search) {
+                // 18.3: the shared CigramRefreshPolicy decides (TTL, single flight, back-off); this used to force a download
                 CigramStage1InitProvider.refreshCatalogNow(app, new Runnable() {
                     @Override public void run() {
                         if (search && !activity.isFinishing() && !activity.isDestroyed()) {
@@ -66,7 +71,7 @@ final class CigramTabRefresh {
         } catch (Throwable ignored) { }
 
         try {
-            if (channels) CigramChannelStore.refresh(app, true);
+            if (channels) CigramChannelStore.refresh(app, false);   // 18.3: was forced on every tab switch; the store's own TTL + back-off apply
         } catch (Throwable ignored) { }
 
         try {

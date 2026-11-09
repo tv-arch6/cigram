@@ -196,32 +196,63 @@ final class CigramChannelStore {
     // ------------------------------------------------------------------ network
 
     /** Asks the server for the catalogue when the saved one is older than a few minutes. */
+    /** 18.3: consecutive failed refreshes / last attempt (in-process): they drive the back-off of {@link CigramRefreshPolicy}. */
+    private static volatile int failures;
+    private static volatile boolean failurePermanent;
+    private static volatile long lastAttemptAt;
+    /** Set by download() when the server answered 304 (the saved list is still current). */
+    private static volatile boolean notModified;
+    private static volatile String lastEtag = "";
+
     static void refresh(final Context context, final boolean force) {
         final Context app = context.getApplicationContext();
         if (fetching) return;
-        SharedPreferences sp = app.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE);
+        final SharedPreferences sp = app.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE);
         long at = sp.getLong("fetched_at", 0L);
         long now = System.currentTimeMillis();
-        if (!force && current != null && at > 0L && now >= at && now - at < FRESH_MS) return;
+        CigramRefreshPolicy.State st = new CigramRefreshPolicy.State();
+        st.now = now;
+        st.lastAttemptAt = lastAttemptAt;
+        st.snapshotConfirmedAt = (current != null || sp.contains("json")) ? at : 0L;
+        st.running = fetching;
+        st.consecutiveFailures = failures;
+        st.lastFailurePermanent = failurePermanent;
+        st.jitterSeed = now;
+        // the channel list keeps its own 3-minute TTL (FRESH_MS); a tab switch no longer forces a download, and a failing
+        // server is asked again with an exponential back-off instead of on every tab switch
+        if (!CigramRefreshPolicy.shouldRefresh(force ? CigramRefreshPolicy.Reason.FORCED : CigramRefreshPolicy.Reason.TAB_SHOWN, st, FRESH_MS)) return;
         fetching = true;
+        lastAttemptAt = now;
         NET.execute(new Runnable() {
             @Override public void run() {
                 String fresh = null;
+                notModified = false;
                 try {
-                    fresh = download();
+                    fresh = download(sp.contains("json") ? sp.getString("etag", "") : "");
                 } catch (Throwable error) {
                     Log.w(TAG, "catalogue refresh failed", error);
                 }
                 final SharedPreferences prefs = app.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE);
+                if (notModified) {
+                    // HTTP 304: the saved list is current; only its age restarts
+                    failures = 0;
+                    failurePermanent = false;
+                    prefs.edit().putLong("fetched_at", System.currentTimeMillis()).putString("error", "").apply();
+                    UI.post(new Runnable() { @Override public void run() { fetching = false; } });
+                    return;
+                }
                 if (fresh == null) {
+                    failures = Math.min(failures + 1, 12);   // a failure never replaces the saved list
                     prefs.edit().putString("error", "تعذر تحديث القنوات؛ آخر نسخة محفوظة باقية").apply();
                     UI.post(new Runnable() { @Override public void run() { fetching = false; } });
                     return;
                 }
+                failures = 0;
+                failurePermanent = false;
                 String old = prefs.getString("json", "");
                 boolean same = fresh.equals(old);
                 prefs.edit().putString("json", fresh).putLong("fetched_at", System.currentTimeMillis())
-                        .putString("error", "").apply();
+                        .putString("etag", lastEtag).putString("error", "").apply();
                 final Catalog built = same ? null : build(app, fresh);
                 UI.post(new Runnable() {
                     @Override public void run() {
@@ -236,18 +267,27 @@ final class CigramChannelStore {
         });
     }
 
-    private static String download() throws Exception {
+    private static String download(String etag) throws Exception {
         HttpURLConnection connection = null;
         BufferedReader reader = null;
         try {
-            connection = (HttpURLConnection) new URL(ENDPOINT + "?_=" + System.currentTimeMillis()).openConnection();
+            // 18.3: no cache-busting query: a conditional request (If-None-Match) needs a stable address
+            CigramPerf.request("channels");
+            connection = (HttpURLConnection) new URL(ENDPOINT).openConnection();
             connection.setConnectTimeout(10000);
             connection.setReadTimeout(15000);
             connection.setUseCaches(false);
             connection.setRequestProperty("Accept", "application/json");
             connection.setRequestProperty("Cache-Control", "no-cache");
+            if (etag != null && etag.length() > 0) connection.setRequestProperty("If-None-Match", etag);
             int code = connection.getResponseCode();
-            if (code < 200 || code >= 300) throw new java.io.IOException("HTTP " + code);
+            if (code == 304) { notModified = true; return null; }
+            if (code < 200 || code >= 300) {
+                failurePermanent = code >= 400 && code < 500 && code != 408 && code != 429;   // a 4xx is not retried quickly
+                throw new java.io.IOException("HTTP " + code);
+            }
+            String got = connection.getHeaderField("ETag");
+            lastEtag = got == null ? "" : got.trim();
             reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), "UTF-8"));
             StringBuilder json = new StringBuilder();
             String line;

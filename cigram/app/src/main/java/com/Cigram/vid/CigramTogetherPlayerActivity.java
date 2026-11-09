@@ -392,7 +392,8 @@ public class CigramTogetherPlayerActivity extends Activity implements CigramToge
         if (Q_SAVER.equals(quality)) { min = 15000; max = 40000; }
         else if (fast) { min = 30000; max = 120000; }       // شبكة جيدة: نخزّن أكثر لتجنب أي تقطيع
         else { min = 20000; max = 60000; }
-        return new DefaultLoadControl.Builder().setBufferDurationsMs(min, max, 2000, 4000).build();
+        // 18.3: the window of this player stays as chosen above; the start / re-buffer thresholds (2 s / 4 s) follow stalls too
+        return CigramAdaptiveLoadControl.create(this, CigramBufferPolicy.custom(min, max, 0), false);
     }
 
     /** يطبّق اختيار الجودة لهذا المشاهد (يعمل على البث متعدد الجودات HLS؛ ملف MP4 واحد يبقى بدقته الأصلية). */
@@ -1088,6 +1089,11 @@ public class CigramTogetherPlayerActivity extends Activity implements CigramToge
                         .setLoadControl(buildLoadControl())
                         .setBandwidthMeter(bm.build())
                         .setMediaSourceFactory(CigramStreams.sourceFactory(this))
+                        // 18.3: audio focus + noisy-audio handling (a call or another app pauses it; unplugged headphones pause it)
+                        .setAudioAttributes(new com.google.android.exoplayer2.audio.AudioAttributes.Builder()
+                                .setUsage(com.google.android.exoplayer2.C.USAGE_MEDIA)
+                                .setContentType(com.google.android.exoplayer2.C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
+                        .setHandleAudioBecomingNoisy(true)
                         .build();
                 applyQuality();
                 player.setVideoSurfaceView(surface);

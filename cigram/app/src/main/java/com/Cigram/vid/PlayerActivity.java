@@ -629,17 +629,18 @@ public class PlayerActivity extends AppCompatActivity {
 		} catch (Throwable ignored) { }
 		
 		final CigramBufferPolicy cgBuffer = CigramBufferPolicy.of(this);   // smaller buffers on weak phones (no out-of-memory crashes)
-		final com.google.android.exoplayer2.DefaultLoadControl loadControl =
-		new com.google.android.exoplayer2.DefaultLoadControl.Builder()
-		.setBufferDurationsMs(
-		cgBuffer.minMs, // min
-		cgBuffer.maxMs, // max
-		700,   // playback starts after 0.7 s of video (was 1.5 s)
-		1000   // after a seek / stall: 1 s (was 2.5 s)
-		)
-		.setBackBuffer(cgBuffer.backMs, true)   // going back is instant (a minute on normal phones)
-		.setPrioritizeTimeOverSizeThresholds(true)
-		.build();
+		// 18.3: the start / re-buffer thresholds follow the connection (0.8 s / 1.5 s on a good one, 2.5-4 s / 5-8 s on a weak or
+		// stalling one) instead of a fixed 0.7 s / 1 s, which on a weak network ended in a stall every second; the RAM-class
+		// limits of CigramBufferPolicy stay the ceiling and the back buffer is kept (going back is instant).
+		final CigramAdaptiveLoadControl loadControl = CigramAdaptiveLoadControl.create(this, cgBuffer, false);
+		try {
+			// a weak network at the start: a multi-quality (HLS / DASH) source is asked to stay below a sustainable bitrate;
+			// a manual quality choice overrides it and a single-file MP4 has no other quality to choose
+			int cgCap = loadControl.maxVideoBitrate();
+			if (cgCap > 0) {
+				trackSelector.setParameters(trackSelector.buildUponParameters().setMaxVideoBitrate(cgCap));
+			}
+		} catch (Throwable ignored) { }
 		
 		final com.google.android.exoplayer2.ExoPlayer exoPlayer =
 		new com.google.android.exoplayer2.ExoPlayer.Builder(this,
@@ -647,6 +648,10 @@ public class PlayerActivity extends AppCompatActivity {
 		.setEnableDecoderFallback(true))   // try the next decoder when the first one cannot start (audio / video)
 		.setTrackSelector(trackSelector)
 		.setLoadControl(loadControl)
+		// 18.3: ask for audio focus (a phone call or another app's audio pauses / ducks the film and it resumes afterwards)
+		.setAudioAttributes(new com.google.android.exoplayer2.audio.AudioAttributes.Builder()
+		.setUsage(com.google.android.exoplayer2.C.USAGE_MEDIA)
+		.setContentType(com.google.android.exoplayer2.C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
 		.setSeekBackIncrementMs(10000L)
 		.setSeekForwardIncrementMs(10000L)
 		.setMediaSourceFactory(CigramStreams.sourceFactory(this))

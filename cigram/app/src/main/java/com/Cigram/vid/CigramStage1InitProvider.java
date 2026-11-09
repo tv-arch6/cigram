@@ -73,6 +73,9 @@ public final class CigramStage1InitProvider extends ContentProvider {
     private static final String KEY_SEARCH_JSON = "search_index_json";
     private static final String KEY_SEARCH_UPDATED = "search_index_updated_at";
     private static final String KEY_JSON_HASH = "json_hash_v2";
+    /** 18.3: validator of the downloaded body (HTTP ETag) and hash of the normalised body that produced the saved snapshot. */
+    private static final String KEY_ETAG = "catalog_etag_v1";
+    private static final String KEY_RAW_HASH = "catalog_raw_hash_v1";
     private static final long CATALOG_RESUME_REFRESH_MS = 5L * 60L * 1000L;
 
     private static final Object CATALOG_MEMORY_LOCK = new Object();
@@ -88,6 +91,9 @@ public final class CigramStage1InitProvider extends ContentProvider {
     private static volatile long LAST_CATALOG_NETWORK_ATTEMPT_AT = 0L;
     private static volatile long LAST_CATALOG_NETWORK_SUCCESS_AT = 0L;
     private static volatile boolean CATALOG_NETWORK_RUNNING = false;
+    /** 18.3: consecutive failed refreshes (drives the back-off of {@link CigramRefreshPolicy}); reset by any success / 304. */
+    private static volatile int CATALOG_FAILURES = 0;
+    private static volatile boolean CATALOG_FAILURE_PERMANENT = false;
     /** Last catalogue load result in plain text; shown on screen by Home when the sections stay empty. */
     static volatile String LAST_DIAG = "لم يبدأ تحميل الكتالوج";
     /** Short breadcrumb trail of the Home build stages, shown with the on-screen diagnosis. */
@@ -264,6 +270,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
 
         appContext = context.getApplicationContext();
         CigramStability.init(appContext);   // v10.49: memory trimming + crash record, first of all
+        CigramPerf.installDebugChecks(appContext);   // 18.3: StrictMode (log only) + main-thread watchdog, debuggable builds only
         CigramTypefaces.warm(appContext);   // app font parsed on a background thread, ready before the first label
         if (appContext instanceof Application) CigramFontGuard.install((Application) appContext);
         if (appContext instanceof Application) CigramTheme.install((Application) appContext);   // v10.70 Light / Dark
@@ -792,18 +799,13 @@ public final class CigramStage1InitProvider extends ContentProvider {
             }
         });
 
-        requestEarlyCatalogRefresh(app, true);
+        requestEarlyCatalogRefresh(app, CigramRefreshPolicy.Reason.COLD_START);
     }
 
     private static void maybeRefreshCatalogOnResume(Activity activity) {
         if (activity == null || !isAlive(activity)) return;
         ACTIVE_MAIN = new java.lang.ref.WeakReference<Activity>(activity);
-        long now = System.currentTimeMillis();
-        long anchor = Math.max(LAST_CATALOG_NETWORK_ATTEMPT_AT,
-                LAST_CATALOG_NETWORK_SUCCESS_AT);
-        if (anchor <= 0L || now - anchor >= CATALOG_RESUME_REFRESH_MS) {
-            requestEarlyCatalogRefresh(activity.getApplicationContext(), false);
-        }
+        requestEarlyCatalogRefresh(activity.getApplicationContext(), CigramRefreshPolicy.Reason.RESUME);
     }
 
     private static final java.util.ArrayList<Runnable> CATALOG_DONE_LISTENERS = new java.util.ArrayList<Runnable>();
@@ -811,10 +813,13 @@ public final class CigramStage1InitProvider extends ContentProvider {
     /** Downloads the catalogue now (a tab was opened). {@code onDone} runs on the main thread when the download ended. */
     static void refreshCatalogNow(Context context, Runnable onDone) {
         if (context == null) return;
-        if (onDone != null) {
-            synchronized (CATALOG_DONE_LISTENERS) { CATALOG_DONE_LISTENERS.add(onDone); }
+        // 18.3: this used to force a full download every time a tab came to the front (it bypassed the freshness window).
+        // Now the shared policy decides (TTL, single flight, back-off); the listener is only kept when a refresh is running,
+        // so nothing (and no Activity) stays referenced when the saved catalogue is still fresh.
+        synchronized (CATALOG_DONE_LISTENERS) {
+            boolean accepted = requestEarlyCatalogRefresh(context.getApplicationContext(), CigramRefreshPolicy.Reason.TAB_SHOWN);
+            if (accepted && onDone != null) CATALOG_DONE_LISTENERS.add(onDone);
         }
-        requestEarlyCatalogRefresh(context.getApplicationContext(), true);
     }
 
     /** Re-applies the saved search index to an open search page (after the catalogue changed). */
@@ -823,24 +828,88 @@ public final class CigramStage1InitProvider extends ContentProvider {
         applySavedSearchIndex(activity);
     }
 
-    private static void requestEarlyCatalogRefresh(final Context context, final boolean coldStart) {
-        if (context == null) return;
+    /** The facts {@link CigramRefreshPolicy} needs about the catalogue. */
+    private static CigramRefreshPolicy.State catalogPolicyState(Context context) {
+        CigramRefreshPolicy.State st = new CigramRefreshPolicy.State();
+        st.now = System.currentTimeMillis();
+        st.lastAttemptAt = LAST_CATALOG_NETWORK_ATTEMPT_AT;
+        st.running = CATALOG_NETWORK_RUNNING;
+        st.consecutiveFailures = CATALOG_FAILURES;
+        st.lastFailurePermanent = CATALOG_FAILURE_PERMANENT;
+        st.jitterSeed = st.now;
+        try {
+            SharedPreferences p = catalogPrefs(context);
+            st.snapshotConfirmedAt = p.contains(KEY_JSON) ? p.getLong(KEY_UPDATED, 0L) : 0L;
+        } catch (Throwable ignored) { }
+        try {
+            CigramBufferTuner.Net net = CigramAdaptiveLoadControl.readNet(context.getApplicationContext());
+            st.metered = net != null && net.metered;
+            android.app.ActivityManager am = (android.app.ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+            st.lowRam = am != null && am.isLowRamDevice();
+        } catch (Throwable ignored) { }
+        return st;
+    }
+
+    /** True when the saved catalogue was confirmed by the server recently enough that a screen need not ask again. */
+    static boolean catalogSnapshotFresh(Context context) {
+        if (context == null) return false;
+        try {
+            CigramRefreshPolicy.State st = catalogPolicyState(context);
+            return st.snapshotConfirmedAt > 0L && !CigramRefreshPolicy.shouldRefresh(CigramRefreshPolicy.Reason.TAB_SHOWN, st);
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    /** The saved snapshot was just confirmed (full download, or HTTP 304 / identical body): its age restarts. */
+    private static void confirmCatalogSnapshot(Context context) {
+        long now = System.currentTimeMillis();
+        try {
+            catalogPrefs(context).edit().putLong(KEY_UPDATED, now).putLong(KEY_SEARCH_UPDATED, now).apply();
+        } catch (Throwable ignored) { }
+        LAST_CATALOG_NETWORK_SUCCESS_AT = now;
+        CATALOG_FAILURES = 0;
+        CATALOG_FAILURE_PERMANENT = false;
+    }
+
+    /**
+     * Starts a catalogue refresh when {@link CigramRefreshPolicy} allows it (single flight, TTL per reason, back-off after
+     * failures). Returns true when a refresh was started now or is already running (the caller may wait for it).
+     */
+    private static boolean requestEarlyCatalogRefresh(final Context context, final CigramRefreshPolicy.Reason reason) {
+        if (context == null) return false;
         synchronized (CATALOG_MEMORY_LOCK) {
-            if (CATALOG_NETWORK_RUNNING) return;
-            long now = System.currentTimeMillis();
-            if (!coldStart && LAST_CATALOG_NETWORK_ATTEMPT_AT > 0L
-                    && now - LAST_CATALOG_NETWORK_ATTEMPT_AT < CATALOG_RESUME_REFRESH_MS) {
-                return;
-            }
+            if (CATALOG_NETWORK_RUNNING) return true;
+            if (!CigramRefreshPolicy.shouldRefresh(reason, catalogPolicyState(context))) return false;
             CATALOG_NETWORK_RUNNING = true;
-            LAST_CATALOG_NETWORK_ATTEMPT_AT = now;
+            LAST_CATALOG_NETWORK_ATTEMPT_AT = System.currentTimeMillis();
         }
 
         NET_IO.execute(new Runnable() {
             @Override public void run() {
                 try {
+                    final long perfT0 = android.os.SystemClock.elapsedRealtime();
                     FetchResult result = fetchCatalog(context);
-                    if (!result.ok || !isValidCatalog(result.body)) return;
+                    if (!result.ok) {
+                        CATALOG_FAILURES = Math.min(CATALOG_FAILURES + 1, 12);
+                        CATALOG_FAILURE_PERMANENT = !result.retryable && result.status >= 400 && result.status < 500 && result.status != 408 && result.status != 429;
+                        return;
+                    }
+                    if (result.notModified) { confirmCatalogSnapshot(context); trace("catalog304"); return; }
+                    if (!isValidCatalog(result.body)) {
+                        CATALOG_FAILURES = Math.min(CATALOG_FAILURES + 1, 12);   // an error / empty body never replaces the saved snapshot
+                        return;
+                    }
+
+                    SharedPreferences prefs = catalogPrefs(context);
+                    final String rawHash = catalogHash(result.body);
+                    // 18.3: identical body (a server that ignores If-None-Match): nothing to parse, index, save or redraw
+                    if (rawHash.length() > 0 && rawHash.equals(prefs.getString(KEY_RAW_HASH, "")) && prefs.contains(KEY_JSON)) {
+                        if (result.etag.length() > 0) prefs.edit().putString(KEY_ETAG, result.etag).apply();
+                        confirmCatalogSnapshot(context);
+                        trace("catalogSame");
+                        return;
+                    }
 
                     PreparedCatalog prepared = prepareCatalog(result.body);
                     final String display = prepared.displayJson;
@@ -848,7 +917,6 @@ public final class CigramStage1InitProvider extends ContentProvider {
                     final String hash = catalogHash(display);
                     long now = System.currentTimeMillis();
 
-                    SharedPreferences prefs = catalogPrefs(context);
                     String oldHash = prefs.getString(KEY_JSON_HASH, "");
                     if (oldHash.length() == 0) {
                         oldHash = catalogHash(prefs.getString(KEY_JSON, ""));
@@ -858,12 +926,17 @@ public final class CigramStage1InitProvider extends ContentProvider {
                     prefs.edit()
                             .putString(KEY_JSON, display)
                             .putString(KEY_JSON_HASH, hash)
+                            .putString(KEY_RAW_HASH, rawHash)
+                            .putString(KEY_ETAG, result.etag)
                             .putLong(KEY_UPDATED, now)
                             .putString(KEY_SEARCH_JSON, index)
                             .putLong(KEY_SEARCH_UPDATED, now)
                             .apply();
                     LAST_CATALOG_NETWORK_SUCCESS_AT = now;
+                    CATALOG_FAILURES = 0;
+                    CATALOG_FAILURE_PERMANENT = false;
                     preloadCatalogImages(context.getApplicationContext(), index);
+                    CigramPerf.slow("catalog.refresh.apply", android.os.SystemClock.elapsedRealtime() - perfT0, 1500L);
 
                     final boolean contentChanged = !hash.equals(oldHash);
                     MAIN.post(new Runnable() {
@@ -893,6 +966,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                 }
             }
         });
+        return true;
     }
 
     private static boolean looksLikeCatalogText(String json) {
@@ -1256,6 +1330,13 @@ public final class CigramStage1InitProvider extends ContentProvider {
                     });
                 }
                 if (!isValidCatalog(cached)) return;
+                // 18.3: every Home (re)creation re-prepared, re-indexed and re-saved the whole saved catalogue and queued its
+                // image preload again. When this process already holds the same catalogue, there is nothing to redo.
+                String savedHash = prefs.getString(KEY_JSON_HASH, "");
+                synchronized (CATALOG_MEMORY_LOCK) {
+                    if (savedHash.length() > 0 && savedHash.equals(CATALOG_MEMORY_HASH) && !CATALOG_MEMORY_ITEMS.isEmpty()) return;
+                }
+                final long perfT0 = android.os.SystemClock.elapsedRealtime();
                 PreparedCatalog prepared = prepareCatalog(cached);
                 String hash = catalogHash(prepared.displayJson);
                 installCatalogInMemory(prepared.displayJson, prepared.searchIndexJson);
@@ -1265,6 +1346,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                         .putString(KEY_SEARCH_JSON, prepared.searchIndexJson)
                         .apply();
                 preloadCatalogImages(activity.getApplicationContext(), prepared.searchIndexJson);
+                CigramPerf.slow("catalog.warmup", android.os.SystemClock.elapsedRealtime() - perfT0, 1500L);
             }
         });
     }
@@ -2142,9 +2224,38 @@ public final class CigramStage1InitProvider extends ContentProvider {
     }
 
     /** Writes each series' gathered episodes (sorted) into its item, once per catalogue read. */
+    /**
+     * 18.3: a section reached by its id on some rows and only by its NAME on others used to be drawn twice (keys "id:x" and
+     * "name:y"). Name-only groups are merged into the id group of the same normalised name (an id wins); items keep their
+     * content ids and the first copy of an item stays (see {@link CigramSectionDedupe}).
+     */
+    private static void mergeNameOnlySections(java.util.LinkedHashMap<String, DynamicHomeSection> grouped) {
+        if (grouped == null || grouped.size() < 2) return;
+        java.util.ArrayList<CigramSectionDedupe.Sec> all = new java.util.ArrayList<CigramSectionDedupe.Sec>();
+        for (DynamicHomeSection s : grouped.values()) all.add(new CigramSectionDedupe.Sec(s.key, s.id, s.name));
+        java.util.Map<String, String> alias = CigramSectionDedupe.aliasMap(all, new CigramSectionDedupe.Normalizer() {
+            @Override public String normalize(String v) { return normalizeSearch(v); }
+        });
+        for (java.util.Map.Entry<String, String> e : alias.entrySet()) {
+            DynamicHomeSection from = grouped.get(e.getKey());
+            DynamicHomeSection into = grouped.get(e.getValue());
+            if (from == null || into == null || from == into) continue;
+            for (java.util.Map.Entry<String, JSONObject> item : from.items.entrySet()) {
+                if (!into.items.containsKey(item.getKey())) into.items.put(item.getKey(), item.getValue());
+            }
+            for (java.util.Map.Entry<String, java.util.LinkedHashMap<String, JSONObject>> acc : from.episodeAcc.entrySet()) {
+                if (!into.episodeAcc.containsKey(acc.getKey())) into.episodeAcc.put(acc.getKey(), acc.getValue());
+            }
+            into.rank = Math.max(into.rank, from.rank);
+            if (into.style.length() == 0) into.style = from.style;
+            grouped.remove(e.getKey());
+        }
+    }
+
     private static void finalizeDynamicSections(
             java.util.LinkedHashMap<String, DynamicHomeSection> grouped) {
         if (grouped == null) return;
+        mergeNameOnlySections(grouped);
         for (DynamicHomeSection section : grouped.values()) {
             if (section == null || section.episodeAcc.isEmpty()) continue;
             for (java.util.Map.Entry<String, java.util.LinkedHashMap<String, JSONObject>> entry
@@ -3046,6 +3157,9 @@ public final class CigramStage1InitProvider extends ContentProvider {
                                 target = temp;
                             }
                             bitmap = decodeDynamicPoster(target);
+                            // 18.3: a 200 answer that is not an image (an HTML error page, a truncated file) must not stay in the
+                            // disk cache: it would be read, fail to decode and be downloaded again on every request
+                            if (bitmap == null) { try { target.delete(); } catch (Throwable ignored) { } }
                         }
                     } catch (Throwable ignored) { android.util.Log.w("CigramInjected", "run", ignored); } finally {
                         try { if (input != null) input.close(); } catch (Throwable ignored) { android.util.Log.w("CigramInjected", "run", ignored); }
@@ -8823,11 +8937,20 @@ public final class CigramStage1InitProvider extends ContentProvider {
     public static String prepareAndStoreCatalog(Context context, String raw) {
         if (context == null || !isValidCatalog(raw)) return "";
         try {
-            PreparedCatalog prepared = prepareCatalog(CigramTitles.normalizeCatalog(raw));
+            // 18.3: a section page used to re-prepare, re-index and re-save the whole catalogue on every open, changed or not
+            String normalized = CigramTitles.normalizeCatalog(raw);
+            String rawHash = catalogHash(normalized);
+            SharedPreferences saved = catalogPrefs(context);
+            if (rawHash.length() > 0 && rawHash.equals(saved.getString(KEY_RAW_HASH, "")) && saved.contains(KEY_JSON)) {
+                confirmCatalogSnapshot(context);
+                return cachedCatalogJson(context);
+            }
+            PreparedCatalog prepared = prepareCatalog(normalized);
             long now = System.currentTimeMillis();
             String hash = catalogHash(prepared.displayJson);
             installCatalogInMemory(prepared.displayJson, prepared.searchIndexJson);
             catalogPrefs(context).edit()
+                    .putString(KEY_RAW_HASH, rawHash)
                     .putString(KEY_JSON, prepared.displayJson)
                     .putString(KEY_JSON_HASH, hash)
                     .putLong(KEY_UPDATED, now)
@@ -11376,6 +11499,10 @@ public final class CigramStage1InitProvider extends ContentProvider {
     private static final class FetchResult {
         boolean ok;
         boolean retryable;
+        /** 18.3: the server answered 304 to our If-None-Match: the saved snapshot is still current (body is empty). */
+        boolean notModified;
+        String etag = "";
+        int status;
         String body = "";
         String userMessage = "تعذر تحميل المحتوى. حاول مرة أخرى.";
     }
@@ -11423,12 +11550,59 @@ public final class CigramStage1InitProvider extends ContentProvider {
      * cache). MUST be called off the main thread.
      */
     public static String loadCatalogJsonBlocking(Context context) {
+        // 18.3: this used to be network-first: every section page / TV page downloaded the whole 5 MB catalogue on open even
+        // though the saved one had been confirmed seconds earlier. Now: a fresh snapshot is returned as it is, and a stale one is
+        // refreshed by ONE download at a time (a second caller waits for it instead of starting another).
         try {
-            FetchResult result = fetchCatalog(context);
-            if (result.ok && isValidCatalog(result.body)) return result.body;
+            if (catalogSnapshotFresh(context)) {
+                String fresh = cachedCatalogJson(context);
+                if (looksLikeCatalogText(fresh)) return fresh;
+            }
+            synchronized (BLOCKING_LOAD_LOCK) {
+                if (catalogSnapshotFresh(context)) {          // the previous holder of the lock refreshed it
+                    String fresh = cachedCatalogJson(context);
+                    if (looksLikeCatalogText(fresh)) return fresh;
+                }
+                // an early / tab refresh is already running: wait for it (bounded) instead of downloading a second copy
+                long until = android.os.SystemClock.elapsedRealtime() + 20000L;
+                while (CATALOG_NETWORK_RUNNING && android.os.SystemClock.elapsedRealtime() < until) {
+                    try { Thread.sleep(150L); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); break; }
+                }
+                if (catalogSnapshotFresh(context)) {
+                    String fresh = cachedCatalogJson(context);
+                    if (looksLikeCatalogText(fresh)) return fresh;
+                }
+                CigramRefreshPolicy.State st = catalogPolicyState(context);
+                if (st.snapshotConfirmedAt > 0L && CATALOG_FAILURES > 0 && !CigramRefreshPolicy.shouldRefresh(CigramRefreshPolicy.Reason.TAB_SHOWN, st)) {
+                    return cachedCatalogJson(context);       // still inside the back-off after failures: use what is saved
+                }
+                boolean started;
+                synchronized (CATALOG_MEMORY_LOCK) {
+                    started = !CATALOG_NETWORK_RUNNING;
+                    if (started) {
+                        CATALOG_NETWORK_RUNNING = true;
+                        LAST_CATALOG_NETWORK_ATTEMPT_AT = System.currentTimeMillis();
+                    }
+                }
+                if (!started) return cachedCatalogJson(context);
+                try {
+                    FetchResult result = fetchCatalog(context);
+                    if (result.ok && result.notModified) { confirmCatalogSnapshot(context); return cachedCatalogJson(context); }
+                    if (result.ok && isValidCatalog(result.body)) {
+                        CATALOG_FAILURES = 0;
+                        try { catalogPrefs(context).edit().putString(KEY_ETAG, result.etag).apply(); } catch (Throwable ignored) { }
+                        return result.body;
+                    }
+                    CATALOG_FAILURES = Math.min(CATALOG_FAILURES + 1, 12);
+                } finally {
+                    CATALOG_NETWORK_RUNNING = false;
+                }
+            }
         } catch (Throwable ignored) { }
         return cachedCatalogJson(context);
     }
+
+    private static final Object BLOCKING_LOAD_LOCK = new Object();
 
     private static FetchResult fetchCatalog(Context context) {
         if (!isOnline(context)) {
@@ -11465,6 +11639,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
 
         final long cgT0 = android.os.SystemClock.elapsedRealtime();
         try {
+            CigramPerf.request("catalog");   // 18.3: a second catalogue request within 10 s is logged as a duplicate
             connection = (HttpURLConnection) new URL(CATALOG_URL).openConnection();
             connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
             connection.setReadTimeout(READ_TIMEOUT_MS);
@@ -11473,9 +11648,27 @@ public final class CigramStage1InitProvider extends ContentProvider {
             connection.setUseCaches(false);
             connection.setRequestProperty("Accept", "application/json");
             connection.setRequestProperty("User-Agent", "Cigram-Android/1.0");
+            // 18.3: conditional request. The Worker's /movies sends the R2 ETag; once the Worker also answers If-None-Match with
+            // 304 (docs/backend patch) an unchanged 5 MB catalogue costs a few hundred bytes. Today's Worker ignores the header and
+            // answers 200: the body hash check below then still avoids the parse / index / save / UI work.
+            String sentEtag = "";
+            try {
+                SharedPreferences cp = catalogPrefs(context);
+                if (cp.contains(KEY_JSON)) sentEtag = cp.getString(KEY_ETAG, "");
+            } catch (Throwable ignored) { }
+            if (sentEtag != null && sentEtag.length() > 0) connection.setRequestProperty("If-None-Match", sentEtag);
 
             int status = connection.getResponseCode();
+            result.status = status;
             LAST_DIAG = "رد السيرفر http=" + status;
+            if (status == 304) {
+                result.ok = true;
+                result.notModified = true;
+                result.etag = sentEtag == null ? "" : sentEtag;
+                return result;
+            }
+            String gotEtag = connection.getHeaderField("ETag");
+            result.etag = gotEtag == null ? "" : gotEtag.trim();
             android.util.Log.i("CigramDiag", "fetchCatalog http=" + status + " url=" + CATALOG_URL);
             if (status >= 500) {
                 android.util.Log.e("CigramDiag", "fetchCatalog SERVER ERROR http=" + status + " url=" + CATALOG_URL);

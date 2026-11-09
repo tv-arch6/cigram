@@ -32,7 +32,9 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
         @Override
         public void run() {
             if (!alive()) return;
-            CgData.load(DxHomeActivity.this, new CgHttp.Done<CgData>() {
+            // 18.3: a snapshot younger than 90 s (after an edit screen, or a manual refresh) is not downloaded again, and a load
+            // already running (the "تحديث" button, another screen) is joined instead of started twice
+            CgData.loadIfStale(DxHomeActivity.this, 90000L, new CgHttp.Done<CgData>() {
                 @Override
                 public void ok(CgData d) {
                     if (alive()) showContent();
@@ -47,7 +49,9 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
         }
 
         private void schedule() {
-            if (alive() && resumed) ui().postDelayed(autoRefresh, AUTO_REFRESH_MS);
+            // exponential back-off while the server keeps failing (2, 4, 8 minutes ... capped at 10), instead of every 2 minutes forever
+            long delay = CgFlight.refreshDelayMs(AUTO_REFRESH_MS, CgData.failures(), 10L * 60000L);
+            if (alive() && resumed) ui().postDelayed(autoRefresh, delay);
         }
     };
 

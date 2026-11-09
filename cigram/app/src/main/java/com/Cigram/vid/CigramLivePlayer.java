@@ -420,12 +420,15 @@ public final class CigramLivePlayer {
         s.stage.addView(s.view, new FrameLayout.LayoutParams(-1, -1, Gravity.CENTER));
 
         s.selector = new DefaultTrackSelector(a);
-        DefaultLoadControl load = new DefaultLoadControl.Builder()
-                .setBufferDurationsMs(10000, 30000, 1500, 3000)
-                .build();
+        // 18.3: 10 s / 30 s window as before; the start / re-buffer thresholds (1.5 s / 3 s) now follow the connection
+        DefaultLoadControl load = CigramAdaptiveLoadControl.create(a, CigramBufferPolicy.custom(10000, 30000, 0), true);
         s.player = new ExoPlayer.Builder(a)
                 .setTrackSelector(s.selector)
                 .setLoadControl(load)
+                // 18.3: audio focus (a call / another app pauses or ducks the channel, it resumes afterwards)
+                .setAudioAttributes(new com.google.android.exoplayer2.audio.AudioAttributes.Builder()
+                        .setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
+                .setHandleAudioBecomingNoisy(true)       // headphones unplugged: pause instead of blasting the speaker
                 .setMediaSourceFactory(CigramStreams.sourceFactory(a))
                 .build();
         s.view.setPlayer(s.player);

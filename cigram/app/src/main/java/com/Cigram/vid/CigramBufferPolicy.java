@@ -26,6 +26,11 @@ final class CigramBufferPolicy {
         return new CigramBufferPolicy(20000, 75000, 60000);
     }
 
+    /** Explicit limits (the watch-together player computes its own base from the network). */
+    static CigramBufferPolicy custom(int minMs, int maxMs, int backMs) {
+        return new CigramBufferPolicy(minMs, maxMs, backMs);
+    }
+
     static CigramBufferPolicy of(Context c) {
         try {
             ActivityManager am = (ActivityManager) c.getSystemService(Context.ACTIVITY_SERVICE);
