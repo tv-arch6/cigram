@@ -1,4 +1,4 @@
-# Cigram 18.2 — backend changes (NOT deployed; see DEPLOY.md)
+# Cigram backend changes 18.2 → 19.0 (NOT deployed; see DEPLOY.md, 19.0 = §9 and CHAT-RETENTION-POLICY.md)
 
 The two Android apps talk to Cloudflare Workers. Their current source was read **read-only** from the Cloudflare
 account (`workers_get_worker_code`, 2026-11-08). Nothing was deployed, no secret was read or written, no data was
@@ -70,3 +70,8 @@ See `DEPLOY.md` (exact owner steps, secrets list, smoke tests, rollback, and the
 
 ## Websites named by the project owner (Podnapisi, SubtitleCat, Addic7ed, TVSubtitles, Moviesubtitles)
 Not integrated. Their access methods and terms were not verified; never bypass CAPTCHA, logins, rate limits or anti-bot protection.
+
+
+## 19.0 (chat history, push, backups)
+`cigram-ads-api/apply_patch_19.py` (+ `chat19_hub_methods.js`, `chat19_functions.js`) is a second stage applied after `apply_patch.py` by `build_deploy.sh`.
+Tests: `tests/ads_chat19_test.mjs` (24). Owner scripts: `scripts/preflight_backup.sh`, `scripts/post_deploy_smoke.sh`. `../backups/2026-11-09/` holds the catalogue snapshot taken before this work (5,685 records, sha256 inside).

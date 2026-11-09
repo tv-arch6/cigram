@@ -3049,7 +3049,7 @@ var ChatHub = class {
           lagging++;
           break;
         }
-        const rows = await this.s.list({ prefix: "m:" + t.id + ":", start: "m:" + t.id + ":" + padSeq(wm + 1), limit: 500 });
+        const rows = await this.s.list({ prefix: "m:" + t.id + ":", start: "m:" + t.id + ":" + padSeq(wm + 1), limit: Math.max(1, Math.min(500, budget - msgs)) });
         if (!rows.size) break;
         const arr = [...rows.values()];
         const first = arr[0].seq, last = arr[arr.length - 1].seq;

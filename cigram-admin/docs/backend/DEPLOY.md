@@ -119,3 +119,53 @@ CPU: the first manifest request parses `movies.json` once (74 ms in Node for 5.2
 bootstrap should be triggered by one admin write on a paid plan, or the feed left off).
 `_admin_private/` is publicly readable while no `ADMIN_BUCKET` is bound (§4): the feed holds only records that are public in `movies.json`.
 Not production-tested: the Worker change, the app's delta path against a real Worker, `ETag` behaviour behind Cloudflare's CDN.
+
+
+## 9. 19.0 additions — permanent chat history, targeted push, backups, session fallback (cigram-ads-api). READY, NOT DEPLOYED
+Built from the same live snapshot as §7/§8 by `./build_deploy.sh` (stage 1 = `apply_patch.py`, stage 2 = `apply_patch_19.py`); the bundle is
+`deploy/cigram-ads-api/worker.js` (sha256 in `deploy/SHA256SUMS`). **No new binding is required to deploy it**: every new capability is optional and
+reports exactly what it lacks (`GET /admin/chat/push-status`, `GET /admin/chat/backup`). Policy: `CHAT-RETENTION-POLICY.md`.
+
+### 9.0 Order (all of it is additive; nothing is migrated, nothing is deleted)
+1. `ADMIN_TOKEN=… ./scripts/preflight_backup.sh` — an offline copy of the catalogue and of every conversation (needs the OWNER token; read-only).
+2. Dashboard → `cigram-ads-api` → *Edit code* → paste `deploy/cigram-ads-api/worker.js` → *Deploy*. (Rollback: *Deployments* → previous version; the new
+   storage keys `dev:`, `devx:`, `ob:`, `pd:`, `bk:`, `bk_state`, `push_stats` and the thread fields `user_floor`, `last_type`, `erased_at` are ignored by the old code.)
+3. `ADMIN_TOKEN=… ./scripts/post_deploy_smoke.sh`.
+4. Deploy the two apps (main 18.5.0 / admin 2.2.0).
+
+### 9.1 Push notifications — what is missing in production today (checked 2026-11-09)
+* `cigram-push` (live, modified 2026-10-14) is a **broadcast** sender: it sends the topic `cigram_all` only and needs the header `X-Admin-Key`. It has no per-user
+  route, and the old `notify()` of `cigram-ads-api` posted to `PUSH_WEBHOOK_URL` without any credential and dropped a notification when another one for the same
+  thread was sent in the last 30 s. A private reply therefore never reached a closed app; only the 15-minute poll of the apps did.
+* The main app registered no device token with the backend at all. 19.0 does (`POST /chat/device`), the admin app too (`POST /admin/chat/device`).
+* **Secrets / variables to add on `cigram-ads-api`** (Settings → Variables and Secrets): `FCM_SERVICE_ACCOUNT` = the whole Firebase service-account JSON of the
+  project `cigram` (the same value `cigram-admin-api` already uses; Firebase console → Project settings → Service accounts → Generate new private key, role
+  *Firebase Cloud Messaging API Admin*). Optional `FCM_PROJECT_ID` (default: `project_id` of the JSON). Optional legacy webhook: `PUSH_WEBHOOK_URL` + `PUSH_WEBHOOK_KEY`
+  (sent as `Authorization: Bearer`). I could not read which secrets are set (the connector shows names and code, not bindings or secrets): check them in the dashboard.
+* **Admin app**: the Android app `com.my.newproject` must exist in the Firebase project `cigram` (Project settings → Your apps → Add app → Android). Then build the
+  admin app with the four PUBLIC settings in `~/.gradle/gradle.properties` (or `-P`): `ADMIN_FCM_APP_ID` (`1:<sender>:android:<hash>`), `ADMIN_FCM_API_KEY`,
+  `ADMIN_FCM_PROJECT_ID` (default `cigram`), `ADMIN_FCM_SENDER_ID`. Without them the admin build still works and keeps the 15-minute poll; the inbox menu
+  «الإشعارات والنسخ» lists exactly which setting is missing. The main app needs nothing new (its Firebase settings are already in `CigramFcm`).
+* Check: open the admin inbox → «الإشعارات والنسخ»: *FCM على الخادم: مُفعّل*, *أجهزة الإدارة المسجّلة ≥ 1*. A real test = write from a user account, close the admin
+  app, wait for the notification (do not trust any "test" that does not leave the Worker).
+* Delivery rules implemented: targeted tokens only (never a topic), data message (no credential or token inside), `collapse_key` per conversation, retry 30 s / 2 min /
+  10 min / 1 h / 6 h (FCM TTL 3 days), one push per message id (`ob:` outbox + `pd:` markers), dead tokens removed (`UNREGISTERED`/`NOT_FOUND`), a phone that signs in with
+  another account stops receiving the previous account's pushes, no push while the recipient has the conversation open.
+
+### 9.2 Backups
+Bind a **private** R2 bucket to `cigram-ads-api` as `ADS_BUCKET` (`cigram-ads` exists) or `CHAT_BACKUP_BUCKET`. The code refuses the public `movies` bucket. First run: `POST /admin/chat/backup`
+(then the alarm does it every 6 h), check with `GET /admin/chat/backup` and `/backup/verify`. Keep `CHAT_KEY` (secret) — backups are encrypted with it.
+
+### 9.3 «انتهت الجلسة» in the chat although the account is signed in
+Two causes were found, one in each place; both are handled, one needs a dashboard check:
+1. **Worker (needs deploying + a binding check)**: the live Worker (2026-10-07) answers `401 invalid_token` for *any* failure of its call to the auth Worker (a timeout, a 429, a 5xx,
+   Cloudflare error 1042 for a Worker-to-Worker call over `workers.dev`). After 9.0 it answers `503 auth_unavailable` for those and logs `{"evt":"chat_auth","outcome":…}`. If that line
+   shows `unavailable` on every request: add a **service binding named `AUTH_API`** → `cigram-auth-api`, or bind the D1 database `cigram-users` as **`AUTH_DB`** (19.0 then verifies the session
+   read-only from the database when the auth Worker cannot be asked; it writes nothing and does not touch the session).
+2. **App (fixed in main 18.5.0)**: a refused token is now checked against the auth service itself from the phone before the app says «sign in again». If the auth service accepts it, the chat
+   shows «خدمة الدعم لا تستطيع التحقق من حسابك الآن», keeps the queue and retries; only a token the auth service also rejects (and that cannot be renewed) is reported as expired.
+
+### 9.4 Not verified in production
+The ads Worker is not reachable from the build environment (egress policy: 403), so nothing in §9 ran against the real Worker: the Worker code passes `tests/ads_chat19_test.mjs` (24) and the two
+older ads suites against the real code with in-memory Durable Object storage, in-memory R2 and a fake FCM endpoint; a real FCM delivery, a real R2 backup and the real auth path are unproven until you run
+`scripts/post_deploy_smoke.sh` and the end-to-end check in §9.1.

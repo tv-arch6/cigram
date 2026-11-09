@@ -209,12 +209,8 @@ public class MainActivity extends AppCompatActivity {
 					final android.content.Context app = getApplicationContext();
 					final android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
 					final java.util.concurrent.Executor workers = android.os.AsyncTask.THREAD_POOL_EXECUTOR;
-					final java.util.LinkedHashMap<String,android.graphics.Bitmap> memory =
-					new java.util.LinkedHashMap<String,android.graphics.Bitmap>(20,.75f,true) {
-						@Override protected boolean removeEldestEntry(java.util.Map.Entry<String,android.graphics.Bitmap> e) {
-							return size() > 18;
-						}
-					};
+					// 19.0: one byte-bounded cache shared by every Home render (it used to be 18 bitmaps, rebuilt on each render)
+					final CigramImages.BitmapCache memory = CigramImages.bitmaps();
 					
 					String clean(String raw) { return raw == null ? "" : raw.trim(); }
 					
@@ -288,44 +284,9 @@ public class MainActivity extends AppCompatActivity {
 						}
 						java.io.File target = cacheFile(url);
 						android.graphics.Bitmap bitmap = decode(target);
-						if (bitmap == null && (url.startsWith("http://") || url.startsWith("https://"))) {
-							java.net.HttpURLConnection connection = null;
-							java.io.InputStream input = null;
-							java.io.FileOutputStream output = null;
-							java.io.File temporary = new java.io.File(target.getParentFile(),target.getName()+".part");
-							try {
-								connection = (java.net.HttpURLConnection)new java.net.URL(url).openConnection();
-								connection.setConnectTimeout(8000);
-								connection.setReadTimeout(8000);
-								connection.setInstanceFollowRedirects(true);
-								connection.setRequestProperty("Accept","image/*");
-								int status = connection.getResponseCode();
-								if (status < 200 || status >= 300) {
-									android.util.Log.e("CigramDiag", "POSTER http=" + status + " url=" + url);
-									throw new java.io.IOException("HTTP "+status);
-								}
-								input = connection.getInputStream();
-								output = new java.io.FileOutputStream(temporary,false);
-								byte[] buffer = new byte[16384]; int count; long total = 0L;
-								while ((count=input.read(buffer))!=-1) {
-									total += count;
-									if (total > 25165824L) throw new java.io.IOException("poster too large");
-									output.write(buffer,0,count);
-								}
-								output.flush();
-								if (target.exists()) target.delete();
-								if (!temporary.renameTo(target)) target = temporary;
-								bitmap = decode(target);
-							} catch (Exception posterError) {
-								android.util.Log.e("CigramDiag", "POSTER FAIL " + posterError.getClass().getSimpleName()
-								+ ": " + posterError.getMessage() + " url=" + url);
-								if (temporary.exists()) temporary.delete();
-							} finally {
-								try { if (input != null) input.close(); } catch (Exception ignored) {}
-								try { if (output != null) output.close(); } catch (Exception ignored) {}
-								if (connection != null) connection.disconnect();
-							}
-						} else if (bitmap == null && url.startsWith("file://")) {
+						// 19.0: the network is touched only by CigramImages.ensureOnDisk (single flight, 3 at a time, unique temp file);
+						// by the time this runs the poster is on disk, or the URL has failed and is in back-off
+						if (bitmap == null && url.startsWith("file://")) {
 							bitmap = decode(new java.io.File(android.net.Uri.parse(url).getPath()));
 						}
 						if (bitmap != null) {
@@ -390,6 +351,8 @@ public class MainActivity extends AppCompatActivity {
 					final android.widget.ImageView view) {
 						if (view == null) return;
 						configure(view);
+						view.animate().cancel();
+						view.setAlpha(1f);
 						view.setImageDrawable(null);
 						final String primary = full(primaryRaw);
 						final String backup = full(backupRaw);
@@ -408,29 +371,64 @@ public class MainActivity extends AppCompatActivity {
 						}
 						
 						CigramSkeleton.apply(view, 14f);
-						workers.execute(new Runnable(){ @Override public void run() {
-								android.graphics.Bitmap bitmap = null;
-								String failed = primary;
-								String[] attempts = new String[]{primary,backup};
-								int used = 0;
-								for (String url : attempts) {
-									if (url == null || url.trim().isEmpty()) continue;
-									if (used > 0 && url.equals(primary)) continue;
-									used++;
-									bitmap = obtain(url);
-									failed = url;
-									if (bitmap != null || used >= 2) break;
-								}
-								final android.graphics.Bitmap result = bitmap;
-								final String failedUrl = failed;
-								if (result == null) logFailure(title,failedUrl);
+						final java.util.ArrayList<String> urls = new java.util.ArrayList<String>();
+						if (!primary.isEmpty()) urls.add(primary);
+						if (!backup.isEmpty() && !backup.equals(primary)) urls.add(backup);
+						showFrom(title, urls, 0, view, token);
+					}
+					
+					/** 19.0: primary first, then the backup, each through the shared single-flight queue. */
+					void showFrom(final String title, final java.util.List<String> urls, final int index,
+					final android.widget.ImageView view, final String token) {
+						showFrom(title, urls, index, view, token, true);
+					}
+					
+					void showFrom(final String title, final java.util.List<String> urls, final int index,
+					final android.widget.ImageView view, final String token, final boolean tryDisk) {
+						if (index >= urls.size()) {
+							if (!urls.isEmpty()) logFailure(title, urls.get(urls.size() - 1));
+							main.post(new Runnable(){ @Override public void run() {
+									if (!token.equals(String.valueOf(view.getTag()))) return;
+									configure(view);
+									view.setImageDrawable(errorPlaceholder(title));   // poster link broken: keep the card, show a fallback
+								}});
+							return;
+						}
+						final String url = urls.get(index);
+						if (tryDisk) {
+							// a poster already on disk is decoded at once, never queued behind slow downloads (head-of-line blocking)
+							final java.io.File cached = cacheFile(url);
+							if (cached != null && cached.isFile() && cached.length() > 0) {
+								workers.execute(new Runnable(){ @Override public void run() {
+										final android.graphics.Bitmap hit = obtain(url);
+										if (hit == null) {                       // a corrupt cache file: remove it and fetch again through the queue
+											try { cached.delete(); } catch (Throwable ignored) { }
+											showFrom(title, urls, index, view, token, false);
+											return;
+										}
+										main.post(new Runnable(){ @Override public void run() {
+												if (!token.equals(String.valueOf(view.getTag()))) return;
+												configure(view);
+												view.setImageBitmap(hit);
+												CigramImages.fadeIn(view);
+											}});
+									}});
+								return;
+							}
+						}
+						CigramImages.queue(app).request(url, CigramImageQueue.VISIBLE, new CigramImageQueue.Callback() {
+							@Override public boolean wanted() { return token.equals(String.valueOf(view.getTag())); }
+							@Override public void done(String doneUrl, boolean ok) {
+								final android.graphics.Bitmap bitmap = ok ? obtain(doneUrl) : null;
+								if (bitmap == null) { showFrom(title, urls, index + 1, view, token); return; }
 								main.post(new Runnable(){ @Override public void run() {
 										if (!token.equals(String.valueOf(view.getTag()))) return;
 										configure(view);
-										if (result != null) view.setImageBitmap(result);
-										else view.setImageDrawable(errorPlaceholder(title));   // poster link broken: keep the card, show a fallback
+										view.setImageBitmap(bitmap);
+										CigramImages.fadeIn(view);
 									}});
-							}});
+							}
+						});
 					}
 				}
 				final HomeImage homeImage =

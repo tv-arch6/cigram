@@ -1792,7 +1792,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             for (DynamicHomeSection s : grouped.values()) {
                 if (s == null || s.items.isEmpty()) continue;
                 java.util.ArrayList<JSONObject> list = new java.util.ArrayList<JSONObject>(s.items.values());
-                for (JSONObject item : list) CigramOrder.addClaimKeys(claims, item);
+                if (!isDerivedId(s.id)) for (JSONObject item : list) CigramOrder.addClaimKeys(claims, item);   // 19.0: a discovery row never takes a title from another row
                 if (!s.keepOrder) CigramOrder.sortJson(list);   // keep the NEWEST titles when capping
                 JSONObject so = new JSONObject();
                 so.put("key", s.key);
@@ -2009,6 +2009,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                         Object root = new JSONTokener(catalogJson).nextValue();
                         grouped = new java.util.LinkedHashMap<String, DynamicHomeSection>();
                         collectDynamicSectionContent(root, "", null, grouped, 0);
+                        addDerivedSections(root, grouped);   // 19.0: PrimeTV-style discovery rows (never over an administrator's section)
                         saveSectionsSnapshot(activity.getApplicationContext(), catalogJson, grouped);
                     } catch (Throwable error) {
                         android.util.Log.w("CigramStage2", "background section parse failed", error);
@@ -2032,9 +2033,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
         if (!(rootView instanceof LinearLayout)) return;
         final LinearLayout home = (LinearLayout) rootView;
 
-        restoreBuiltInHomeRows(activity, home);
-        removeTagged(activity, TAG_DYNAMIC_SECTIONS);
-
+        // 19.0: the teardown of the previous block moved BELOW the signature check (see renderSignature): an unchanged Home is left alone
         try {
             java.util.LinkedHashMap<String, DynamicHomeSection> prepared = null;
             synchronized (PRE_LOCK) {
@@ -2053,9 +2052,15 @@ public final class CigramStage1InitProvider extends ContentProvider {
                 Object root = new JSONTokener(catalogJson).nextValue();
                 grouped = new java.util.LinkedHashMap<String, DynamicHomeSection>();
                 collectDynamicSectionContent(root, "", null, grouped, 0);
+                addDerivedSections(root, grouped);
             }
 
-            if (grouped.isEmpty() && !CigramHomeOrder.plan(activity).any) return;
+            if (grouped.isEmpty() && !CigramHomeOrder.plan(activity).any) {
+                restoreBuiltInHomeRows(activity, home);          // nothing to show: the previous block (if any) goes, as before
+                removeTagged(activity, TAG_DYNAMIC_SECTIONS);
+                RENDER_SIG = "";
+                return;
+            }
 
             java.util.ArrayList<DynamicHomeSection> sections =
                     new java.util.ArrayList<DynamicHomeSection>(grouped.values());
@@ -2078,6 +2083,21 @@ public final class CigramStage1InitProvider extends ContentProvider {
             else promoteSectionsForUser(activity, sections);
             DYNAMIC_LAST_JSON = catalogJson;
             DYNAMIC_LAST_ACTIVITY = new java.lang.ref.WeakReference<Activity>(activity);
+
+            // 19.0: an unchanged Home is NOT rebuilt. The same catalogue content + order + titles / styles + administrator plan, drawn
+            // in THIS activity and still attached, means every card is already right: no teardown, no 220 ms fade-in, no scroll jump,
+            // no second wave of poster loads. A change in any visible aspect changes the signature and renders exactly as before.
+            final String renderSig = renderSignature(activity, sections, adminPlan);
+            final View existingBlock = home.findViewWithTag(TAG_DYNAMIC_SECTIONS);
+            if (renderSig.length() > 0 && renderSig.equals(RENDER_SIG) && existingBlock != null
+                    && RENDER_ACTIVITY != null && RENDER_ACTIVITY.get() == activity) {
+                CigramStage1InitProvider.trace("homeSame");
+                installNetflixTop(activity, home, sections);     // cheap and always rebuilt (admin layout changes show at once)
+                return;
+            }
+            restoreBuiltInHomeRows(activity, home);
+            removeTagged(activity, TAG_DYNAMIC_SECTIONS);
+
             final Runnable rerender = new Runnable() {
                 @Override public void run() {
                     Activity a = DYNAMIC_LAST_ACTIVITY == null ? null : DYNAMIC_LAST_ACTIVITY.get();
@@ -2129,10 +2149,12 @@ public final class CigramStage1InitProvider extends ContentProvider {
                 }
             }
 
-            if (block.getChildCount() == 0) return;
+            if (block.getChildCount() == 0) { RENDER_SIG = ""; return; }
 
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
             home.addView(block, Math.max(0, Math.min(insertAt, home.getChildCount())), lp);
+            RENDER_SIG = renderSig;
+            RENDER_ACTIVITY = new java.lang.ref.WeakReference<Activity>(activity);
             // v10.70: sections arrive softly instead of popping in
             block.setAlpha(0f);
             block.animate().alpha(1f).setDuration(220L).start();
@@ -2219,6 +2241,88 @@ public final class CigramStage1InitProvider extends ContentProvider {
         } finally {
             if (depth == 0) finalizeDynamicSections(grouped);
         }
+    }
+
+    /** Signature of what the last render drew (and in which activity). Empty = unknown: the next render always draws. */
+    private static volatile String RENDER_SIG = "";
+    private static volatile java.lang.ref.WeakReference<Activity> RENDER_ACTIVITY;
+
+    /**
+     * 19.0: SHA-1 over everything that decides how the sections look: the administrator's plan (order / hidden / disabled, also of the
+     * two fixed rows), every section's id, name, style, administrator title / style, flags and the full content of every card. Computed
+     * from the in-memory sections (a few hundred KB), never from the network.
+     */
+    private static String renderSignature(Activity activity, java.util.List<DynamicHomeSection> sections, CigramHomeOrder.Plan plan) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-1");
+            StringBuilder head = new StringBuilder("v1|").append(plan.any).append('|');
+            for (String[] b : new String[][]{{"latest_movies", "أحدث الأفلام"}, {"featured_series", "المسلسلات المميزة"}}) {
+                head.append(plan.rank(b[0], b[1])).append(',').append(plan.disabled(b[0], b[1])).append(',').append(plan.hiddenOnHome(b[0], b[1])).append(';');
+            }
+            md.update(head.toString().getBytes("UTF-8"));
+            for (DynamicHomeSection s : sections) {
+                if (s == null || s.items.isEmpty()) continue;
+                String title = CigramLayoutConfig.titleFor(activity, s.id, s.name);
+                String style = CigramLayoutConfig.styleFor(activity, s.id, s.name);
+                md.update(("|S|" + s.key + '|' + s.id + '|' + s.name + '|' + title + '|' + style + '|' + s.style + '|' + s.keepOrder + '|' + s.noMore
+                        + '|' + s.items.size() + '|' + plan.rank(s.id, s.name)).getBytes("UTF-8"));
+                for (JSONObject item : s.items.values()) md.update(item.toString().getBytes("UTF-8"));
+            }
+            StringBuilder hex = new StringBuilder();
+            for (byte x : md.digest()) hex.append(String.format(java.util.Locale.US, "%02x", x & 255));
+            return hex.toString();
+        } catch (Throwable error) {
+            return "";
+        }
+    }
+
+    static boolean isDerivedId(String id) {
+        return id != null && id.startsWith("derived_");
+    }
+
+    /**
+     * 19.0: appends the discovery rows of {@link CigramHomeGroups} (top rated movies / series, series with new episodes, documentaries,
+     * nationality rows when the data has one) to the sections read from the catalogue. They go through the SAME path as an
+     * administrator's section (addDynamicSectionItem), so a series carries all its episodes and opens complete. They are programmatic:
+     * no «المزيد» page, best first, last in the default order; the administrator can hide / reorder them by id (derived_*).
+     * Never added over an existing section of the same subject (CigramHomeGroups checks the names).
+     */
+    private static void addDerivedSections(Object root, java.util.LinkedHashMap<String, DynamicHomeSection> grouped) {
+        if (grouped == null) return;
+        try {
+            JSONArray records = CigramHomeGroups.records(root);
+            if (records == null || records.length() == 0) return;
+            java.util.ArrayList<String> names = new java.util.ArrayList<String>();
+            names.add("أحدث الأفلام");
+            names.add("المسلسلات المميزة");
+            for (DynamicHomeSection existing : grouped.values()) {
+                if (existing == null) continue;
+                if (existing.name != null) names.add(existing.name);
+            }
+            java.util.List<CigramHomeGroups.Group> groups = CigramHomeGroups.compute(records, names);
+            for (CigramHomeGroups.Group g : groups) {
+                String key = "id:" + normalizeSearch(g.id);
+                if (grouped.containsKey(key)) continue;
+                for (JSONObject head : g.heads) addDynamicSectionItem(grouped, derivedCopy(head, g));
+                for (JSONObject episode : g.episodes) addDynamicSectionItem(grouped, derivedCopy(episode, g));
+                DynamicHomeSection section = grouped.get(key);
+                if (section == null) continue;
+                section.rank = 1L;            // after every administrator section in the default order
+                section.keepOrder = true;     // best first
+                section.noMore = true;        // a discovery row has no «المزيد» page
+            }
+            if (!groups.isEmpty()) finalizeDynamicSections(grouped);
+            android.util.Log.i("CigramHome", "derived rows " + CigramHomeGroups.sizes(groups));
+        } catch (Throwable error) {
+            android.util.Log.w("CigramStage2", "derived rows skipped", error);
+        }
+    }
+
+    private static JSONObject derivedCopy(JSONObject record, CigramHomeGroups.Group g) throws Exception {
+        JSONObject copy = new JSONObject(record.toString());
+        copy.put("section_id", g.id);
+        copy.put("section_name", g.name);
+        return copy;
     }
 
     /** Writes each series' gathered episodes (sorted) into its item, once per catalogue read. */

@@ -474,5 +474,46 @@ await test("when the auth Worker cannot be asked, an AUTH_DB binding verifies th
   assert.equal(un.json.error, "auth_unavailable");
 });
 
+// ================================================================ websocket foreground flag, backup budget
+await test("the app's {t:'fg'} message marks its socket as background / foreground (push decision)", async () => {
+  const w = makeSocket(["u:" + C], { side: "user", thread: C });
+  assert.equal(hubObj.userActive(C), true);
+  await hubObj.webSocketMessage(w, JSON.stringify({ t: "fg", on: false }));
+  assert.equal(w.attachment.fg, false);
+  assert.equal(hubObj.userActive(C), false);
+  await hubObj.webSocketMessage(w, JSON.stringify({ t: "fg", on: true }));
+  assert.equal(hubObj.userActive(C), true);
+  w.readyState = 3;
+});
+
+await test("a backlog larger than the per-run budget is backed up over several runs (the budget is a real cap) and restores completely", async () => {
+  const dora = await jwt({ sub: "auth-user-big", email: "dora@example.invalid", name: "Dora", exp: exp() });
+  await call("POST", "/chat/send", dora, { client_id: "d-0", type: "text", text: "start" });
+  const D = (await threadOf("auth-user-big")).id;
+  for (let i = 0; i < 110; i++) assert.equal((await call("POST", "/admin/chat/send", ADMIN, { thread: D, client_id: "big-" + i, type: "text", text: "رسالة رقم " + i })).status, 200);   // (an admin may send 120 per minute)
+  let runs = 0, lag = 1;
+  while (lag > 0 && runs < 10) {
+    const r = await call("POST", "/admin/chat/backup", ADMIN, { max_messages: 100, thread: D });
+    assert.equal(r.status, 200, JSON.stringify(r.json));
+    assert.equal(r.json.failed, 0);
+    lag = r.json.lagging_threads;
+    runs++;
+  }
+  assert.equal(runs, 2, "111 messages with a budget of 100 need exactly two runs (" + runs + ")");
+  assert.equal((await call("GET", "/admin/chat/backup/verify", ADMIN)).json.ok, true);
+  // the whole thread vanishes from the live store; the restore brings back every message in order
+  const keys = [...(await hubState.storage.list({ prefix: "m:" + D + ":" })).keys()];
+  assert.equal(keys.length, 111);
+  for (const k of keys) await hubState.storage.delete(k);
+  await hubState.storage.delete("t:" + D);
+  const r = await call("POST", "/admin/chat/restore", ADMIN, { thread: D });
+  assert.equal(r.json.restored_messages, 111);
+  assert.equal(r.json.restored_threads, 1);
+  const m = (await call("GET", "/admin/chat/messages?thread=" + D + "&limit=100&before=1000", ADMIN)).json.messages;
+  assert.equal(m.length, 100);
+  assert.equal(m[m.length - 1].text, "رسالة رقم 109");
+  assert.equal((await hubState.storage.get("t:" + D)).last_seq, 111);
+});
+
 globalThis.fetch = realFetch;
 console.log("\n" + passed + " passed");

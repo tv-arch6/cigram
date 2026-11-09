@@ -1694,6 +1694,14 @@ async function verifyUser(request, env) {
       if (timer) clearTimeout(timer);
     }
   }
+  if (!user && verdict !== "invalid" && env.AUTH_DB) {
+    // 19.0: the auth Worker could not be asked (service binding / URL problem): look at the session read-only in D1
+    const d1 = await verifyViaD1(env, tok);
+    if (d1 && d1.id) {
+      user = pickUser(d1);
+      verdict = "";
+    } else if (d1 && d1.invalid) verdict = "invalid";
+  }
   if (!user) {
     const grace = verdict !== "invalid" && hit && t0 - hit.at < 30 * 6e4;
     // route-level log only: no token, no user id
@@ -2241,6 +2249,11 @@ var ChatHub = class {
         } catch (e) {
         }
       }
+    } else if (m.t === "fg") {
+      try {
+        if (ws.serializeAttachment) ws.serializeAttachment(Object.assign({}, a, { fg: !!m.on }));
+      } catch (e) {
+      }
     } else if (m.t === "ping") {
       try {
         ws.send(JSON.stringify({ t: "pong", server_time: Date.now() }));
@@ -2285,21 +2298,6 @@ var ChatHub = class {
     await this.webSocketClose(ws);
   }
   // ------------------------------------------------------------ push (webhook) — اختياري
-  async notify(side, thread, title, body, extra) {
-    const url = this.env.PUSH_WEBHOOK_URL;
-    if (!url) return;
-    const k = side + ":" + thread;
-    const last = this._lastPush.get(k) || 0;
-    if (Date.now() - last < 3e4) return;
-    this._lastPush.set(k, Date.now());
-    if (this._lastPush.size > 3e3) this._lastPush.clear();
-    const p = fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(Object.assign({ kind: "chat", to: side, user_key: side === "user" ? thread : void 0, thread, title, body }, extra || {})) }).catch(() => {
-    });
-    try {
-      this.state.waitUntil(p);
-    } catch (e) {
-    }
-  }
   // ------------------------------------------------------------ threads
   async getThread(id, create, info) {
     let t = await this.s.get("t:" + id);
@@ -2352,6 +2350,8 @@ var ChatHub = class {
       last_ts: t.last_ts,
       last_seq: t.last_seq,
       last_from: t.last_from,
+      last_type: t.last_type || "",
+      erased: !!t.erased_at,
       preview: prev,
       unread_admin: t.unread_admin,
       unread_user: t.unread_user,
@@ -2365,6 +2365,9 @@ var ChatHub = class {
     return { status: t.status, last_seq: t.last_seq, unread: t.unread_user, banned: !!t.banned, created: t.created };
   }
   async op_thread_open(p) {
+    return this.withThread(cleanText(p.user_key, 120), () => this.op_thread_open_locked(p));
+  }
+  async op_thread_open_locked(p) {
     const id = cleanText(p.user_key, 120);
     if (!id) fail(400, "invalid_user", "\u0645\u0633\u062A\u062E\u062F\u0645 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D.");
     const t = await this.getThread(id, true, p);
@@ -2383,7 +2386,7 @@ var ChatHub = class {
     const q = cleanText(p.q, 60).toLowerCase();
     const out = [];
     for (const t of all.values()) {
-      if (p.archived ? !t.archived : t.archived) continue;
+      if (p.archived !== "all" && (p.archived ? !t.archived : t.archived)) continue;
       if (p.status && t.status !== p.status) continue;
       if (p.unread && !t.unread_admin) continue;
       if (p.tag && (t.tags || []).indexOf(p.tag) < 0) continue;
@@ -2396,9 +2399,20 @@ var ChatHub = class {
     const lim = int(p.limit, 1, 300, 100);
     const views = [];
     let totalUnread = 0;
-    for (const t of all.values()) if (!t.archived) totalUnread += t.unread_admin || 0;
+    const counts = { all: 0, unread: 0, open: 0, pending: 0, archived: 0 };
+    for (const t of all.values()) {
+      if (t.archived) {
+        counts.archived++;
+        continue;
+      }
+      totalUnread += t.unread_admin || 0;
+      counts.all++;
+      if (t.unread_admin) counts.unread++;
+      if (t.status === "open") counts.open++;
+      if (t.status === "pending") counts.pending++;
+    }
     for (const t of out.slice(0, lim)) views.push(await this.threadView(t));
-    return { threads: views, unread_total: totalUnread, admin_online: this.adminOnline() };
+    return { threads: views, unread_total: totalUnread, counts, admin_online: this.adminOnline() };
   }
   async op_unread_total() {
     const all = await this.s.list({ prefix: "t:" });
@@ -2410,6 +2424,9 @@ var ChatHub = class {
     return { unread: n, threads };
   }
   async op_thread_update(p) {
+    return this.withThread(cleanText(p.thread, 120), () => this.op_thread_update_locked(p));
+  }
+  async op_thread_update_locked(p) {
     const t = await this.s.get("t:" + p.thread);
     if (!t) fail(404, "not_found", "\u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629.");
     if (p.status !== void 0) t.status = oneOf(p.status, CHAT_STATUSES, t.status);
@@ -2446,19 +2463,24 @@ var ChatHub = class {
     return v;
   }
   async op_messages(p) {
+    return this.withThread(cleanText(p.thread, 120), () => this.op_messages_locked(p));
+  }
+  async op_messages_locked(p) {
     const thread = cleanText(p.thread, 120);
     const t = await this.s.get("t:" + thread);
     if (!t) return { messages: [], thread: null };
     const side = p.side === "admin" ? "admin" : "user";
+    const floor = side === "user" ? t.user_floor || 0 : 0;
     const limit = int(p.limit, 1, 100, 40);
     let rows;
     const after = int(p.after, 0, 1e12, 0);
     if (after > 0) {
-      const all = await this.s.list({ prefix: "m:" + thread + ":", start: "m:" + thread + ":" + padSeq(after + 1), limit });
+      const all = await this.s.list({ prefix: "m:" + thread + ":", start: "m:" + thread + ":" + padSeq(Math.max(after, floor) + 1), limit });
       rows = [...all.values()];
     } else {
       const before = int(p.before, 0, 1e12, 0);
       const opts = { prefix: "m:" + thread + ":", reverse: true, limit };
+      if (floor) opts.start = "m:" + thread + ":" + padSeq(floor + 1);
       if (before) opts.end = "m:" + thread + ":" + padSeq(before);
       const all = await this.s.list(opts);
       rows = [...all.values()].reverse();
@@ -2483,9 +2505,13 @@ var ChatHub = class {
     return { messages: out, thread: side === "admin" ? await this.threadView(t) : this.userThreadView(t), admin_online: this.adminOnline() };
   }
   async op_send(p) {
+    return this.withThread(cleanText(p.thread, 120), () => this.op_send_locked(p));
+  }
+  async op_send_locked(p) {
     const side = p.side === "admin" ? "admin" : "user";
     const thread = cleanText(p.thread, 120);
     const t = await this.getThread(thread, side === "user", p);
+    if (t && side === "user" && p.uid && !t.uid) t.uid = cleanText(p.uid, 120);
     if (!t) fail(404, "not_found", "\u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629.");
     if (side === "user" && t.banned) fail(403, "banned", "\u062A\u0645 \u062A\u0642\u064A\u064A\u062F \u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0629 \u0645\u0646 \u0642\u0628\u0644 \u0627\u0644\u0625\u062F\u0627\u0631\u0629.");
     if (!this.rl("send:" + side + ":" + thread, side === "user" ? 20 : 120, 6e4)) fail(429, "rate_limited", "\u0631\u0633\u0627\u0626\u0644 \u0643\u062B\u064A\u0631\u0629. \u0627\u0646\u062A\u0638\u0631 \u0642\u0644\u064A\u0644\u0627\u064B.");
@@ -2563,6 +2589,7 @@ var ChatHub = class {
     if (clientId) await this.s.put("cid:" + thread + ":" + clientId, m.seq);
     t.last_ts = now;
     t.last_from = side;
+    t.last_type = type;
     t.prev_enc = await encJson(this.env, thread, { text: previewOf(type, payload.text) });
     if (side === "user") {
       t.unread_admin = (t.unread_admin || 0) + 1;
@@ -2589,14 +2616,18 @@ var ChatHub = class {
       }
     }
     await this.s.put("t:" + thread, t);
+    await this.ensureAlarm();
     const tv = await this.threadView(t);
     this.emit(thread, { t: "msg", thread, msg: view, thread_info: tv }, side === "user" ? ["admin", "user"] : ["user", "admin"]);
     if (auto) this.emit(thread, { t: "msg", thread, msg: auto, thread_info: tv }, ["admin", "user"]);
-    if (side === "user" && !this.adminOnline()) await this.notify("admin", thread, "\u0631\u0633\u0627\u0644\u0629 \u062C\u062F\u064A\u062F\u0629 \u0645\u0646 \u0645\u0639\u0644\u0646", t.name + ": " + previewOf(type, payload.text));
-    if (side === "admin" && !this.userOnline(thread)) await this.notify("user", thread, payload.dev && payload.dev.name || "Cigram", previewOf(type, payload.text), { dev_name: payload.dev && payload.dev.name || "", ts: String(now) });
+    if (side === "user" && !this.adminActive()) await this.notify("admin", thread, m, "\u0631\u0633\u0627\u0644\u0629 \u062C\u062F\u064A\u062F\u0629 \u0645\u0646 \u0645\u0639\u0644\u0646", t.name + ": " + previewOf(type, payload.text));
+    if (side === "admin" && !this.userActive(thread)) await this.notify("user", thread, m, payload.dev && payload.dev.name || "Cigram", previewOf(type, payload.text), { dev_name: payload.dev && payload.dev.name || "", ts: String(now) });
     return { message: view, auto, thread: side === "admin" ? tv : this.userThreadView(t) };
   }
   async op_read(p) {
+    return this.withThread(cleanText(p.thread, 120), () => this.op_read_locked(p));
+  }
+  async op_read_locked(p) {
     const thread = cleanText(p.thread, 120);
     const t = await this.s.get("t:" + thread);
     if (!t) return {};
@@ -2613,33 +2644,29 @@ var ChatHub = class {
       await this.s.put("m:" + thread + ":" + padSeq(m.seq), m);
       changed++;
     }
+    // 19.0: the counter follows `upto` exactly (a read marker below the newest message leaves the newer ones unread)
+    let remaining = 0;
+    if (upto < t.last_seq) for (const m of rows.values()) if (m.from === other && !m.read && !m.deleted && m.seq > upto) remaining++;
     if (side === "admin") {
-      t.unread_admin = 0;
+      t.unread_admin = remaining;
       t.admin_seen = now;
     } else {
-      t.unread_user = 0;
+      t.unread_user = remaining;
       t.user_seen = now;
     }
     await this.s.put("t:" + thread, t);
-    this.emit(thread, { t: "read", thread, side, upto, ts: now }, [other]);
+    this.emit(thread, { t: "read", thread, side, upto, ts: now, unread: remaining }, [other]);
     if (side === "user") this.push("a", { t: "thread_unread", thread, unread_admin: t.unread_admin });
     return { changed };
   }
   async op_delete_msg(p) {
-    const thread = cleanText(p.thread, 120);
-    const key = "m:" + thread + ":" + padSeq(int(p.seq, 1, 1e12, 0));
-    const m = await this.s.get(key);
-    if (!m) fail(404, "not_found", "\u0627\u0644\u0631\u0633\u0627\u0644\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629.");
-    if (m.deleted) return {};
-    const d = await decJson(this.env, thread, m.enc);
-    if (d.media) await this.dropMedia(d.media.id);
-    m.deleted = true;
-    m.enc = await encJson(this.env, thread, {});
-    await this.s.put(key, m);
-    this.emit(thread, { t: "deleted", thread, seq: m.seq }, ["admin", "user"]);
-    return {};
+    // 19.0: a message is never deleted (accidental deletion of history is not possible from any app)
+    fail(409, "history_is_permanent", "\u0645\u0644\u0641 \u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0629 \u062F\u0627\u0626\u0645 \u0648\u0644\u0627 \u064A\u064F\u062D\u0630\u0641. \u064A\u0645\u0643\u0646 \u0623\u0631\u0634\u0641\u062A\u0647\u0627 \u0641\u0642\u0637.");
   }
   async op_quote_respond(p) {
+    return this.withThread(cleanText(p.thread, 120), () => this.op_quote_respond_locked(p));
+  }
+  async op_quote_respond_locked(p) {
     const thread = cleanText(p.thread, 120);
     const key = "m:" + thread + ":" + padSeq(int(p.seq, 1, 1e12, 0));
     const m = await this.s.get(key);
@@ -2655,11 +2682,14 @@ var ChatHub = class {
       t.status = accept ? "won" : "pending";
       await this.s.put("t:" + thread, t);
     }
-    const sys = await this.op_send_system({ thread, text: accept ? "\u2705 \u0648\u0627\u0641\u0642 \u0627\u0644\u0645\u0639\u0644\u0646 \u0639\u0644\u0649 \u0639\u0631\u0636 \u0627\u0644\u0633\u0639\u0631." : "\u274C \u0631\u0641\u0636 \u0627\u0644\u0645\u0639\u0644\u0646 \u0639\u0631\u0636 \u0627\u0644\u0633\u0639\u0631.", origin: p.origin });
+    const sys = await this.op_send_system_locked({ thread, text: accept ? "\u2705 \u0648\u0627\u0641\u0642 \u0627\u0644\u0645\u0639\u0644\u0646 \u0639\u0644\u0649 \u0639\u0631\u0636 \u0627\u0644\u0633\u0639\u0631." : "\u274C \u0631\u0641\u0636 \u0627\u0644\u0645\u0639\u0644\u0646 \u0639\u0631\u0636 \u0627\u0644\u0633\u0639\u0631.", origin: p.origin });
     this.emit(thread, { t: "quote_state", thread, seq: m.seq, state: m.qstate }, ["admin", "user"]);
     return { state: m.qstate, message: sys };
   }
   async op_send_system(p) {
+    return this.withThread(cleanText(p.thread, 120), () => this.op_send_system_locked(p));
+  }
+  async op_send_system_locked(p) {
     const thread = cleanText(p.thread, 120);
     const t = await this.s.get("t:" + thread);
     if (!t) return null;
@@ -2758,24 +2788,471 @@ var ChatHub = class {
     }
     await this.s.delete("media:" + id);
   }
-  async op_purge(p) {
-    const thread = cleanText(p.thread, 120);
-    const msgs = await this.s.list({ prefix: "m:" + thread + ":" });
-    const keys = [];
-    for (const [k, m] of msgs) {
-      keys.push(k);
-      if (m.client_id) keys.push("cid:" + thread + ":" + m.client_id);
-    }
-    const metas = await this.s.list({ prefix: "media:" });
-    for (const meta of metas.values()) if (meta.thread === thread) await this.dropMedia(meta.id);
-    for (let i = 0; i < keys.length; i += 100) await this.s.delete(keys.slice(i, i + 100));
-    await this.s.delete("t:" + thread);
+  // ================================================================================================================
+  // 19.0 — inserted into class ChatHub by apply_patch_19.py
+  //   * per-thread serialisation (no lost / duplicated sequence numbers when two sends race)
+  //   * permanent history: archive / restore only, identity erasure instead of deletion
+  //   * targeted push with outbox, retry, deduplication
+  //   * conversation backup (immutable segments in a PRIVATE bucket) and restore of missing records
+  // ================================================================================================================
+  async withThread(thread, fn) {
+    if (!this._locks) this._locks = /* @__PURE__ */ new Map();
+    const prev = this._locks.get(thread) || Promise.resolve();
+    let release;
+    const mine = new Promise((r) => { release = r; });
+    const tail = prev.then(() => mine);
+    this._locks.set(thread, tail);
+    await prev;
     try {
-      for (const w of this.socketsOf("u:" + thread)) w.close(1e3, "purged");
+      return await fn();
+    } finally {
+      release();
+      if (this._locks.get(thread) === tail) this._locks.delete(thread);
+    }
+  }
+  // a socket is "active" unless the app told us it went to the background ({"t":"fg","on":false})
+  activeSockets(tag) {
+    return this.socketsOf(tag).filter((w) => {
+      try {
+        const a = w.deserializeAttachment ? w.deserializeAttachment() : null;
+        return !(a && a.fg === false);
+      } catch (e) {
+        return true;
+      }
+    });
+  }
+  adminActive() {
+    return this.activeSockets("a").length > 0;
+  }
+  userActive(thread) {
+    return this.activeSockets("u:" + thread).length > 0;
+  }
+  // ------------------------------------------------------------ devices (push tokens)
+  async op_device_register(p) {
+    const side = p.side === "admin" ? "admin" : "user";
+    const owner = side === "admin" ? cleanText(p.owner, 40) || "owner" : cleanText(p.thread, 120);
+    const token = String(p.token || "").trim();
+    if (!owner) fail(400, "invalid_owner", "مستخدم غير صالح.");
+    if (token.length < 20 || token.length > 4096 || /\s/.test(token)) fail(400, "invalid_token", "رمز الجهاز غير صالح.");
+    const h = (await sha256Hex("fcm|" + token)).slice(0, 24);
+    const idx = "devx:" + side + ":" + h;
+    const prevOwner = await this.s.get(idx);
+    if (prevOwner && prevOwner !== owner) await this.s.delete("dev:" + side + ":" + prevOwner + ":" + h);   // the phone changed account: the old account stops receiving its pushes
+    const key = "dev:" + side + ":" + owner + ":" + h;
+    const prev = await this.s.get(key);
+    const now = Date.now();
+    await this.s.put(key, { side, owner, h, token, app: cleanText(p.app, 40), v: int(p.v, 0, 1e9, 0), created: prev ? prev.created : now, seen: now });
+    await this.s.put(idx, owner);
+    const list = await this.s.list({ prefix: "dev:" + side + ":" + owner + ":" });
+    if (list.size > 8) {
+      const old = [...list.entries()].sort((a, b) => a[1].seen - b[1].seen).slice(0, list.size - 8);
+      await this.s.delete(old.map((x) => x[0]));
+      for (const [, d] of old) await this.s.delete("devx:" + side + ":" + d.h);
+    }
+    return { registered: true, devices: Math.min(list.size, 8), push: chat19Features(this.env).push_fcm };
+  }
+  async op_device_remove(p) {
+    const side = p.side === "admin" ? "admin" : "user";
+    const owner = side === "admin" ? cleanText(p.owner, 40) || "owner" : cleanText(p.thread, 120);
+    const h = (await sha256Hex("fcm|" + String(p.token || "").trim())).slice(0, 24);
+    await this.s.delete("dev:" + side + ":" + owner + ":" + h);
+    const idx = "devx:" + side + ":" + h;
+    if ((await this.s.get(idx)) === owner) await this.s.delete(idx);
+    return { removed: true };
+  }
+  async devicesFor(side, owner) {
+    const list = await this.s.list({ prefix: side === "admin" ? "dev:admin:" : "dev:user:" + owner + ":" });
+    return [...list.values()];
+  }
+  async op_push_status() {
+    const f = chat19Features(this.env);
+    const adm = await this.s.list({ prefix: "dev:admin:" });
+    const usr = await this.s.list({ prefix: "dev:user:" });
+    const ob = await this.s.list({ prefix: "ob:" });
+    const st = (await this.s.get("push_stats")) || {};
+    const missing = [];
+    if (!f.push_fcm && !f.push_webhook) missing.push("FCM_SERVICE_ACCOUNT (secret, the Firebase service-account JSON) or PUSH_WEBHOOK_URL");
+    if (f.push_fcm && !String(this.env.FCM_PROJECT_ID || (fcmAccount(this.env) || {}).project_id || "")) missing.push("FCM_PROJECT_ID");
+    return { features: f, devices: { admin: adm.size, user: usr.size }, queued: ob.size, stats: st, missing };
+  }
+  async bumpPush(kind, code) {
+    const st = (await this.s.get("push_stats")) || { sent: 0, failed: 0, dead: 0, given_up: 0, no_devices: 0, no_channel: 0 };
+    st[kind] = (st[kind] || 0) + 1;
+    if (kind === "sent") st.last_ok = Date.now();
+    if (code) {
+      st.last_error = String(code).slice(0, 40);
+      st.last_error_at = Date.now();
+    }
+    await this.s.put("push_stats", st);
+  }
+  // Pushes one chat message to the right side. Deduplicated by message id (a repeated call is a no-op), retried by the alarm.
+  async notify(side, thread, m, title, body, extra) {
+    if (!m || !m.id) return;
+    const key = "ob:" + m.id + ":" + side;
+    if (await this.s.get(key) || await this.s.get("pd:" + m.id + ":" + side)) return;
+    const t = await this.s.get("t:" + thread);
+    const ev = { kind: "chat", to: side, msg_id: m.id, seq: String(m.seq), ts: String(m.ts || Date.now()), title: cleanText(title, 80), body: cleanText(body, 140), collapse: side + ":" + thread };
+    if (side === "admin") {
+      if (t && t.name && ev.body.indexOf(t.name + ": ") === 0) ev.body = ev.body.slice(t.name.length + 2);   // the name travels in its own field
+      ev.thread = thread;
+      ev.unread = String(t ? t.unread_admin || 0 : 0);
+      ev.name = cleanText(t && t.name, 60);
+    } else {
+      ev.unread = String(t ? t.unread_user || 0 : 0);
+      if (extra && extra.dev_name) ev.dev_name = cleanText(extra.dev_name, 40);
+    }
+    const rec = { id: m.id, side, thread, ev, tries: 0, next: Date.now(), created: Date.now(), sent: [] };
+    await this.s.put(key, rec);
+    let timer;
+    await Promise.race([this.deliverOutbox(key, rec), new Promise((r) => { timer = setTimeout(r, 2500); })]).catch(() => {
+    }).finally(() => clearTimeout(timer));
+    await this.scheduleAlarm(Date.now() + 15e3);
+  }
+  async deliverOutbox(key, rec) {
+    const fresh = await this.s.get(key);
+    if (!fresh) return;                              // delivered by the other path in the meantime
+    rec = fresh;
+    const owner = rec.side === "admin" ? "" : rec.thread;
+    const devs = await this.devicesFor(rec.side, owner);
+    const fcm = !!fcmAccount(this.env);
+    const hook = this.env.PUSH_WEBHOOK_URL;
+    let retry = false;
+    let delivered = rec.sent.length > 0;
+    if (!fcm && !hook) {
+      await this.s.delete(key);
+      await this.s.put("pd:" + rec.id + ":" + rec.side, { at: Date.now(), result: "no_channel" });
+      await this.bumpPush("no_channel", "no_channel");
+      return;
+    }
+    if (fcm) {
+      if (!devs.length) await this.bumpPush("no_devices");
+      for (const d of devs) {
+        if (rec.sent.indexOf(d.h) >= 0) continue;
+        const r = await fcmSend(this.env, d.token, rec.ev, rec.ev.collapse);
+        if (r.ok) {
+          rec.sent.push(d.h);
+          delivered = true;
+          await this.bumpPush("sent");
+        } else if (r.dead) {
+          await this.s.delete("dev:" + d.side + ":" + d.owner + ":" + d.h);
+          await this.s.delete("devx:" + d.side + ":" + d.h);
+          await this.bumpPush("dead", r.code);
+        } else {
+          if (r.retry) retry = true;
+          await this.bumpPush("failed", r.code || r.skip);
+        }
+      }
+    }
+    if (hook && !rec.hook) {
+      try {
+        const h = { "content-type": "application/json" };
+        if (this.env.PUSH_WEBHOOK_KEY) h.authorization = "Bearer " + this.env.PUSH_WEBHOOK_KEY;
+        const r = await fetch(hook, { method: "POST", headers: h, body: JSON.stringify(Object.assign({ to: rec.side, user_key: rec.side === "user" ? rec.thread : void 0 }, rec.ev)) });
+        if (r.ok) {
+          rec.hook = true;
+          delivered = true;
+        } else if (r.status >= 500 || r.status === 429) retry = true;
+      } catch (e) {
+        retry = true;
+      }
+    }
+    if (retry && rec.tries < PUSH_RETRY_MS.length && Date.now() - rec.created < PUSH_TTL_S * 1e3) {
+      rec.next = Date.now() + PUSH_RETRY_MS[rec.tries];
+      rec.tries++;
+      await this.s.put(key, rec);
+      await this.scheduleAlarm(rec.next);
+      return;
+    }
+    await this.s.delete(key);
+    await this.s.put("pd:" + rec.id + ":" + rec.side, { at: Date.now(), result: delivered ? "sent" : retry ? "given_up" : "no_devices" });
+    if (retry) await this.bumpPush("given_up");
+  }
+  async scheduleAlarm(at) {
+    try {
+      const cur = await this.s.getAlarm();
+      if (!cur || cur > at) await this.s.setAlarm(Math.max(at, Date.now() + 1e3));
     } catch (e) {
     }
-    this.push("a", { t: "thread_gone", thread });
-    return { purged: keys.length };
+  }
+  // ------------------------------------------------------------ identity erasure (NOT history deletion)
+  // "Forget me" / account removal: the conversation stays (archived, searchable by the owner); the person's name, e-mail and
+  // account id are removed from the thread record and the user's own view starts empty (their floor moves to the last seq).
+  async op_erase_identity(p) {
+    const thread = cleanText(p.thread, 120);
+    return this.withThread(thread, async () => {
+      const t = await this.s.get("t:" + thread);
+      if (!t) return { erased: false };
+      const now = Date.now();
+      t.name = "مستخدم محذوف";
+      t.email = "";
+      t.uid = "";
+      t.user_floor = t.last_seq;
+      t.unread_user = 0;
+      t.erased_at = now;
+      t.archived = true;
+      await this.s.put("t:" + thread, t);
+      for (const w of this.socketsOf("u:" + thread)) {
+        try {
+          w.close(1e3, "identity_erased");
+        } catch (e) {
+        }
+      }
+      this.push("a", { t: "thread", thread, status: t.status, banned: !!t.banned });
+      return { erased: true, history_retained: true, thread_id_kept: true };
+    });
+  }
+  // ------------------------------------------------------------ search over the message history
+  async op_search(p) {
+    const q = cleanText(p.q, 60).toLowerCase();
+    if (q.length < 2) return { hits: [], scanned: 0, complete: true };
+    const cap = int(p.scan, 100, 3e4, 8e3);
+    const threads = [...(await this.s.list({ prefix: "t:" })).values()].sort((a, b) => b.last_ts - a.last_ts);
+    const hits = [];
+    let scanned = 0;
+    let complete = true;
+    outer: for (const t of threads) {
+      if (p.thread && t.id !== p.thread) continue;
+      const rows = await this.s.list({ prefix: "m:" + t.id + ":", reverse: true, limit: 2e3 });
+      for (const m of rows.values()) {
+        if (m.deleted) continue;
+        if (scanned >= cap) {
+          complete = false;
+          break outer;
+        }
+        scanned++;
+        const d = await decJson(this.env, t.id, m.enc);
+        const txt = String(d.text || "");
+        const at = txt.toLowerCase().indexOf(q);
+        if (at < 0) continue;
+        hits.push({ thread: t.id, name: t.name, seq: m.seq, from: m.from, ts: m.ts, archived: !!t.archived, snippet: txt.slice(Math.max(0, at - 30), at + 90).replace(/\s+/g, " ") });
+        if (hits.length >= 60) {
+          complete = false;
+          break outer;
+        }
+      }
+    }
+    return { hits, scanned, complete };
+  }
+  // ------------------------------------------------------------ backups (immutable segments, private bucket only)
+  async op_backup_run(p) {
+    const b = backupBucket(this.env);
+    if (!b) fail(503, "backup_not_configured", "أضف ربط R2 خاصاً باسم ADS_BUCKET أو CHAT_BACKUP_BUCKET (ليس الحاوية العامة movies).");
+    const started = Date.now();
+    const budget = int(p.max_messages, 100, 5e4, 6e3);
+    const threads = [...(await this.s.list({ prefix: "t:" })).values()];
+    let segs = 0, msgs = 0, lagging = 0, failed = 0;
+    for (const t of threads) {
+      if (p.thread && p.thread !== t.id) continue;
+      let wm = await this.s.get("bk:" + t.id) || 0;
+      while (wm < t.last_seq) {
+        if (msgs >= budget) {
+          lagging++;
+          break;
+        }
+        const rows = await this.s.list({ prefix: "m:" + t.id + ":", start: "m:" + t.id + ":" + padSeq(wm + 1), limit: Math.max(1, Math.min(500, budget - msgs)) });
+        if (!rows.size) break;
+        const arr = [...rows.values()];
+        const first = arr[0].seq, last = arr[arr.length - 1].seq;
+        const key = BACKUP_PREFIX + "msgs/" + t.id + "/" + padSeq(first) + "-" + padSeq(last) + ".json";
+        const body = JSON.stringify({ v: 1, thread: t.id, from: first, to: last, messages: arr });
+        try {
+          let head = await b.head(key);
+          if (!head) {                                         // immutable: an existing segment is never overwritten
+            await b.put(key, body, { httpMetadata: { contentType: "application/json" } });
+            head = await b.head(key);
+          }
+          if (!head || !(head.size > 0)) throw new Error("verify_failed");
+        } catch (e) {
+          failed++;
+          break;
+        }
+        wm = last;
+        await this.s.put("bk:" + t.id, wm);
+        segs++;
+        msgs += arr.length;
+      }
+    }
+    // thread + attachment metadata snapshot (encrypted: the thread records hold names / e-mails), written only when it changed
+    let snapshot = "";
+    try {
+      const media = [...(await this.s.list({ prefix: "media:" })).values()];
+      const blob = await encJson(this.env, "_backup_meta", { v: 1, at: started, threads, media });
+      const hash = (await sha256Hex(JSON.stringify(threads) + "|" + JSON.stringify(media))).slice(0, 12);
+      const st0 = await this.s.get("bk_state") || {};
+      if (st0.snapshot_hash !== hash) {
+        const d = new Date(started).toISOString().replace(/[-:T]/g, "").slice(0, 10 + 2);
+        snapshot = BACKUP_PREFIX + "_threads/" + d + "-" + hash + ".json";
+        if (!await b.head(snapshot)) await b.put(snapshot, JSON.stringify({ v: 1, enc: blob }), { httpMetadata: { contentType: "application/json" } });
+        const chk = await b.head(snapshot);
+        if (!chk || !(chk.size > 0)) throw new Error("snapshot_verify_failed");
+        st0.snapshot_hash = hash;
+        st0.snapshot_key = snapshot;
+      }
+      st0.last_run = started;
+      if (failed === 0) st0.last_ok = Date.now();
+      st0.last_segments = segs;
+      st0.last_messages = msgs;
+      st0.lagging_threads = lagging;
+      st0.failed = failed;
+      st0.error = "";
+      await this.s.put("bk_state", st0);
+    } catch (e) {
+      const st1 = await this.s.get("bk_state") || {};
+      st1.last_run = started;
+      st1.error = String(e && e.message || e).slice(0, 80);
+      await this.s.put("bk_state", st1);
+      failed++;
+    }
+    return { segments: segs, messages: msgs, lagging_threads: lagging, failed, snapshot: snapshot || void 0, ms: Date.now() - started };
+  }
+  async op_backup_status() {
+    const st = await this.s.get("bk_state") || {};
+    const threads = [...(await this.s.list({ prefix: "t:" })).values()];
+    let behind = 0, unsaved = 0;
+    for (const t of threads) {
+      const wm = await this.s.get("bk:" + t.id) || 0;
+      if (wm < t.last_seq) {
+        behind++;
+        unsaved += t.last_seq - wm;
+      }
+    }
+    const b = backupBucket(this.env);
+    return { configured: !!b, threads: threads.length, threads_behind: behind, messages_unsaved: unsaved, state: st };
+  }
+  // Verifies the backup layout against the live records: for every thread the saved ranges must be contiguous from 1 to the watermark.
+  async op_backup_verify() {
+    const b = backupBucket(this.env);
+    if (!b) fail(503, "backup_not_configured", "لا يوجد R2 خاص للنسخ الاحتياطي.");
+    const threads = [...(await this.s.list({ prefix: "t:" })).values()];
+    const problems = [];
+    let ok = 0;
+    for (const t of threads) {
+      const wm = await this.s.get("bk:" + t.id) || 0;
+      if (!wm) {
+        if (t.last_seq > 0) problems.push({ thread: t.id, issue: "never_backed_up" });
+        continue;
+      }
+      const ranges = [];
+      let cursor;
+      do {
+        const o = await b.list({ prefix: BACKUP_PREFIX + "msgs/" + t.id + "/", cursor });
+        for (const x of o.objects || []) {
+          const m = /\/(\d{10})-(\d{10})\.json$/.exec(x.key);
+          if (m) ranges.push([parseInt(m[1], 10), parseInt(m[2], 10)]);
+        }
+        cursor = o.truncated ? o.cursor : void 0;
+      } while (cursor);
+      ranges.sort((a, c) => a[0] - c[0]);
+      let next = 1, gap = 0;
+      for (const [a, c] of ranges) {
+        if (a > next) gap = next;
+        next = Math.max(next, c + 1);
+      }
+      if (gap) problems.push({ thread: t.id, issue: "gap", at_seq: gap });
+      else if (next - 1 < wm) problems.push({ thread: t.id, issue: "short", covered: next - 1, watermark: wm });
+      else ok++;
+    }
+    return { ok: problems.length === 0, threads: threads.length, verified: ok, problems: problems.slice(0, 50) };
+  }
+  // Restores what the live store lacks (a lost / corrupted record), from the saved segments. NEVER overwrites an existing record.
+  async op_backup_restore(p) {
+    const b = backupBucket(this.env);
+    if (!b) fail(503, "backup_not_configured", "لا يوجد R2 خاص للنسخ الاحتياطي.");
+    let restoredMsgs = 0, restoredThreads = 0, skipped = 0;
+    // 1) the newest thread snapshot restores threads that vanished
+    const snaps = [];
+    let cursor;
+    do {
+      const o = await b.list({ prefix: BACKUP_PREFIX + "_threads/", cursor });
+      for (const x of o.objects || []) snaps.push(x.key);
+      cursor = o.truncated ? o.cursor : void 0;
+    } while (cursor);
+    snaps.sort();
+    const latest = snaps[snaps.length - 1];
+    if (latest) {
+      const obj = await b.get(latest);
+      const j = obj ? JSON.parse(await obj.text()) : null;
+      const meta = j && j.enc ? await decJson(this.env, "_backup_meta", j.enc) : null;
+      for (const t of meta && meta.threads || []) {
+        if (p.thread && p.thread !== t.id) continue;
+        if (!await this.s.get("t:" + t.id)) {
+          await this.s.put("t:" + t.id, t);
+          restoredThreads++;
+        }
+      }
+      for (const md of meta && meta.media || []) if (!await this.s.get("media:" + md.id) && (!p.thread || md.thread === p.thread)) await this.s.put("media:" + md.id, md);
+    }
+    // 2) every saved message the live store lacks
+    const prefix = BACKUP_PREFIX + "msgs/" + (p.thread ? p.thread + "/" : "");
+    cursor = void 0;
+    do {
+      const o = await b.list({ prefix, cursor });
+      for (const x of o.objects || []) {
+        const obj = await b.get(x.key);
+        if (!obj) continue;
+        const seg = JSON.parse(await obj.text());
+        for (const m of seg.messages || []) {
+          const k = "m:" + m.thread + ":" + padSeq(m.seq);
+          if (await this.s.get(k)) {
+            skipped++;
+            continue;
+          }
+          await this.s.put(k, m);
+          restoredMsgs++;
+          if (m.client_id) await this.s.put("cid:" + m.thread + ":" + m.client_id, m.seq);
+          const t = await this.s.get("t:" + m.thread);
+          if (t && t.last_seq < m.seq) {
+            t.last_seq = m.seq;
+            await this.s.put("t:" + m.thread, t);
+          }
+        }
+      }
+      cursor = o.truncated ? o.cursor : void 0;
+    } while (cursor);
+    return { restored_messages: restoredMsgs, restored_threads: restoredThreads, already_present: skipped };
+  }
+  // ------------------------------------------------------------ housekeeping run by the alarm (never touches a conversation)
+  async housekeeping19(now) {
+    // 1) push outbox: retry what is due
+    const ob = await this.s.list({ prefix: "ob:" });
+    for (const [k, rec] of ob) {
+      if (rec.next <= now) {
+        try {
+          await this.deliverOutbox(k, rec);
+        } catch (e) {
+        }
+      }
+    }
+    // 2) deduplication markers older than 14 days (markers only: no message, no thread)
+    const pd = await this.s.list({ prefix: "pd:", limit: 500 });
+    const old = [];
+    for (const [k, v] of pd) if (now - (v.at || 0) > 14 * DAY_MS) old.push(k);
+    if (old.length) await this.s.delete(old.slice(0, 100));
+    // 3) the backup, at most every 6 hours, only when a private bucket is bound
+    if (backupBucket(this.env)) {
+      const st = await this.s.get("bk_state") || {};
+      if (now - (st.last_run || 0) > 6 * 36e5 || st.lagging_threads) {
+        try {
+          await this.op_backup_run({});
+        } catch (e) {
+        }
+      }
+    }
+  }
+  async rescheduleAlarm19(now) {
+    let next = now + 6 * 36e5;
+    try {
+      const ob = await this.s.list({ prefix: "ob:" });
+      for (const rec of ob.values()) if (rec.next < next) next = Math.max(rec.next, now + 1e4);
+      const st = await this.s.get("bk_state");
+      if (st && st.lagging_threads) next = Math.min(next, now + 6e4);
+      await this.s.setAlarm(next);
+    } catch (e) {
+    }
+  }
+  async op_purge(p) {
+    // 19.0: a conversation is never purged (retention alarm, advertiser deletion and the admin route all end here)
+    fail(409, "history_is_permanent", "\u0645\u0644\u0641 \u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0629 \u062F\u0627\u0626\u0645 \u0648\u0644\u0627 \u064A\u064F\u062D\u0630\u0641. \u064A\u0645\u0643\u0646 \u0623\u0631\u0634\u0641\u062A\u0647\u0627 \u0641\u0642\u0637.");
   }
   async op_presence(p) {
     const st = p.settings || null;
@@ -2804,15 +3281,9 @@ var ChatHub = class {
     const now = Date.now();
     const metas = await this.s.list({ prefix: "media:" });
     for (const meta of metas.values()) if (!meta.used && now - meta.created > 24 * 36e5) await this.dropMedia(meta.id);
-    const days = parseInt(this.env.CHAT_RETENTION_DAYS || "0", 10);
-    if (days > 0) {
-      const all = await this.s.list({ prefix: "t:" });
-      for (const t of all.values()) if (t.archived && now - t.last_ts > days * DAY_MS) await this.op_purge({ thread: t.id });
-    }
-    try {
-      await this.s.setAlarm(now + 6 * 36e5);
-    } catch (e) {
-    }
+    // 19.0: CHAT_RETENTION_DAYS is ignored on purpose: conversations are permanent (see CHAT-RETENTION-POLICY.md)
+    await this.housekeeping19(now);
+    await this.rescheduleAlarm19(now);
   }
 };
 function hubStub(env) {
@@ -2956,9 +3427,10 @@ async function serveChatMedia(request, env, id, url) {
 }
 __name(serveChatMedia, "serveChatMedia");
 async function purgeChatForUser(env, userKey) {
+  // 19.0: removing an advertiser / account erases the IDENTITY on the thread, never the conversation
   if (!env.CHAT_HUB) return;
   try {
-    await hub(env, "purge", { thread: userKey });
+    await hub(env, "erase_identity", { thread: userKey, reason: "account_removed" });
   } catch (e) {
   }
 }
@@ -2992,6 +3464,7 @@ async function routeChat(request, env, ctx, url, path) {
     }
     if (!env.CHAT_HUB) return reply({ ok: true, state: "offline" });
     const pr = await hub(env, "presence", { settings: st && { hours: st.hours } });
+    pr.features = chat19Features(env);
     pr.developer = { name: cleanText(env.DEV_NAME, 40) || "\u0645\u0637\u0648\u0651\u0631 Cigram", avatar: /^https:\/\//.test(String(env.DEV_AVATAR || "")) ? String(env.DEV_AVATAR) : "" };
     return reply(pr);
   }
@@ -3018,7 +3491,7 @@ async function routeChat(request, env, ctx, url, path) {
         adv = (await core(env, "adv_ensure_user", { user_key: thread, name: userNameOf(user), email: user.email, origin })).advertiser;
       } catch (e) {
       }
-      const r = await hub(env, "send", { side: "user", thread, name: userNameOf(user), email: user.email, adv_id: adv && adv.id, client_id: body.client_id, type: body.type, text: body.text, media_id: body.media_id, reply_to: body.reply_to, order: body.order, origin });
+      const r = await hub(env, "send", { side: "user", thread, name: userNameOf(user), email: user.email, adv_id: adv && adv.id, uid: user.id, client_id: body.client_id, type: body.type, text: body.text, media_id: body.media_id, reply_to: body.reply_to, order: body.order, origin });
       return reply(r);
     }
     if (method === "POST" && path === "/chat/read") {
@@ -3032,7 +3505,15 @@ async function routeChat(request, env, ctx, url, path) {
     }
     if (method === "POST" && path === "/chat/delete-all") {
       await purgeChatForUser(env, thread);
-      return reply({ ok: true });
+      return reply({ ok: true, identity_erased: true, history_retained: true });
+    }
+    if (method === "POST" && path === "/chat/device") {
+      const body = await readJson(request, 6e3);
+      return reply(await hub(env, "device_register", { side: "user", thread, token: body.token, app: body.app, v: body.v }));
+    }
+    if (method === "POST" && path === "/chat/device/remove") {
+      const body = await readJson(request, 6e3);
+      return reply(await hub(env, "device_remove", { side: "user", thread, token: body.token }));
     }
     if (path.indexOf("/chat/upload/") === 0) {
       const r = await chatUploadRoutes(request, env, url, path.slice("/chat/upload".length), method, { side: "user", thread });
@@ -3044,9 +3525,9 @@ async function routeChat(request, env, ctx, url, path) {
     const dev = await requireAdmin(request, env);
     const sub = path.slice("/admin/chat".length);
     // 18.2 roles: "support" developers read / answer / archive; destructive or account-level actions are owner-only
-    if (["/purge", "/delete-message", "/convert-order", "/export"].indexOf(sub) >= 0 || (sub === "/templates" && method === "POST")) requireRole(dev, "owner");
+    if (["/purge", "/delete-message", "/convert-order", "/export", "/restore", "/backup/verify"].indexOf(sub) >= 0 || (sub === "/backup" && method === "POST") || (sub === "/templates" && method === "POST")) requireRole(dev, "owner");
     if (method === "GET" && sub === "/ws") return chatWsForward(request, env, "admin", "");
-    if (method === "GET" && sub === "/threads") return reply(await hub(env, "threads_list", { q: q("q"), status: q("status"), unread: q("unread") === "1", tag: q("tag"), assigned: q("assigned"), archived: q("archived") === "1", limit: q("limit") }));
+    if (method === "GET" && sub === "/threads") return reply(await hub(env, "threads_list", { q: q("q"), status: q("status"), unread: q("unread") === "1", tag: q("tag"), assigned: q("assigned"), archived: q("archived") === "all" ? "all" : q("archived") === "1", limit: q("limit") }));
     if (method === "GET" && sub === "/unread") return reply(await hub(env, "unread_total", {}));
     if (method === "GET" && sub === "/messages") return reply(await hub(env, "messages", { thread: q("thread"), side: "admin", after: q("after"), before: q("before"), limit: q("limit"), origin }));
     if (method === "POST" && sub === "/send") {
@@ -3062,10 +3543,21 @@ async function routeChat(request, env, ctx, url, path) {
       if (tb && tb.banned !== void 0) requireRole(dev, "owner");
       return reply(await hub(env, "thread_update", tb));
     }
-    if (method === "POST" && sub === "/delete-message") return reply(await hub(env, "delete_msg", await readJson(request, 1e3)));
-    if (method === "POST" && sub === "/purge") {
-      const body = await readJson(request, 1e3);
-      return reply(await hub(env, "purge", { thread: body.thread }));
+    if (method === "POST" && sub === "/delete-message") fail(409, "history_is_permanent", "\u0645\u0644\u0641 \u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0629 \u062F\u0627\u0626\u0645 \u0648\u0644\u0627 \u064A\u064F\u062D\u0630\u0641. \u064A\u0645\u0643\u0646 \u0623\u0631\u0634\u0641\u062A\u0647\u0627 \u0641\u0642\u0637.");
+    if (method === "POST" && sub === "/purge") fail(409, "history_is_permanent", "\u0645\u0644\u0641 \u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0629 \u062F\u0627\u0626\u0645 \u0648\u0644\u0627 \u064A\u064F\u062D\u0630\u0641. \u064A\u0645\u0643\u0646 \u0623\u0631\u0634\u0641\u062A\u0647\u0627 \u0641\u0642\u0637.");
+    if (method === "GET" && sub === "/search") return reply(await hub(env, "search", { q: q("q"), thread: q("thread") }));
+    if (method === "GET" && sub === "/backup") return reply(await hub(env, "backup_status", {}));
+    if (method === "POST" && sub === "/backup") return reply(await hub(env, "backup_run", Object.assign({}, await readJson(request, 1e3))));
+    if (method === "GET" && sub === "/backup/verify") return reply(await hub(env, "backup_verify", {}));
+    if (method === "POST" && sub === "/restore") return reply(await hub(env, "backup_restore", Object.assign({}, await readJson(request, 1e3))));
+    if (method === "GET" && sub === "/push-status") return reply(await hub(env, "push_status", {}));
+    if (method === "POST" && sub === "/device") {
+      const body = await readJson(request, 6e3);
+      return reply(await hub(env, "device_register", { side: "admin", owner: dev && dev.id || "owner", token: body.token, app: body.app, v: body.v }));
+    }
+    if (method === "POST" && sub === "/device/remove") {
+      const body = await readJson(request, 6e3);
+      return reply(await hub(env, "device_remove", { side: "admin", owner: dev && dev.id || "owner", token: body.token }));
     }
     if (method === "GET" && sub === "/export") return reply(await hub(env, "export", { thread: q("thread"), origin }));
     if (method === "GET" && sub === "/templates") return reply(await hub(env, "templates_get", {}));
@@ -3101,6 +3593,99 @@ async function routeChat(request, env, ctx, url, path) {
   return null;
 }
 __name(routeChat, "routeChat");
+// ===================================================================================================================
+// 19.0 — permanent support history, targeted push (FCM HTTP v1), conversation backups.   [inserted by apply_patch_19.py]
+// Standalone helpers used by the ChatHub durable object and by the routes. No secret is ever put in a payload or a log.
+// ===================================================================================================================
+var BACKUP_PREFIX = "chat-backup/v1/";
+var PUSH_RETRY_MS = [3e4, 12e4, 6e5, 36e5, 216e5];       // 30 s, 2 min, 10 min, 1 h, 6 h  (then the message is given up: the app still syncs it when opened)
+var PUSH_TTL_S = 3 * 24 * 3600;                           // FCM keeps an undelivered push for 3 days
+function chat19Features(env) {
+  return { permanent_history: true, push_fcm: !!fcmAccount(env), push_webhook: !!env.PUSH_WEBHOOK_URL, backup: !!backupBucket(env), search: true, devices: true, contract: 19 };
+}
+__name(chat19Features, "chat19Features");
+// the backup must never land in the PUBLIC movies bucket: private bucket only (CHAT_BACKUP_BUCKET, else ADS_BUCKET)
+function backupBucket(env) {
+  return env.CHAT_BACKUP_BUCKET || env.ADS_BUCKET || null;
+}
+__name(backupBucket, "backupBucket");
+function fcmAccount(env) {
+  try {
+    const sa = typeof env.FCM_SERVICE_ACCOUNT === "string" ? JSON.parse(env.FCM_SERVICE_ACCOUNT) : env.FCM_SERVICE_ACCOUNT;
+    return sa && sa.client_email && sa.private_key ? sa : null;
+  } catch (e) {
+    return null;
+  }
+}
+__name(fcmAccount, "fcmAccount");
+var _fcmTok = { v: "", until: 0 };
+async function fcmAccessToken(env, sa) {
+  const now = Math.floor(Date.now() / 1e3);
+  if (_fcmTok.v && now < _fcmTok.until - 60) return _fcmTok.v;
+  const enc = /* @__PURE__ */ __name((o) => b64url(new TextEncoder().encode(JSON.stringify(o))), "enc");
+  const head = enc({ alg: "RS256", typ: "JWT" });
+  const claims = enc({ iss: sa.client_email, scope: "https://www.googleapis.com/auth/firebase.messaging", aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 });
+  const pem = String(sa.private_key).replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
+  const key = await crypto.subtle.importKey("pkcs8", fromB64(pem), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(head + "." + claims));
+  const res = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: "grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=" + head + "." + claims + "." + b64url(new Uint8Array(sig)) });
+  const out = await res.json().catch(() => ({}));
+  if (!out.access_token) throw new Error("fcm_oauth_failed");
+  _fcmTok = { v: out.access_token, until: now + (out.expires_in || 3600) };
+  return _fcmTok.v;
+}
+__name(fcmAccessToken, "fcmAccessToken");
+// One FCM v1 data message to ONE device token. `data` values are strings, no credential inside.
+async function fcmSend(env, deviceToken, data, collapse) {
+  const sa = fcmAccount(env);
+  if (!sa) return { ok: false, skip: "fcm_not_configured" };
+  const project = String(env.FCM_PROJECT_ID || sa.project_id || "").trim();
+  if (!project) return { ok: false, skip: "fcm_no_project" };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let at;
+    try {
+      at = await fcmAccessToken(env, sa);
+    } catch (e) {
+      return { ok: false, retry: true, code: "oauth" };
+    }
+    const android = { priority: "HIGH", ttl: PUSH_TTL_S + "s" };
+    if (collapse) android.collapse_key = collapse;
+    let res;
+    try {
+      res = await fetch("https://fcm.googleapis.com/v1/projects/" + project + "/messages:send", { method: "POST", headers: { authorization: "Bearer " + at, "content-type": "application/json" }, body: JSON.stringify({ message: { token: deviceToken, data, android } }) });
+    } catch (e) {
+      return { ok: false, retry: true, code: "network" };
+    }
+    if (res.ok) return { ok: true };
+    const j = await res.json().catch(() => ({}));
+    const st = j && j.error && j.error.status || "";
+    if (res.status === 401 && attempt === 0) {
+      _fcmTok = { v: "", until: 0 };
+      continue;
+    }
+    const dead = res.status === 404 || st === "NOT_FOUND" || st === "UNREGISTERED" || res.status === 400 && st === "INVALID_ARGUMENT";
+    return { ok: false, status: res.status, code: st || String(res.status), dead, retry: !dead && (res.status === 429 || res.status >= 500 || res.status === 401) };
+  }
+  return { ok: false, retry: true, code: "auth" };
+}
+__name(fcmSend, "fcmSend");
+// Fallback verification of a user session straight from the auth database (read only, same rule as the auth Worker:
+// hashed token + active user + not expired). Used ONLY when the auth Worker could not be asked (binding / URL problem),
+// it never touches the session (no last-seen write, no fingerprint check), and it is skipped when AUTH_DB is not bound.
+async function verifyViaD1(env, tok) {
+  if (!env.AUTH_DB || typeof env.AUTH_DB.prepare !== "function") return null;
+  try {
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(tok)));
+    let bin = "";
+    for (const b of digest) bin += String.fromCharCode(b);
+    const row = await env.AUTH_DB.prepare("SELECT u.id AS id, u.email AS email, u.name AS name FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND u.is_active = 1 AND datetime(s.expires_at) > datetime('now') LIMIT 1").bind(btoa(bin)).first();
+    if (!row) return { invalid: true };
+    return { id: String(row.id || ""), email: String(row.email || "").toLowerCase(), name: String(row.name || "").slice(0, 100) };
+  } catch (e) {
+    return null;
+  }
+}
+__name(verifyViaD1, "verifyViaD1");
 export {
   AdsCore,
   ChatHub,

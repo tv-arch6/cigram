@@ -1,5 +1,5 @@
 --- live-snapshots/cigram-ads-api.live.js	2026-11-09 12:46:54.000000000 +0000
-+++ /home/user/cigram/cigram-main/docs/backend/deploy/cigram-ads-api/worker.js	2026-11-09 19:38:22.637967550 +0000
++++ /home/user/cigram/cigram-main/docs/backend/deploy/cigram-ads-api/worker.js	2026-11-09 20:02:11.469089245 +0000
 @@ -1583,10 +1583,41 @@
    return body;
  }
@@ -676,7 +676,7 @@
 +          lagging++;
 +          break;
 +        }
-+        const rows = await this.s.list({ prefix: "m:" + t.id + ":", start: "m:" + t.id + ":" + padSeq(wm + 1), limit: 500 });
++        const rows = await this.s.list({ prefix: "m:" + t.id + ":", start: "m:" + t.id + ":" + padSeq(wm + 1), limit: Math.max(1, Math.min(500, budget - msgs)) });
 +        if (!rows.size) break;
 +        const arr = [...rows.values()];
 +        const first = arr[0].seq, last = arr[arr.length - 1].seq;

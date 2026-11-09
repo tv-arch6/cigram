@@ -1,5 +1,5 @@
 --- live-snapshots/cigram-admin-api.live.js	2026-11-09 12:46:54.000000000 +0000
-+++ /home/user/cigram/cigram-main/docs/backend/deploy/cigram-admin-api/worker.js	2026-11-09 19:38:22.593967549 +0000
++++ /home/user/cigram/cigram-main/docs/backend/deploy/cigram-admin-api/worker.js	2026-11-09 20:02:11.427828448 +0000
 @@ -1929,6 +1929,7 @@
    }, 7, false);
    const records = tracker.records(getWritableMoviesArray(out.doc).list);

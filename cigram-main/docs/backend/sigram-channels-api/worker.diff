@@ -1,5 +1,5 @@
 --- live-snapshots/sigram-channels-api.live.js	2026-11-09 12:46:54.000000000 +0000
-+++ /home/user/cigram/cigram-main/docs/backend/deploy/sigram-channels-api/worker.js	2026-11-09 19:38:22.654267975 +0000
++++ /home/user/cigram/cigram-main/docs/backend/deploy/sigram-channels-api/worker.js	2026-11-09 20:02:11.483234844 +0000
 @@ -246,6 +246,28 @@
    return json({ ok: true, message: "تم حذف القناة", category: categoryObject.name, channel, image_deleted: imageDeleted });
  }
