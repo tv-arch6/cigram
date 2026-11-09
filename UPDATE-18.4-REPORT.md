@@ -95,10 +95,29 @@ counters say which of the three it is) and the page where it happens.
 | Cold / cached startup on a device, memory, failure recovery time | **not measured** (no device) |
 
 ## 8. Tests actually executed (build cache OFF, from the extracted ZIPs)
-@@TESTS@@
+| Suite | Result |
+|---|---|
+| Main app JVM tests **from the ZIP as it is (no catalogue file)** | **117 tests: 114 passed, 0 failed, 3 skipped.** The 3 skipped need a real `movies.json` (production data, not in the archive): `CigramCatalogRealDataTest`, 2 × `CigramSectionDedupeTest.realCatalogue*` |
+| Main app JVM tests **with the real catalogue** (`CIGRAM_CATALOGUE=<copy of the live movies.json>`, second run, cache off) | **117 tests: 117 passed, 0 failed, 0 skipped** |
+| Admin app JVM tests | **94 tests: 93 passed, 0 failed, 1 skipped** (`WnPipelineTest`, skipped by its own source since 18.2) |
+| Worker contract tests (Node, the real patched Worker code, R2 in memory) | `admin_subhub_test` **31**, `catalog_feed_test` **16**, `ads_support_test` **23**, `channels_conditional_test` **6**: **76 passed**; `deploy/SHA256SUMS` and `live-snapshots/SHA256SUMS` verified |
+| New in 18.4 | main: store 11, sync + delta 22, preferences facade 6, doctor 4, real data 1 = **44**; admin: store 11, sync 22, doctor 4 = **37** (same sources); Worker feed **16** |
+| Emulator scenarios (indicative, one run each) | §6 |
+
+Not run at all: tests on a real device, against a deployed Worker, with a low-memory profile, chunked upload / WebSocket against a real server, scroll measurements.
 
 ## 9. Builds
-@@BUILDS@@
+Fresh extraction of each ZIP, `clean` + cache off, exit 0 for every task: main `testPlayDebugUnitTest assemblePlayDebug assemblePlayRelease assembleDirectDebug assembleDirectRelease bundlePlayRelease`; admin `testDebugUnitTest assembleDebug assembleRelease bundleRelease`.
+`aapt2` confirms `com.Cigram.vid` 91 / 18.4.0 and `com.my.newproject` 9 / 2.1.0 (package ids unchanged).
+| Artifact (unsigned: no production keystore available) | Bytes | SHA-256 |
+|---|---|---|
+| main `app-play-release.aab` | 16,683,145 | `d5af57a5e65799fa165a5bba5471041ee74696cf32257573d37a6f8f7de72835` |
+| main `app-play-release-unsigned.apk` | 17,788,417 | `72fb506ba97fbc2380ba43646a87123a2637b35b97d6c43c5dc9bc6a415ad2ef` |
+| main `app-direct-release-unsigned.apk` | 17,788,969 | `546928caba84767cd0fd387c0bf09d771c1afc33136507eb6d86d3122a46b6b4` |
+| admin `app-release.aab` | 6,010,969 | `230b821e43feff90b2d522504ce34ece79bddd8e4cf64ef655dfb715277dc1a5` |
+| admin `app-release-unsigned.apk` | 6,605,584 | `adb6dc4d7d8169968155094ec9023275b5a7a5616fbc4f5d90930d6987bcf1f0` |
+
+These files are not delivered (the delivery is the two source ZIPs); they show that the sources build. The ZIPs' own SHA-256 values are given in the message that delivers them (a hash cannot be stored inside the file it describes).
 
 ## 10. Remaining issues and owner actions
 1. **Deploy** `docs/backend/deploy/cigram-admin-api/worker.js` (see `docs/backend/DEPLOY.md` §8: smoke test, rollback = paste `live-snapshots/cigram-admin-api.live.js`). Until then the apps use the full download. First manifest call parses `movies.json` once (74 ms in Node): check your Workers plan's CPU limit.
