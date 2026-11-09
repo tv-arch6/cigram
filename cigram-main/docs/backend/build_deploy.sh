@@ -11,7 +11,10 @@ here=$(cd "$(dirname "$0")" && pwd)
 out=$here/deploy
 rm -rf "$out"; mkdir -p "$out/cigram-admin-api" "$out/cigram-ads-api" "$out/sigram-channels-api"
 python3 "$here/cigram-admin-api/apply_patch.py" "$ADMIN_LIVE" "$out/cigram-admin-api/worker.js"
-python3 "$here/cigram-ads-api/apply_patch.py"   "$ADS_LIVE"   "$out/cigram-ads-api/worker.js"
+python3 "$here/cigram-ads-api/apply_patch.py"   "$ADS_LIVE"   "$out/cigram-ads-api/worker.18.js"
+# 19.0 (second stage): permanent history, targeted push, backups, race-free sequencing
+python3 "$here/cigram-ads-api/apply_patch_19.py" "$out/cigram-ads-api/worker.18.js" "$out/cigram-ads-api/worker.js"
+rm "$out/cigram-ads-api/worker.18.js"
 python3 "$here/sigram-channels-api/apply_patch.py" "$CHANNELS_LIVE" "$out/sigram-channels-api/worker.js"
 # the tests import ES modules: same bytes, .mjs extension
 cp "$out/cigram-admin-api/worker.js" "$out/cigram-admin-api/worker.mjs"
@@ -23,6 +26,7 @@ node --check "$out/sigram-channels-api/worker.mjs"
 node "$here/tests/admin_subhub_test.mjs" "$out/cigram-admin-api/worker.mjs"
 node "$here/tests/catalog_feed_test.mjs" "$out/cigram-admin-api/worker.mjs"
 node "$here/tests/ads_support_test.mjs"  "$out/cigram-ads-api/worker.mjs"
+node "$here/tests/ads_chat19_test.mjs"   "$out/cigram-ads-api/worker.mjs"
 node "$here/tests/channels_conditional_test.mjs" "$out/sigram-channels-api/worker.mjs"
 rm "$out/cigram-admin-api/worker.mjs" "$out/cigram-ads-api/worker.mjs" "$out/sigram-channels-api/worker.mjs"
 diff -u "$ADMIN_LIVE" "$out/cigram-admin-api/worker.js" > "$here/cigram-admin-api/worker.diff" || true

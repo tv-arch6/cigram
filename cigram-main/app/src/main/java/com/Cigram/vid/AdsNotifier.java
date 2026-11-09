@@ -82,18 +82,62 @@ public final class AdsNotifier {
         } catch (Throwable ignored) { }
     }
 
-    /** A chat push (FCM, kind = chat) from the developer: same notification, opens the private conversation. */
+    /** Pure helper (JVM-tested): the remembered message ids after seeing {@code id}; {@code null} when {@code id} was already seen. */
+    static java.util.List<String> remember(java.util.List<String> seen, String id, int cap) {
+        if (id == null || id.length() == 0) return seen == null ? new java.util.ArrayList<String>() : seen;
+        java.util.ArrayList<String> out = new java.util.ArrayList<String>(seen == null ? java.util.Collections.<String>emptyList() : seen);
+        if (out.contains(id)) return null;
+        out.add(id);
+        while (out.size() > cap) out.remove(0);
+        return out;
+    }
+
+    private static boolean firstTime(Context c, String id) {
+        try {
+            android.content.SharedPreferences p = c.getApplicationContext().getSharedPreferences(CHANNEL + "_seen", Context.MODE_PRIVATE);
+            java.util.ArrayList<String> seen = new java.util.ArrayList<String>();
+            for (String x : p.getString("ids", "").split(",")) if (x.length() > 0) seen.add(x);
+            java.util.List<String> next = remember(seen, id, 40);
+            if (next == null) return false;
+            StringBuilder sb = new StringBuilder();
+            for (String x : next) { if (sb.length() > 0) sb.append(','); sb.append(x); }
+            p.edit().putString("ids", sb.toString()).apply();
+        } catch (Throwable ignored) { }
+        return true;
+    }
+
+    private static long num(String v) {
+        try { return v == null ? 0L : Long.parseLong(v.trim()); } catch (Throwable ignored) { return 0L; }
+    }
+
+    /**
+     * A chat push (FCM, kind = chat) from the developer: the same notification as the poll, opening the private conversation.
+     * 19.0: deduplicated by message id (FCM redelivery, the 15-minute poll and a retry can all carry the same message), skipped
+     * on a phone that is signed out, and silent while the conversation is on screen. The sender's name, a preview and the
+     * message time come from the payload; no credential is ever in it.
+     */
     public static void showPush(Context c, java.util.Map<String, String> data, String title, String body) {
         try {
+            if (!CigramAds.isLoggedIn(c)) return;
+            String id = data == null ? "" : data.get("msg_id");
+            if (!firstTime(c, id)) return;
+            long seq = data == null ? 0L : num(data.get("seq"));
+            if (AdsChatActivity.isVisible()) {
+                if (seq > AdsChatStore.lastNotified(c)) AdsChatStore.setLastNotified(c, seq);
+                return;
+            }
             JSONObject msg = new JSONObject();
             String text = body != null ? body : data == null ? "" : data.get("body");
             msg.put("text", text == null ? "" : text);
             msg.put("type", "text");
-            String ts = data == null ? null : data.get("ts");
-            msg.put("ts", ts == null ? System.currentTimeMillis() : Long.parseLong(ts));
+            long ts = data == null ? 0L : num(data.get("ts"));
+            msg.put("ts", ts > 0 ? ts : System.currentTimeMillis());
             String name = data == null ? null : data.get("dev_name");
+            if (name == null || name.length() == 0) name = title;
             if (name != null && name.length() > 0) msg.put("dev", new JSONObject().put("name", name));
-            show(c, 1, msg);
+            int unread = (int) Math.max(1L, data == null ? 1L : num(data.get("unread")));
+            if (seq > AdsChatStore.lastNotified(c)) AdsChatStore.setLastNotified(c, seq);
+            show(c, unread, msg);
         } catch (Throwable ignored) { }
     }
 

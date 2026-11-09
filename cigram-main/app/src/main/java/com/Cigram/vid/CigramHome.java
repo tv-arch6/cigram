@@ -51,6 +51,7 @@ public final class CigramHome {
             CigramFeatured.refreshIfStale(activity);
             CigramReport.flushQueue(activity);
             CigramPreload.warm(activity);   // v10.44: the other pages get ready in the background
+            AdsDevice.ensureRegistered(activity);   // 19.0: chat push token (throttled, only when signed in)
         } catch (Throwable ignored) { }
     }
 

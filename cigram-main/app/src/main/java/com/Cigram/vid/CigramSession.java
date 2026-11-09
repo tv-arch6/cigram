@@ -216,6 +216,36 @@ public final class CigramSession {
         JSONObject user;
     }
 
+    private static final String ME_URL = "https://cigram-auth-api.wwq-mixtv.workers.dev/me";
+
+    /**
+     * 19.0: is this token a live session according to the auth service? Same endpoint and the same User-Agent as the login
+     * (the auth Worker binds a session to the client family, so the app family must be used). Blocking; never throws.
+     * 200 -> VALID, 401/403 -> INVALID, anything else (offline, timeout, 5xx, 429) -> UNKNOWN. Writes nothing.
+     */
+    static AdsAuthGateway.Probe probe(String token) {
+        if (token == null || token.length() == 0) return AdsAuthGateway.Probe.INVALID;
+        HttpURLConnection c = null;
+        try {
+            c = (HttpURLConnection) new URL(ME_URL).openConnection();
+            c.setConnectTimeout(8000);
+            c.setReadTimeout(10000);
+            c.setUseCaches(false);
+            c.setRequestMethod("GET");
+            c.setRequestProperty("Authorization", "Bearer " + token);
+            c.setRequestProperty("Accept", "application/json");
+            c.setRequestProperty("User-Agent", "Cigram-Android/1.0");
+            int code = c.getResponseCode();
+            if (code == 200) return AdsAuthGateway.Probe.VALID;
+            if (code == 401 || code == 403) return AdsAuthGateway.Probe.INVALID;
+            return AdsAuthGateway.Probe.UNKNOWN;
+        } catch (Throwable error) {
+            return AdsAuthGateway.Probe.UNKNOWN;
+        } finally {
+            if (c != null) { try { c.disconnect(); } catch (Throwable ignored) { } }
+        }
+    }
+
     private static Result login(String email, String password, boolean asJson) {
         Result out = new Result();
         HttpURLConnection c = null;

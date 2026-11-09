@@ -178,9 +178,16 @@ public class AdsChatActivity extends Activity {
         if (cameraPath != null) b.putString("cam", cameraPath);
     }
 
+    private static volatile boolean VISIBLE;
+
+    /** True while the private conversation is on screen (a push for it is then pointless: the message is already shown). */
+    static boolean isVisible() { return VISIBLE; }
+
     @Override protected void onStart() {
         super.onStart();
         active = true;
+        VISIBLE = true;
+        AdsDevice.ensureRegistered(this);        // 19.0: the Worker learns this phone's push token
         if (ws == null) {
             ws = new AdsWs(this, "/chat/ws", new AdsWs.Listener() {
                 @Override public void onOpen() { setBanner(null); fetchNew(); flushPending(); loadPresence(); }
@@ -198,6 +205,7 @@ public class AdsChatActivity extends Activity {
 
     @Override protected void onStop() {
         active = false;
+        VISIBLE = false;
         if (ws != null) ws.stop();
         h.removeCallbacks(pollRun);
         stopRecording(true);
@@ -560,6 +568,17 @@ public class AdsChatActivity extends Activity {
         } catch (Throwable ignored) { }
     }
 
+    private int bootstrapRetryMs = 3000;
+    private final Runnable bootstrapRetryRun = new Runnable() {
+        @Override public void run() { if (!destroyed && active) bootstrap(); }
+    };
+
+    private void scheduleBootstrapRetry() {
+        h.removeCallbacks(bootstrapRetryRun);
+        h.postDelayed(bootstrapRetryRun, bootstrapRetryMs);
+        bootstrapRetryMs = Math.min(60000, bootstrapRetryMs * 2);
+    }
+
     private void bootstrap() {
         CigramAds.get(this, "/chat/thread", true, new CigramAds.Callback() {
             @Override public void onResult(CigramAds.Result r) {
@@ -571,12 +590,18 @@ public class AdsChatActivity extends Activity {
                         return;
                     }
                     if (r.authExpired) setSessionBanner();
-                    else setBanner(r.offline ? "لا يوجد اتصال — يعرض آخر محادثة محفوظة" : r.message);
+                    else {
+                        setBanner(r.offline ? "لا يوجد اتصال — يعرض آخر محادثة محفوظة" : r.message);
+                        // 19.0: a temporary failure (offline, busy / unreachable server, the chat Worker unable to verify the account)
+                        // is retried with back-off until it works; the saved conversation stays on screen meanwhile
+                        if (r.offline || r.authTransient || r.code == 0 || r.code == 408 || r.code == 429 || r.code >= 500) scheduleBootstrapRetry();
+                    }
                     loaded = true;
                     return;
                 }
                 JSONObject t = r.json.optJSONObject("thread");
                 banned = t != null && t.optBoolean("banned");
+                bootstrapRetryMs = 3000;
                 setBanner(null);
                 updateSubtitle();
                 loadPresence();

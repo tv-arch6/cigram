@@ -79,6 +79,59 @@ final class AdInboxNotifier {
         } catch (Throwable ignored) { }
     }
 
+    /** Pure helper (JVM-tested): the remembered ids after seeing {@code id}; {@code null} when it was already seen. */
+    static java.util.List<String> remember(java.util.List<String> seen, String id, int cap) {
+        java.util.ArrayList<String> out = new java.util.ArrayList<String>(seen == null ? java.util.Collections.<String>emptyList() : seen);
+        if (id == null || id.length() == 0) return out;
+        if (out.contains(id)) return null;
+        out.add(id);
+        while (out.size() > cap) out.remove(0);
+        return out;
+    }
+
+    private static boolean firstTime(Context c, String id) {
+        try {
+            SharedPreferences p = c.getSharedPreferences(PREFS + "_ids", Context.MODE_PRIVATE);
+            java.util.ArrayList<String> seen = new java.util.ArrayList<String>();
+            for (String x : p.getString("ids", "").split(",")) if (x.length() > 0) seen.add(x);
+            java.util.List<String> next = remember(seen, id, 60);
+            if (next == null) return false;
+            StringBuilder sb = new StringBuilder();
+            for (String x : next) { if (sb.length() > 0) sb.append(','); sb.append(x); }
+            p.edit().putString("ids", sb.toString()).apply();
+        } catch (Throwable ignored) { }
+        return true;
+    }
+
+    private static long num(String v) {
+        try { return v == null ? 0L : Long.parseLong(v.trim()); } catch (Throwable ignored) { return 0L; }
+    }
+
+    /**
+     * 19.0: a push (FCM data message) for a new user message, shown even when the app is closed: the user's name, a preview of
+     * the message, the unread count and the message time; a tap opens that conversation. Deduplicated by message id, and by the
+     * notification id (one per conversation) against the 15-minute poll. Silent while that very conversation is on screen.
+     */
+    static void showPush(Context c, java.util.Map<String, String> d) {
+        try {
+            if (d == null) return;
+            String thread = d.get("thread");
+            if (thread == null || thread.length() == 0) return;
+            if (!firstTime(c, d.get("msg_id"))) return;
+            if (AdChatActivity.isOpen(thread)) return;
+            JSONObject t = new JSONObject();
+            t.put("id", thread);
+            t.put("name", d.get("name") == null || d.get("name").length() == 0 ? "عميل" : d.get("name"));
+            t.put("preview", d.get("body") == null ? "" : d.get("body"));
+            t.put("unread_admin", (int) Math.max(1L, num(d.get("unread"))));
+            long ts = num(d.get("ts"));
+            t.put("last_ts", ts > 0 ? ts : System.currentTimeMillis());
+            notify(c, t);
+            SharedPreferences p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            if (t.optLong("last_ts") > p.getLong("last_ts", 0L)) p.edit().putLong("last_ts", t.optLong("last_ts")).apply();
+        } catch (Throwable ignored) { }
+    }
+
     /** One check (background thread only). */
     static void check(Context c) {
         CgCfg.loadToken(c);
@@ -133,7 +186,10 @@ final class AdInboxNotifier {
                     .setStyle(new Notification.BigTextStyle().bigText(text))
                     .setAutoCancel(true)
                     .setContentIntent(pi)
+                    .setWhen(t.optLong("last_ts") > 0 ? t.optLong("last_ts") : System.currentTimeMillis())
+                    .setShowWhen(true)
                     .setCategory(Notification.CATEGORY_MESSAGE);
+            if (t.optInt("unread_admin") > 1) b.setSubText(t.optInt("unread_admin") + " رسائل غير مقروءة");
             if (Build.VERSION.SDK_INT < 26) b.setPriority(Notification.PRIORITY_HIGH);
             nm.notify("ads_inbox", t.optString("id").hashCode(), b.build());
         } catch (Throwable ignored) { }

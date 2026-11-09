@@ -128,7 +128,11 @@ public final class AdsWs {
                     renewedRecently = true;
                     retryNow = true;
                 } else {
-                    authFailed = renewedRecently || !CigramAds.AUTH.canRenew();
+                    // 19.0: the auth service has the last word. A token it still accepts means the CHAT Worker could not verify it:
+                    // not a lost session (the banner «sign in again» would be false), just retry with the normal back-off.
+                    boolean stillValid = false;
+                    try { stillValid = CigramAds.AUTH.probe(CigramUserData.token(app)) == AdsAuthGateway.Probe.VALID; } catch (Throwable ignored) { }
+                    authFailed = !stillValid && (renewedRecently || !CigramAds.AUTH.canRenew());
                 }
             } catch (Throwable ignored) {
                 // أي فشل شبكة: نعيد المحاولة

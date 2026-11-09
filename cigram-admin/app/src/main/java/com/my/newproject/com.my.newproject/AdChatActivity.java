@@ -193,9 +193,15 @@ public class AdChatActivity extends CgBase {
         });
     }
 
+    private static volatile String OPEN_THREAD = "";
+
+    /** 19.0: true while this very conversation is on screen (its push notification is then pointless). */
+    static boolean isOpen(String threadId) { return threadId != null && threadId.length() > 0 && threadId.equals(OPEN_THREAD); }
+
     @Override protected void onStart() {
         super.onStart();
         active = true;
+        OPEN_THREAD = thread;
         if (ws == null) {
             ws = new AdWs(this, "/admin/chat/ws", new AdWs.Listener() {
                 @Override public void onOpen() { setBanner(null); fetchNew(); }
@@ -210,6 +216,7 @@ public class AdChatActivity extends CgBase {
 
     @Override protected void onStop() {
         active = false;
+        if (thread.equals(OPEN_THREAD)) OPEN_THREAD = "";
         if (ws != null) ws.stop();
         ui().removeCallbacks(pollRun);
         stopRec(true);
@@ -727,7 +734,7 @@ public class AdChatActivity extends CgBase {
     private void showManage() {
         final boolean banned = threadInfo.optBoolean("banned");
         final CharSequence[] labels = {"تغيير الحالة", "الوسوم", "ملاحظات داخلية (لا يراها المستخدم)", "تعيين مسؤول", "تحويل طلب إعلان إلى حملة (مسودة)",
-                "فتح ملف المعلن", banned ? "رفع التقييد" : "تقييد الحساب في المحادثة (إساءة)", threadInfo.optBoolean("archived") ? "إلغاء الأرشفة" : "أرشفة المحادثة", "تصدير المحادثة (نص)", "حذف المحادثة نهائياً",
+                "فتح ملف المعلن", banned ? "رفع التقييد" : "تقييد الحساب في المحادثة (إساءة)", threadInfo.optBoolean("archived") ? "إلغاء الأرشفة" : "أرشفة المحادثة", "تصدير المحادثة (نص)", "سياسة حفظ المحادثات",
                 "المعرّف الداخلي للمستخدم"};
         CgUi.choose(this, "إدارة المحادثة", labels, new CgUi.IntCb() {
             @Override public void run(int i) {
@@ -787,11 +794,13 @@ public class AdChatActivity extends CgBase {
                     } else if (i == 8) {
                         exportChat();
                     } else if (i == 9) {
-                        CgUi.confirm(AdChatActivity.this, "حذف المحادثة", "ستُحذف كل الرسائل والملفات نهائياً ولا يمكن التراجع.", "حذف", true, new Runnable() {
-                            @Override public void run() {
-                                try { AdApi.post(AdChatActivity.this, "/admin/chat/purge", new JSONObject().put("thread", thread), new AdApi.Cb() { @Override public void on(AdApi.Result r) { if (r.ok) finish(); else CgUi.toast(AdChatActivity.this, r.message); } }); } catch (Throwable ignored) { }
-                            }
-                        });
+                        // 19.0: conversations are permanent. There is no delete: the server refuses purge / delete-message (409)
+                        CgUi.dialog(AdChatActivity.this).setTitle("المحادثات دائمة")
+                                .setMessage("لا يمكن حذف أي محادثة أو رسالة من التطبيق (وكذلك يرفض الخادم ذلك).\n\n"
+                                        + "• الأرشفة تُخفي المحادثة من القائمة الرئيسية فقط؛ تبقى كاملة ويمكن البحث فيها واستعادتها.\n"
+                                        + "• إذا حذف المستخدم حسابه أو طلب النسيان تُمسح هويته (الاسم والبريد) ويبقى السجل.\n"
+                                        + "• يحتفظ الخادم بنسخ احتياطية غير قابلة للتعديل للمحادثات.")
+                                .setPositiveButton("حسناً", null).show();
                     }
                 } catch (Throwable ignored) { }
             }
@@ -1029,14 +1038,6 @@ public class AdChatActivity extends CgBase {
                 labels.add("نسخ");
                 acts.add(new Runnable() { @Override public void run() { try { ((ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("m", m.text)); CgUi.toast(AdChatActivity.this, "تم النسخ"); } catch (Throwable ignored) { } } });
             }
-            labels.add("حذف الرسالة للجميع");
-            acts.add(new Runnable() {
-                @Override public void run() {
-                    CgUi.confirm(AdChatActivity.this, "حذف الرسالة", "ستُحذف الرسالة (وملفها إن وُجد) عند الطرفين.", "حذف", true, new Runnable() {
-                        @Override public void run() { try { AdApi.post(AdChatActivity.this, "/admin/chat/delete-message", new JSONObject().put("thread", thread).put("seq", m.seq), new AdApi.Cb() { @Override public void on(AdApi.Result r) { if (!r.ok) CgUi.toast(AdChatActivity.this, r.message); } }); } catch (Throwable ignored) { } }
-                    });
-                }
-            });
         }
         if (labels.isEmpty()) return;
         CgUi.choose(this, "خيارات", labels.toArray(new CharSequence[0]), new CgUi.IntCb() { @Override public void run(int i) { acts.get(i).run(); } });

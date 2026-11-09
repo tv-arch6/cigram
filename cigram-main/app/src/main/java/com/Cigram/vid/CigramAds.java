@@ -65,6 +65,8 @@ public final class CigramAds {
         public boolean authExpired;
         /** True when a 401 could not be resolved right now (renewal failed for a temporary reason): the session is NOT lost. */
         public boolean authTransient;
+        /** 19.0: the auth service says the token is valid, yet the chat Worker refused it: a server-side verification problem. */
+        public boolean serverCannotVerify;
 
         /** An authentication answer: HTTP 401 from the Worker (never a timeout, an offline state, a 5xx or a 403). */
         public boolean authRejected() {
@@ -93,6 +95,9 @@ public final class CigramAds {
         @Override public boolean canRenew() {
             Context c = APP;
             return c != null && CigramSession.canRenew(c);
+        }
+        @Override public AdsAuthGateway.Probe probe(String token) {
+            return CigramSession.probe(token);
         }
     };
 

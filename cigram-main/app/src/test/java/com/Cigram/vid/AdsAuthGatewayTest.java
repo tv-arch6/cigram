@@ -28,11 +28,13 @@ import org.junit.Test;
 public class AdsAuthGatewayTest {
 
     // ---------------------------------------------------------------- fake token source
-    static final class FakeAuth implements AdsAuthGateway.Auth {
+    static class FakeAuth implements AdsAuthGateway.Auth {
         volatile String current = "old";
         volatile String renewTo = "new";
         volatile boolean expiresSoon;
         volatile boolean canRenew = true;
+        volatile AdsAuthGateway.Probe probe = AdsAuthGateway.Probe.UNKNOWN;
+        final AtomicInteger probeCalls = new AtomicInteger();
         final AtomicInteger renewCalls = new AtomicInteger();
         final AtomicInteger loginClears = new AtomicInteger();    // would count any attempt to drop the session: must stay 0
 
@@ -45,6 +47,7 @@ public class AdsAuthGatewayTest {
         }
         @Override public boolean expiresSoon() { return expiresSoon; }
         @Override public boolean canRenew() { return canRenew; }
+        @Override public AdsAuthGateway.Probe probe(String token) { probeCalls.incrementAndGet(); return probe; }
     }
 
     private static CigramAds.Result result(int code, String error) {
@@ -73,6 +76,61 @@ public class AdsAuthGatewayTest {
         CigramAds.Result c = result(r.code, r.error);
         c.offline = r.offline;
         return c;
+    }
+
+    // ---------------------------------------------------------------- 19.0: the auth service has the last word
+    @Test public void aTokenTheAuthServiceStillAcceptsIsNeverReportedAsExpired() {
+        FakeAuth a = new FakeAuth();
+        a.canRenew = false;                                  // e.g. a Google sign-in: nothing to renew with
+        a.probe = AdsAuthGateway.Probe.VALID;
+        Scripted call = new Scripted(result(401, "invalid_token"), "never");
+        CigramAds.Result r = AdsAuthGateway.run(call, a, "old");
+        assertFalse("the session is fine, the chat Worker could not verify it", r.authExpired);
+        assertTrue(r.authTransient);
+        assertTrue(r.serverCannotVerify);
+        assertEquals(1, a.probeCalls.get());
+        assertEquals(0, a.loginClears.get());
+    }
+
+    @Test public void anInvalidTokenWithNothingToRenewWithIsExpired() {
+        FakeAuth a = new FakeAuth();
+        a.canRenew = false;
+        a.probe = AdsAuthGateway.Probe.INVALID;
+        CigramAds.Result r = AdsAuthGateway.run(new Scripted(result(401, "invalid_token"), "never"), a, "old");
+        assertTrue(r.authExpired);
+        assertFalse(r.authTransient);
+        assertFalse(r.serverCannotVerify);
+    }
+
+    @Test public void whenTheAuthServiceCannotBeAskedTheOldRuleApplies() {
+        FakeAuth a = new FakeAuth();
+        a.canRenew = false;
+        a.probe = AdsAuthGateway.Probe.UNKNOWN;               // offline / 5xx from the auth service
+        assertTrue(AdsAuthGateway.run(new Scripted(result(401, "invalid_token"), "never"), a, "old").authExpired);
+        FakeAuth b = new FakeAuth();
+        b.canRenew = true;
+        b.renewTo = "";                                       // renewal failed for a temporary reason
+        b.probe = AdsAuthGateway.Probe.UNKNOWN;
+        CigramAds.Result r = AdsAuthGateway.run(new Scripted(result(401, "invalid_token"), "never"), b, "old");
+        assertTrue(r.authTransient);
+        assertFalse(r.authExpired);
+    }
+
+    @Test public void aRenewedTokenThatIsStillRefusedButValidAtTheAuthServiceIsTemporary() {
+        FakeAuth a = new FakeAuth();
+        a.renewTo = "new";
+        a.probe = AdsAuthGateway.Probe.VALID;
+        CigramAds.Result r = AdsAuthGateway.run(new Scripted(result(401, "invalid_token"), "never"), a, "old");
+        assertTrue(r.renewed);
+        assertTrue(r.authTransient && r.serverCannotVerify);
+        assertFalse(r.authExpired);
+    }
+
+    @Test public void aProbeThatThrowsIsNotAnAuthResult() {
+        FakeAuth a = new FakeAuth() { @Override public AdsAuthGateway.Probe probe(String t) { throw new IllegalStateException("boom"); } };
+        a.canRenew = false;
+        CigramAds.Result r = AdsAuthGateway.run(new Scripted(result(401, "invalid_token"), "never"), a, "old");
+        assertTrue("falls back to the pre-19.0 rule", r.authExpired);
     }
 
     // ---------------------------------------------------------------- gateway

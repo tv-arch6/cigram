@@ -14,6 +14,10 @@ package com.Cigram.vid;
  *     credentials are stored to renew with. A renewal that failed for any other reason is reported as a temporary
  *     problem, never as a logout. Timeouts, offline, 5xx and malformed answers are not authentication results at all.
  *  5. Nothing here ever clears the stored session.
+ *  6. (19.0) Before a 401 that could not be solved by a renewal is called an expired session, the token is checked directly
+ *     against the auth service from the phone (the same call the rest of the app uses). Valid there = the chat Worker could
+ *     not verify it (binding / network problem on its side): that is a temporary condition, never «sign in again», the
+ *     queue is kept and retried. Only «invalid there as well» (or no answer at all from a signed-out account) is an expiry.
  */
 final class AdsAuthGateway {
 
@@ -29,7 +33,12 @@ final class AdsAuthGateway {
         boolean expiresSoon();
         /** True when sealed credentials exist, i.e. a renewal can work at all. */
         boolean canRenew();
+        /** 19.0: asks the auth service itself (not the chat Worker) whether {@code token} is a live session. Blocking. */
+        default Probe probe(String token) { return Probe.UNKNOWN; }
     }
+
+    /** The auth service's verdict about a token. UNKNOWN = it could not be asked (offline, timeout, 5xx). */
+    enum Probe { VALID, INVALID, UNKNOWN }
 
     /** One HTTP attempt with a given bearer. */
     interface Call {
@@ -58,19 +67,38 @@ final class AdsAuthGateway {
         if (fresh.length() > 0 && !fresh.equals(use)) {
             CigramAds.Result r2 = call.run(fresh);
             r2.renewed = true;
-            if (r2.authRejected()) markExpired(r2);
+            if (r2.authRejected()) classify(r2, auth, fresh, true, true);
             return r2;
         }
         boolean can;
         try { can = auth.canRenew(); } catch (Throwable t) { can = false; }
-        if (can) {
+        classify(r, auth, use, false, can);
+        return r;
+    }
+
+    /**
+     * The chat Worker refused the token and a renewal did not help. Ask the auth service itself before deciding:
+     *  VALID   -> the account is signed in; the chat Worker cannot verify it right now (temporary, retried, never a logout)
+     *  otherwise the pre-19.0 rule: a token that was just renewed and is STILL refused = expired; no renewal was possible
+     *  = expired when there are no stored credentials, temporary when there are (the silent login failed for a passing reason).
+     */
+    static void classify(CigramAds.Result r, Auth auth, String token, boolean renewedAndStillRefused, boolean canRenew) {
+        Probe p;
+        try { p = auth.probe(token); } catch (Throwable t) { p = Probe.UNKNOWN; }
+        if (p == null) p = Probe.UNKNOWN;
+        if (p == Probe.VALID) {
+            r.authTransient = true;
+            r.serverCannotVerify = true;
+            r.message = "خدمة الدعم لا تستطيع التحقق من حسابك الآن (المشكلة من الخادم وليست من حسابك). رسائلك محفوظة وسنعيد المحاولة تلقائياً.";
+            return;
+        }
+        if (canRenew && !renewedAndStillRefused) {
             // credentials exist but the silent login could not be completed right now (network, throttle, server)
             r.authTransient = true;
             r.message = "تعذر تجديد الجلسة الآن. حاول بعد قليل — حسابك ما زال مسجّلاً.";
-        } else {
-            markExpired(r);
+            return;
         }
-        return r;
+        markExpired(r);
     }
 
     private static void markExpired(CigramAds.Result r) {

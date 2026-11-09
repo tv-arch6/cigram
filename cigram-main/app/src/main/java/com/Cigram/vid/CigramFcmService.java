@@ -43,5 +43,7 @@ public class CigramFcmService extends FirebaseMessagingService {
             CigramFcm.sync(getApplicationContext());
         } catch (Throwable ignored) {
         }
+        // 19.0: the private-support chat needs the new token too (targeted push of an administrator's reply)
+        AdsDevice.onNewToken(getApplicationContext(), token);
     }
 }
