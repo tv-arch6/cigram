@@ -930,6 +930,10 @@ public final class CigramStage1InitProvider extends ContentProvider {
                             Activity main = ACTIVE_MAIN == null ? null : ACTIVE_MAIN.get();
                             if (!isAlive(main)) { trace("earlyNoMain"); return; }
                             if (homeBusyScrolling() && waits++ < 40) { MAIN.postDelayed(this, 350L); return; }   // at most ~14 s, then apply anyway
+                            // the rebuild removes and re-adds Home's rows: keep the reader where they were instead of jumping to the top
+                            View homeScroll = findByIdName(main, "vscroll1");
+                            final android.widget.ScrollView sv = homeScroll instanceof android.widget.ScrollView ? (android.widget.ScrollView) homeScroll : null;
+                            final int keepY = sv == null ? 0 : sv.getScrollY();
                             removeTagged(main, "cigram_stage1_main_error");
                             removeTagged(main, "cigram_offline_screen");
                             removeTagged(main, "cigram_stage1_offline_banner");
@@ -937,6 +941,10 @@ public final class CigramStage1InitProvider extends ContentProvider {
                                     main, "movies", display, hash, false);
                             if (contentChanged && delivered) {
                                 renderDynamicSections(main, display);
+                                if (sv != null && keepY > 0) {
+                                    sv.post(new Runnable() { @Override public void run() { sv.scrollTo(0, keepY); } });
+                                    sv.postDelayed(new Runnable() { @Override public void run() { if (!homeBusyScrolling()) sv.scrollTo(0, keepY); } }, 350L);
+                                }
                             }
                         }
                     });

@@ -3207,8 +3207,11 @@ public class MainActivity extends AppCompatActivity {
 			
 			final InternetState internetState = new InternetState();
 			
+			// 18.4 offline-first: a blocking "no internet" screen is for a phone that has NOTHING to show. With a saved catalogue Home opens
+			// at once from it (the small "browsing offline" banner is shown by CigramStage1InitProvider instead).
 			if (!internetState.isAvailable()
-			&& offlineRoot.findViewWithTag("cigram_offline_screen") == null) {
+			&& offlineRoot.findViewWithTag("cigram_offline_screen") == null
+			&& !CigramCatalogPrefs.of(MainActivity.this).hasCatalogue()) {
 				
 				final android.widget.FrameLayout offlineScreen =
 				new android.widget.FrameLayout(offlineActivity);

@@ -277,6 +277,12 @@ public final class CigramCatalogPrefs implements SharedPreferences {
         }
     }
 
+    /** True when a usable catalogue is saved (after the one-time migration). Screens use it to decide "show saved content" vs "nothing to show". */
+    public boolean hasCatalogue() {
+        ensureLoaded();
+        synchronized (lock) { return display.length() > 0; }
+    }
+
     /** The sync manager commits through the store directly: re-read the snapshot it wrote so every SharedPreferences reader sees it. */
     public void reload() {
         synchronized (lock) {
