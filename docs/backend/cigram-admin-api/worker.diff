@@ -1,5 +1,5 @@
 --- /tmp/claude-0/-home-user-cigram/00ab601a-7933-5033-89f1-28dfc3bf56ee/scratchpad/backend_live/admin-api/worker.js	2026-11-08 16:36:39.737155438 +0000
-+++ /home/user/cigram/docs/backend/deploy/cigram-admin-api/worker.js	2026-11-08 22:53:06.311268761 +0000
++++ /home/user/cigram/docs/backend/deploy/cigram-admin-api/worker.js	2026-11-09 09:48:12.483388437 +0000
 @@ -10336,7 +10336,7 @@
        const f = await tmdbGetOrNull(env, "/find/" + t.imdb_id, { external_source: "imdb_id" });
        const hit = f && (t.type === "tv" ? f.tv_results : f.movie_results);
@@ -215,7 +215,7 @@
    const data = await wnTmdb(env, "/discover/" + tmdbKind, wnDiscoverParams(kind, feed, f, cfg), { ttl: f.fresh ? 0 : 600 });
    let rows = (Array.isArray(data.results) ? data.results : []).map((row) => ({ row, kind }));
    const totalPages = Math.min(500, Number(data.total_pages) || 1);
-@@ -13715,6 +13655,641 @@
+@@ -13715,6 +13655,661 @@
    });
  }
  
@@ -285,6 +285,26 @@
 +function subsOsId(v) {
 +  const m = cleanString(v).replace(/^tt/i, "").replace(/^0+/, "");
 +  return /^\d{1,12}$/.test(m) ? m : "";
++}
++
++// ----------------------------------------------------------------------------- 18.3 conditional GET for the public catalogue
++// GET /movies used to send the whole 5.3 MB R2 object every time (with the ETag header, but ignoring If-None-Match). R2 evaluates the
++// preconditions itself (get(key, { onlyIf: request.headers })): an unchanged catalogue now answers 304 without a body, a changed one
++// is sent in full exactly as before. `no-cache` = clients revalidate on every request, so a title added in the admin app is visible at once.
++async function returnR2JsonConditional(request, env, key, missingValue = null) {
++  const obj = await env.MOVIES_BUCKET.get(key, { onlyIf: request.headers });
++  if (!obj) {
++    if (missingValue !== null) return json(missingValue);
++    return json({ ok: false, error: "not_found", object: key }, 404);
++  }
++  const headers = corsHeaders({
++    "content-type": "application/json; charset=utf-8",
++    etag: obj.httpEtag || "",
++    "cache-control": "no-cache",
++    "access-control-expose-headers": "ETag",
++  });
++  if (obj.body === undefined || obj.body === null) return new Response(null, { status: 304, headers });   // If-None-Match matched
++  return new Response(obj.body, { status: 200, headers });
 +}
 +
 +// ------------------------------------------------------------------ provider health ("connected" = a real call worked)
@@ -857,7 +877,7 @@
  // ----------------------------------------------------------------------------- route table
  
  const WN_ROUTES = (() => {
-@@ -13738,6 +14313,8 @@
+@@ -13738,6 +14333,8 @@
      "GET /admin/discover/history": A(handleWnHistory),
      "GET /admin/discover/cron": A(handleWnCron),
      "POST /admin/discover/collection": A(handleWnCollection),
@@ -866,7 +886,7 @@
    };
  })();
  
-@@ -13822,7 +14399,8 @@
+@@ -13822,14 +14419,15 @@
              .concat(Object.keys(OPS_ROUTES))
              .concat(Object.keys(REQUESTS_ROUTES))
              .concat(Object.keys(PUSH_ROUTES))
@@ -876,7 +896,15 @@
            version: 7,
          });
        }
-@@ -13908,6 +14486,9 @@
+ 
+       // Movies
+       if (request.method === "GET" && path === "/movies") {
+-        return returnR2JsonObject(env, MOVIES_OBJECT, []);
++        return returnR2JsonConditional(request, env, MOVIES_OBJECT, []);
+       }
+ 
+       if (request.method === "POST" && path === "/add-movie") {
+@@ -13908,6 +14506,9 @@
        const wnHandler = WN_ROUTES[request.method + " " + path];
        if (wnHandler) return wnHandler(request, env, url, ctx);
  

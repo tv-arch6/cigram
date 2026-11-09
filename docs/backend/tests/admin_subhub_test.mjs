@@ -74,10 +74,15 @@ async function osStub(u, init, j) {
 
 class MemR2 {
   constructor() { this.m = new Map(); this.n = 0; }
-  async get(k) {
+  async get(k, opts = {}) {
     if (!this.m.has(k)) return null;
     const { text, etag } = this.m.get(k);
-    return { etag, httpEtag: etag, text: async () => text, json: async () => JSON.parse(text), arrayBuffer: async () => new TextEncoder().encode(text).buffer };
+    const obj = { etag, httpEtag: '"' + etag + '"', text: async () => text, json: async () => JSON.parse(text), arrayBuffer: async () => new TextEncoder().encode(text).buffer };
+    // R2 evaluates conditional headers itself: a matching If-None-Match gives an R2Object WITHOUT body
+    const inm = opts && opts.onlyIf && opts.onlyIf.get ? opts.onlyIf.get("if-none-match") : null;
+    if (inm && inm === obj.httpEtag) return obj;
+    obj.body = text;
+    return obj;
   }
   async head(k) { return this.m.has(k) ? { etag: this.m.get(k).etag } : null; }
   async put(k, v, o) {
@@ -111,6 +116,29 @@ const realLog = console.log;
 console.log = (...a) => { if (typeof a[0] === "string" && a[0].startsWith('{"evt":"subhub"')) logLines.push(a[0]); else realLog(...a); };
 let passed = 0;
 const test = async (name, fn) => { await fn(); passed++; console.log("ok -", name); };
+
+await test("GET /movies is conditional: ETag, 304 for an unchanged catalogue, full body after a change", async () => {
+  const get = (h = {}) => worker.fetch(new Request("https://admin.test/movies", { headers: h }), env, { waitUntil() {} });
+  const first = await get();
+  assert.equal(first.status, 200);
+  const etag = first.headers.get("etag");
+  assert.ok(/^"e\d+"$/.test(etag), etag);
+  assert.equal(first.headers.get("cache-control"), "no-cache");
+  assert.equal((await first.json()).length, 3, "the full catalogue is unchanged");
+  const second = await get({ "if-none-match": etag });
+  assert.equal(second.status, 304);
+  assert.equal(await second.text(), "");
+  await bucket.put("movies.json", JSON.stringify([{ id: "n1", type: "movie", title: "New", video: "https://v.example.invalid/n.mp4" }]));
+  const third = await get({ "if-none-match": etag });
+  assert.equal(third.status, 200);
+  assert.equal((await third.json())[0].id, "n1");
+  // restore the fixture for the other tests
+  await bucket.put("movies.json", JSON.stringify([
+    { id: "m1", type: "movie", title: "فيلم بلا معرّف", video: "https://v.example.invalid/a.mp4" },
+    { id: "m2", type: "movie", title: "Fight Club", tmdb: "550", imdb_id: "tt0137523", video: "https://v.example.invalid/b.mp4" },
+    { id: "m3", type: "movie", title: "Has Subtitle", tmdb: "551", imdb_id: "tt0000551", video: "https://v.example.invalid/c.mp4", subtitle: "https://pub.example.invalid/c/c.ar.srt" },
+  ]));
+});
 
 await test("health lists the new routes", async () => {
   const r = await call("GET", "/health", null, null);

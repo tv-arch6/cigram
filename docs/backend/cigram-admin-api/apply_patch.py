@@ -156,5 +156,10 @@ rep("""  out.key = key;
   out.url = await subsStore(env, key, got.srt);""")
 rep("""      const r = await subsDoFetch(env, { item_id: ep.id, mode: "upload" }, list);""", """      const r = await subsDoFetch(env, { item_id: ep.id, mode: "upload", overwrite: overwrite }, list);""")
 
+# 18.3) GET /movies: conditional (ETag / If-None-Match -> 304), see returnR2JsonConditional in subhub_providers.js
+rep("""      if (request.method === "GET" && path === "/movies") {
+        return returnR2JsonObject(env, MOVIES_OBJECT, []);""","""      if (request.method === "GET" && path === "/movies") {
+        return returnR2JsonConditional(request, env, MOVIES_OBJECT, []);""")
+
 open(dst, "w", encoding="utf-8").write(s)
 print("patched:", dst)

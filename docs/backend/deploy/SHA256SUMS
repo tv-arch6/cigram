@@ -1,2 +1,3 @@
-5ed40b9a74ed64b2c9b95ce00d7e04e16455c4c6174159dc15303d19b8d782f5  cigram-admin-api/worker.js
-ed09af3c9683222c8152e4cc3289e49e1aa1759e180e0f03b80357e6d359b7da  cigram-ads-api/worker.js
+bc53dc497b6438dd1f19ebefc234662b51cf8d4f56282e763c7ef7fa8f9928e9  cigram-admin-api/worker.js
+114d4f78800288e9a25e1edc570c7cecccf227fe9c454970bcf65962d57dcedb  cigram-ads-api/worker.js
+1763817fc119515ff3dc2222e7f4b7c5fac194b8bdea05baeb77c47b6000f099  sigram-channels-api/worker.js

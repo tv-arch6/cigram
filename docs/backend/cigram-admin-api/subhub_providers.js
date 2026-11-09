@@ -39,6 +39,26 @@ function subsOsId(v) {
   return /^\d{1,12}$/.test(m) ? m : "";
 }
 
+// ----------------------------------------------------------------------------- 18.3 conditional GET for the public catalogue
+// GET /movies used to send the whole 5.3 MB R2 object every time (with the ETag header, but ignoring If-None-Match). R2 evaluates the
+// preconditions itself (get(key, { onlyIf: request.headers })): an unchanged catalogue now answers 304 without a body, a changed one
+// is sent in full exactly as before. `no-cache` = clients revalidate on every request, so a title added in the admin app is visible at once.
+async function returnR2JsonConditional(request, env, key, missingValue = null) {
+  const obj = await env.MOVIES_BUCKET.get(key, { onlyIf: request.headers });
+  if (!obj) {
+    if (missingValue !== null) return json(missingValue);
+    return json({ ok: false, error: "not_found", object: key }, 404);
+  }
+  const headers = corsHeaders({
+    "content-type": "application/json; charset=utf-8",
+    etag: obj.httpEtag || "",
+    "cache-control": "no-cache",
+    "access-control-expose-headers": "ETag",
+  });
+  if (obj.body === undefined || obj.body === null) return new Response(null, { status: 304, headers });   // If-None-Match matched
+  return new Response(obj.body, { status: 200, headers });
+}
+
 // ------------------------------------------------------------------ provider health ("connected" = a real call worked)
 async function subhubNote(env, id, ok, detail) {
   const now = Date.now();

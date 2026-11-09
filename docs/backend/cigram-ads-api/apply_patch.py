@@ -181,5 +181,20 @@ rep('''      const others = this.socketsOf("a").filter((w) => w !== ws);
       try { await this.s.put("admin_last_active", Date.now()); } catch (e) { }
       if (!others.length) {''')
 
+
+# 18.3) chat authentication (verify_user.js): the check of the user's token answered 401 "invalid_token" -- shown by the app as
+# «انتهت الجلسة، سجّل الدخول من جديد» -- for EVERY failure of the call to the auth Worker (timeout, 429, 5xx, a wrong service
+# binding, a malformed answer). Only a real 401/403 from the auth Worker means the session is over; anything else is a
+# temporary problem (503 auth_unavailable) and a token verified in the last 30 minutes keeps being served meanwhile.
+import os
+_new = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "verify_user.js"), encoding="utf-8").read().rstrip("\n")
+_head = "async function verifyUser(request, env) {"
+_tailm = '__name(verifyUser, "verifyUser");'
+if s.count(_head) != 1 or s.count(_tailm) != 1:
+    raise SystemExit("verifyUser anchors not found exactly once")
+_a = s.index(_head)
+_b = s.index(_tailm) + len(_tailm)
+s = s[:_a] + _new + s[_b:]
+
 open(dst, "w", encoding="utf-8").write(s)
 print("patched:", dst)

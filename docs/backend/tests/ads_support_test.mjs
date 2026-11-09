@@ -162,4 +162,115 @@ await test("presence returns the developer's public identity and last activity",
   assert.equal(typeof r.json.last_active, "number");
 });
 
+// ---------------------------------------------------------------- 18.3: authentication of the chat (opaque tokens, like the real auth Worker)
+// The real cigram-auth-api issues OPAQUE session tokens (not JWTs); the chat Worker verifies them by calling GET /me through the
+// AUTH_API service binding. This stub speaks that contract: 200 {success, user:{id,email,name}} or 401 {success:false}.
+const authMode = { mode: "ok", calls: 0 };
+const sessions = { "opaque-dave": { id: "auth-user-123", email: "dave@example.invalid", name: "Dave" }, "opaque-erin": { id: "auth-user-456", email: "erin@example.invalid", name: "Erin" } };
+const env2 = Object.assign({}, env);
+delete env2.JWT_SECRET;
+env2.AUTH_API = { fetch: async (url, init) => {
+  authMode.calls++;
+  if (authMode.mode === "throw") throw new Error("Network connection lost");
+  if (authMode.mode === "500") return new Response("upstream error", { status: 500 });
+  if (authMode.mode === "429") return new Response("{}", { status: 429 });
+  if (authMode.mode === "1042") return new Response("error code: 1042", { status: 404 });
+  if (authMode.mode === "malformed") return new Response(JSON.stringify({ success: true }), { status: 200 });
+  const t = new Headers(init.headers).get("authorization").replace(/^Bearer /, "");
+  const u = sessions[t];
+  if (!u) return new Response(JSON.stringify({ success: false, message: "انتهت الجلسة" }), { status: 401 });
+  return new Response(JSON.stringify({ success: true, user: u, expires_at: "2026-12-01T00:00:00Z" }), { status: 200 });
+} };
+const logs = [];
+const realLog = console.log;
+console.log = (...a) => { if (typeof a[0] === "string" && a[0].startsWith('{"evt":"chat_auth"')) logs.push(a[0]); else realLog(...a); };
+const call2 = async (method, path, token, body, headers = {}) => {
+  const r = await worker.fetch(new Request("https://ads.test" + path, { method, headers: Object.assign({ "content-type": "application/json" }, token ? { authorization: "Bearer " + token } : {}, headers), body: body ? JSON.stringify(body) : undefined }), env2, { waitUntil() {} });
+  return { status: r.status, json: await r.json() };
+};
+const realNow = Date.now;
+const at = (ms) => { Date.now = () => realNow() + ms; };
+
+await test("an opaque session token is verified through the auth Worker and opens the chat", async () => {
+  authMode.mode = "ok";
+  const r = await call2("GET", "/chat/thread", "opaque-dave");
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  const w = await call2("POST", "/chat/send", "opaque-dave", { client_id: "oa1", type: "text", text: "hello from an opaque-token session" });
+  assert.equal(w.status, 200, JSON.stringify(w.json));
+});
+
+await test("the identity comes from the verified token, never from the request", async () => {
+  // Erin claims to be Dave in a header and in the body: the message must land in Erin's own thread
+  const w = await call2("POST", "/chat/send", "opaque-erin", { client_id: "oc1", type: "text", text: "erin writes", user_id: "auth-user-123", thread: "u_dave" }, { "x-user-id": "auth-user-123" });
+  assert.equal(w.status, 200, JSON.stringify(w.json));
+  const mine = await call2("GET", "/chat/messages?limit=40", "opaque-erin");
+  assert.deepEqual(mine.json.messages.map((m) => m.text), ["erin writes"]);
+  const alices = await call2("GET", "/chat/messages?limit=40", "opaque-dave");
+  assert.ok(alices.json.messages.every((m) => m.text !== "erin writes"), "Dave never sees Erin's message");
+});
+
+await test("only a real 401 from the auth Worker is a session expiry (401 invalid_token)", async () => {
+  authMode.mode = "ok";
+  const r = await call2("GET", "/chat/thread", "opaque-revoked-or-expired");
+  assert.equal(r.status, 401);
+  assert.equal(r.json.error, "invalid_token");
+});
+
+for (const mode of ["500", "429", "throw", "1042", "malformed"]) {
+  await test("auth Worker problem '" + mode + "' is a temporary 503 auth_unavailable, NOT a logout", async () => {
+    authMode.mode = mode;
+    const r = await call2("GET", "/chat/thread", "opaque-never-seen-before-" + mode);
+    assert.equal(r.status, 503, JSON.stringify(r.json));
+    assert.equal(r.json.error, "auth_unavailable");
+    assert.notEqual(r.json.error, "invalid_token");
+    authMode.mode = "ok";
+  });
+}
+
+await test("a token verified in the last 30 minutes keeps working while the auth Worker is down (bounded)", async () => {
+  authMode.mode = "ok";
+  assert.equal((await call2("GET", "/chat/thread", "opaque-dave")).status, 200);   // verified (cache is refreshed by this call or an earlier one)
+  authMode.mode = "500";
+  at(6 * 60 * 1000);                                                                  // the 5-minute cache entry has expired
+  const during = await call2("GET", "/chat/thread", "opaque-dave");
+  assert.equal(during.status, 200, "served from the 30-minute grace window during the outage");
+  at(40 * 60 * 1000);                                                                 // beyond the window
+  const after = await call2("GET", "/chat/thread", "opaque-dave");
+  Date.now = realNow;
+  assert.equal(after.status, 503);
+  assert.equal(after.json.error, "auth_unavailable");
+  authMode.mode = "ok";
+});
+
+await test("a revoked session is never served from the grace window", async () => {
+  authMode.mode = "ok";
+  assert.equal((await call2("GET", "/chat/thread", "opaque-erin")).status, 200);
+  delete sessions["opaque-erin"];                                                    // the account logs out / is revoked
+  at(6 * 60 * 1000);
+  const r = await call2("GET", "/chat/thread", "opaque-erin");                       // auth Worker answers 401 -> invalid
+  assert.equal(r.status, 401);
+  authMode.mode = "500";
+  const again = await call2("GET", "/chat/thread", "opaque-erin");                   // the stale entry was dropped: no grace
+  Date.now = realNow;
+  assert.equal(again.status, 503);
+  authMode.mode = "ok";
+});
+
+await test("a message re-sent after a renewal (same client_id) is stored once", async () => {
+  authMode.mode = "ok";
+  const a = await call2("POST", "/chat/send", "opaque-dave", { client_id: "retry-1", type: "text", text: "sent twice by a retry" });
+  const b = await call2("POST", "/chat/send", "opaque-dave", { client_id: "retry-1", type: "text", text: "sent twice by a retry" });
+  assert.equal(a.status, 200); assert.equal(b.json.duplicate, true);
+  const m = await call2("GET", "/chat/messages?limit=40", "opaque-dave");
+  assert.equal(m.json.messages.filter((x) => x.text === "sent twice by a retry").length, 1);
+});
+
+await test("auth log lines carry only the outcome and the duration (no token, no user id)", async () => {
+  assert.ok(logs.length >= 6);
+  for (const l of logs) assert.deepEqual(Object.keys(JSON.parse(l)).sort(), ["evt", "ms", "outcome"]);
+  const all = logs.join("");
+  for (const secret of ["opaque-dave", "opaque-erin", "auth-user-123", "dave@example"]) assert.ok(!all.includes(secret), secret);
+});
+console.log = realLog;
+
 console.log(`\n${passed} passed`);

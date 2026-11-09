@@ -9,10 +9,11 @@ project owner. Nothing in this file has been run against the production account.
 |---|---|
 | `deploy/cigram-admin-api/worker.js` | live `cigram-admin-api` (2026-11-08 snapshot) + `cigram-admin-api/apply_patch.py` + `subhub_providers.js` |
 | `deploy/cigram-ads-api/worker.js` | live `cigram-ads-api` (same snapshot) + `cigram-ads-api/apply_patch.py` |
+| `deploy/sigram-channels-api/worker.js` | live `sigram-channels-api` + `sigram-channels-api/apply_patch.py` (18.3: conditional GET for `/channels`) |
 | `deploy/SHA256SUMS`, `deploy/LIVE-SOURCE-SHA256.txt` | hashes of the bundles and of the live sources they were built from |
 
-Both bundles were built by `./build_deploy.sh <live admin worker.js> <live ads worker.js>`, which also runs every test
-(`tests/admin_subhub_test.mjs` 30 tests, `tests/ads_support_test.mjs` 11 tests). The patches refuse to apply when the live
+All three bundles were built by `./build_deploy.sh <live admin worker.js> <live ads worker.js> <live channels worker.js>`, which also runs every test
+(`tests/admin_subhub_test.mjs` 31, `tests/ads_support_test.mjs` 23, `tests/channels_conditional_test.mjs` 6). The patches refuse to apply when the live
 code differs from the snapshot, so rerun the script against the code that is live on the day you deploy.
 
 ## 1. Before deploying
@@ -73,3 +74,13 @@ run one deliberately from the app on a short file, with an approved limit, and c
 ## 6. Rollback
 Workers → the Worker → Deployments → select the previous version → *Rollback*. The new R2 objects (`subhub/…`) are additive and
 can stay; no existing object is modified by the patches.
+
+
+## 7. 18.3 additions (what changed in the Workers and what to check after deploying)
+| Worker | Change | Check after deploying |
+|---|---|---|
+| `cigram-ads-api` | **Chat authentication.** `verifyUser` answered `401 invalid_token` (shown in the app as «انتهت الجلسة، سجّل الدخول من جديد») for EVERY failure of its call to the auth Worker's `/me`: a timeout, a 429, a 5xx, a wrong service binding, a malformed answer. Now only a real 401/403 from `/me` is a session expiry; anything else is `503 auth_unavailable` (the app keeps the session and retries), a 6 s timeout bounds the call, a token verified in the last 30 minutes keeps being served during an outage (revocation cannot be observed then; it is checked again as soon as `/me` answers), and one log line per failure (`{"evt":"chat_auth","outcome":"invalid|unavailable|grace","ms":…}`: no token, no user id). | In Cloudflare → `cigram-ads-api` → Logs: look for `chat_auth` lines with `outcome":"unavailable"`. If they appear on every request, the Worker cannot reach `https://cigram-auth-api.wwq-mixtv.workers.dev/me`: bind the auth Worker as a **service binding named `AUTH_API`** (a Worker-to-Worker `fetch` over `workers.dev` is refused by Cloudflare) or fix `AUTH_VERIFY_URL`. |
+| `cigram-admin-api` | `GET /movies` is conditional: `ETag` (already sent) + `If-None-Match` → `304` without a body (R2 `onlyIf`), `cache-control: no-cache`. | `curl -sI $A/movies` shows `etag`; repeat with `-H 'If-None-Match: <that etag>'` → `HTTP 304`. The app sends the header from 18.2.1 on; older apps are unaffected (they get the full body as before). |
+| `sigram-channels-api` | `GET /channels` is conditional the same way (`etag`, `cache-control: no-cache` instead of `no-store`, 304). | same check on `/channels`. A channel added in the admin app is visible at once (clients revalidate on every request). |
+
+Without these Worker changes the app still works exactly as before: it sends `If-None-Match`, a Worker that ignores it answers 200, and the app then skips its parse / index / save / redraw work when the body hash is unchanged.

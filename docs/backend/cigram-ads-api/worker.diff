@@ -1,5 +1,5 @@
 --- /tmp/claude-0/-home-user-cigram/00ab601a-7933-5033-89f1-28dfc3bf56ee/scratchpad/backend_live/ads-api/worker.js	2026-11-08 16:36:39.706486859 +0000
-+++ /home/user/cigram/docs/backend/deploy/cigram-ads-api/worker.js	2026-11-08 22:53:06.326714509 +0000
++++ /home/user/cigram/docs/backend/deploy/cigram-ads-api/worker.js	2026-11-09 09:48:12.500283048 +0000
 @@ -1583,10 +1583,41 @@
    return body;
  }
@@ -43,7 +43,63 @@
    const ok = tok && timingSafeEqual(tok, env.ADMIN_TOKEN);
    if (!ok) {
      const r = await coreStub(env).fetch("https://core/op", { method: "POST", body: JSON.stringify({ op: "authfail", p: { ip } }) });
-@@ -2211,6 +2242,7 @@
+@@ -1633,28 +1664,50 @@
+ __name(pickUser, "pickUser");
+ async function verifyUser(request, env) {
+   const tok = bearerOf(request);
+-  if (!tok || tok.length > 4e3) fail(401, "login_required", "\u0633\u062C\u0651\u0644 \u0627\u0644\u062F\u062E\u0648\u0644 \u0623\u0648\u0644\u0627\u064B.");
++  if (!tok || tok.length > 4e3) fail(401, "login_required", "سجّل الدخول أولاً.");
+   const verifyUrl = String(env.AUTH_VERIFY_URL || "https://cigram-auth-api.wwq-mixtv.workers.dev/me").trim();
+   const ck = await sha256Hex(tok);
++  const t0 = Date.now();
+   const hit = _authCache.get(ck);
+-  if (hit && hit.exp > Date.now()) return hit.user;
++  if (hit && hit.exp > t0) return hit.user;
+   let user = null;
++  let verdict = "";   // "invalid": the auth service itself said so. "unavailable": we could not find out.
+   if (env.JWT_SECRET) {
+     const claims = await verifyJwtHS256(tok, env.JWT_SECRET);
+     if (claims) user = pickUser(claims);
+   }
+   if (!user && verifyUrl) {
++    const ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
++    const timer = ctl ? setTimeout(() => ctl.abort(), 6e3) : null;
+     try {
+       const vreq = { headers: { authorization: "Bearer " + tok, accept: "application/json" } };
++      if (ctl) vreq.signal = ctl.signal;
+       const r = env.AUTH_API && typeof env.AUTH_API.fetch === "function" ? await env.AUTH_API.fetch(verifyUrl, vreq) : await fetch(verifyUrl, vreq);
+-      if (r.ok) user = pickUser(await r.json());
++      if (r.status === 401 || r.status === 403) verdict = "invalid";
++      else if (r.ok) {
++        user = pickUser(await r.json().catch(() => null));
++        if (!user) verdict = "unavailable";   // 200 without an identity: a malformed answer, not a logout
++      } else verdict = "unavailable";         // 429, 5xx, a wrong binding / URL ...
+     } catch (e) {
++      verdict = "unavailable";
++    } finally {
++      if (timer) clearTimeout(timer);
++    }
++  }
++  if (!user) {
++    const grace = verdict !== "invalid" && hit && t0 - hit.at < 30 * 6e4;
++    // route-level log only: no token, no user id
++    console.log(JSON.stringify({ evt: "chat_auth", outcome: grace ? "grace" : verdict === "invalid" ? "invalid" : "unavailable", ms: Date.now() - t0 }));
++    if (grace) return hit.user;
++    if (verdict === "invalid") {
++      _authCache.delete(ck);
++      fail(401, "invalid_token", "انتهت الجلسة. سجّل الدخول من جديد.");
+     }
++    fail(503, "auth_unavailable", "تعذر التحقق من الجلسة الآن. حاول بعد قليل — حسابك ما زال مسجّلاً.");
+   }
+-  if (!user) fail(401, "invalid_token", "\u0627\u0646\u062A\u0647\u062A \u0627\u0644\u062C\u0644\u0633\u0629. \u0633\u062C\u0651\u0644 \u0627\u0644\u062F\u062E\u0648\u0644 \u0645\u0646 \u062C\u062F\u064A\u062F.");
+   user.key = await userKeyOf(user.id, user.email);
+   if (_authCache.size > 2e3) _authCache.clear();
+-  _authCache.set(ck, { user, exp: Date.now() + 5 * 6e4 });
++  _authCache.set(ck, { user, exp: t0 + 5 * 6e4, at: t0 });
+   return user;
+ }
+ __name(verifyUser, "verifyUser");
+@@ -2211,6 +2264,7 @@
        if (!this.socketsOf("u:" + a.thread).filter((w) => w !== ws).length) this.push("a", { t: "presence", thread: a.thread, side: "user", online: false, last_seen: Date.now() });
      } else {
        const others = this.socketsOf("a").filter((w) => w !== ws);
@@ -51,7 +107,7 @@
        if (!others.length) {
          try {
            for (const w of this.state.getWebSockets()) {
-@@ -2231,7 +2263,7 @@
+@@ -2231,7 +2285,7 @@
      await this.webSocketClose(ws);
    }
    // ------------------------------------------------------------ push (webhook) — اختياري
@@ -60,7 +116,7 @@
      const url = this.env.PUSH_WEBHOOK_URL;
      if (!url) return;
      const k = side + ":" + thread;
-@@ -2239,7 +2271,7 @@
+@@ -2239,7 +2293,7 @@
      if (Date.now() - last < 3e4) return;
      this._lastPush.set(k, Date.now());
      if (this._lastPush.size > 3e3) this._lastPush.clear();
@@ -69,7 +125,7 @@
      });
      try {
        this.state.waitUntil(p);
-@@ -2257,6 +2289,7 @@
+@@ -2257,6 +2311,7 @@
          adv_id: info && info.adv_id || "",
          name: cleanText(info && info.name, 100) || "\u0645\u0639\u0644\u0646",
          email: cleanText(info && info.email, 120),
@@ -77,7 +133,7 @@
          status: "open",
          tags: [],
          assigned: "",
-@@ -2301,16 +2334,22 @@
+@@ -2301,16 +2356,22 @@
        unread_admin: t.unread_admin,
        unread_user: t.unread_user,
        user_seen: t.user_seen,
@@ -101,7 +157,7 @@
      if (p.name && t.name !== cleanText(p.name, 100) && t.name === "\u0645\u0639\u0644\u0646") {
        t.name = cleanText(p.name, 100);
        await this.s.put("t:" + id, t);
-@@ -2327,7 +2366,8 @@
+@@ -2327,7 +2388,8 @@
        if (p.unread && !t.unread_admin) continue;
        if (p.tag && (t.tags || []).indexOf(p.tag) < 0) continue;
        if (p.assigned && t.assigned !== p.assigned) continue;
@@ -111,7 +167,7 @@
        out.push(t);
      }
      out.sort((a, b) => (b.unread_admin ? 1 : 0) - (a.unread_admin ? 1 : 0) || b.last_ts - a.last_ts);
-@@ -2371,6 +2411,7 @@
+@@ -2371,6 +2433,7 @@
        return v;
      }
      v.text = d.text || "";
@@ -119,7 +175,7 @@
      if (d.reply) v.reply = d.reply;
      if (d.quote) v.quote = Object.assign({}, d.quote, { state: m.qstate || "pending" });
      if (d.order) v.order = d.order;
-@@ -2412,7 +2453,11 @@
+@@ -2412,7 +2475,11 @@
      }
      if (upto) this.emit(thread, { t: "delivered", thread, upto, ts: now }, [other]);
      const out = [];
@@ -132,7 +188,7 @@
      return { messages: out, thread: side === "admin" ? await this.threadView(t) : this.userThreadView(t), admin_online: this.adminOnline() };
    }
    async op_send(p) {
-@@ -2436,6 +2481,7 @@
+@@ -2436,6 +2503,7 @@
      const text = cleanText(p.text, CHAT_MAX_TEXT);
      const payload = {};
      if (text) payload.text = text;
@@ -140,7 +196,7 @@
      if (p.reply_to) {
        const rs = int(p.reply_to, 1, 1e12, 0);
        const rm = rs ? await this.s.get("m:" + thread + ":" + padSeq(rs)) : null;
-@@ -2488,7 +2534,8 @@
+@@ -2488,7 +2556,8 @@
        delivered: (side === "user" ? this.adminOnline() : this.userOnline(thread)) ? now : 0,
        read: 0,
        deleted: false,
@@ -150,7 +206,7 @@
      };
      await this.s.put("m:" + thread + ":" + padSeq(m.seq), m);
      if (clientId) await this.s.put("cid:" + thread + ":" + clientId, m.seq);
-@@ -2524,7 +2571,7 @@
+@@ -2524,7 +2593,7 @@
      this.emit(thread, { t: "msg", thread, msg: view, thread_info: tv }, side === "user" ? ["admin", "user"] : ["user", "admin"]);
      if (auto) this.emit(thread, { t: "msg", thread, msg: auto, thread_info: tv }, ["admin", "user"]);
      if (side === "user" && !this.adminOnline()) await this.notify("admin", thread, "\u0631\u0633\u0627\u0644\u0629 \u062C\u062F\u064A\u062F\u0629 \u0645\u0646 \u0645\u0639\u0644\u0646", t.name + ": " + previewOf(type, payload.text));
@@ -159,7 +215,7 @@
      return { message: view, auto, thread: side === "admin" ? tv : this.userThreadView(t) };
    }
    async op_read(p) {
-@@ -2714,7 +2761,8 @@
+@@ -2714,7 +2783,8 @@
      let state = "offline";
      if (this.adminOnline()) state = "online";
      else if (st && !inWorkHours(st, now)) state = "off_hours";
@@ -169,7 +225,7 @@
    }
    async op_templates_get() {
      return { templates: await this.s.get("templates") || [] };
-@@ -2921,7 +2969,9 @@
+@@ -2921,7 +2991,9 @@
      } catch (e) {
      }
      if (!env.CHAT_HUB) return reply({ ok: true, state: "offline" });
@@ -180,7 +236,7 @@
    }
    let m;
    if (method === "GET" && (m = /^\/chat\/media\/([A-Za-z0-9]+)$/.exec(path))) return serveChatMedia(request, env, m[1], url);
-@@ -2929,7 +2979,7 @@
+@@ -2929,7 +3001,7 @@
      const user = await verifyUser(request, env);
      const thread = user.key;
      if (method === "GET" && path === "/chat/ws") return chatWsForward(request, env, "user", thread);
@@ -189,7 +245,7 @@
      if (method === "GET" && path === "/chat/messages") {
        return reply(await hub(env, "messages", { thread, side: "user", after: q("after"), before: q("before"), limit: q("limit"), origin }));
      }
-@@ -2938,8 +2988,9 @@
+@@ -2938,8 +3010,9 @@
        return reply({ ok: true, unread: t.thread.unread, last_seq: t.thread.last_seq });
      }
      if (method === "POST" && path === "/chat/send") {
@@ -200,7 +256,7 @@
        let adv = null;
        try {
          adv = (await core(env, "adv_ensure_user", { user_key: thread, name: userNameOf(user), email: user.email, origin })).advertiser;
-@@ -2962,28 +3013,33 @@
+@@ -2962,28 +3035,33 @@
        return reply({ ok: true });
      }
      if (path.indexOf("/chat/upload/") === 0) {
