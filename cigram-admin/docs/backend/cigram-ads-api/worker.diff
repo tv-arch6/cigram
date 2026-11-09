@@ -1,0 +1,296 @@
+--- live-snapshots/cigram-ads-api.live.js	2026-11-09 11:47:21.261490579 +0000
++++ /home/user/cigram/docs/backend/deploy/cigram-ads-api/worker.js	2026-11-09 11:47:27.411183770 +0000
+@@ -1583,10 +1583,41 @@
+   return body;
+ }
+ __name(core, "core");
++// 18.2 — developer accounts (optional secret DEVELOPERS = JSON array):
++//   [{"id":"dev_1","name":"حسن","avatar":"https://…","role":"owner"|"support","token_sha256":"<hex sha256 of that developer's token>"}]
++// ADMIN_TOKEN keeps working as the owner account (DEV_NAME / DEV_AVATAR give its public name / picture).
++function devPublic(dev) {
++  return dev ? { name: cleanText(dev.name, 40), avatar: /^https:\/\//.test(String(dev.avatar || "")) ? String(dev.avatar).slice(0, 400) : "" } : null;
++}
++__name(devPublic, "devPublic");
++async function developerOf(request, env) {
++  const tok = bearerOf(request);
++  if (!tok) return null;
++  if (env.ADMIN_TOKEN && timingSafeEqual(tok, env.ADMIN_TOKEN)) {
++    return { id: "owner", name: cleanText(env.DEV_NAME, 40) || "\u0645\u0637\u0648\u0651\u0631 Cigram", avatar: String(env.DEV_AVATAR || ""), role: "owner" };
++  }
++  if (!env.DEVELOPERS) return null;
++  let list = [];
++  try { list = JSON.parse(env.DEVELOPERS); } catch (e) { return null; }
++  const h = await sha256Hex(tok);
++  for (const d of Array.isArray(list) ? list : []) {
++    if (d && d.token_sha256 && timingSafeEqual(h, String(d.token_sha256).toLowerCase())) {
++      return { id: cleanText(d.id, 40), name: cleanText(d.name, 40), avatar: String(d.avatar || ""), role: d.role === "owner" ? "owner" : "support" };
++    }
++  }
++  return null;
++}
++__name(developerOf, "developerOf");
++function requireRole(dev, role) {
++  if (role === "owner" && (!dev || dev.role !== "owner")) fail(403, "forbidden_role", "\u0647\u0630\u0627 \u0627\u0644\u0625\u062C\u0631\u0627\u0621 \u0644\u0644\u0645\u0627\u0644\u0643 \u0641\u0642\u0637.");
++}
++__name(requireRole, "requireRole");
+ async function requireAdmin(request, env) {
+   const ip = clientIp(request);
+   const tok = bearerOf(request);
+-  if (!env.ADMIN_TOKEN) fail(503, "admin_not_configured", "\u0644\u0645 \u064A\u064F\u0636\u0628\u0637 ADMIN_TOKEN \u0641\u064A \u0627\u0644\u0640 Worker.");
++  const dev18 = await developerOf(request, env);
++  if (dev18) return dev18;
++  if (!env.ADMIN_TOKEN && !env.DEVELOPERS) fail(503, "admin_not_configured", "\u0644\u0645 \u064A\u064F\u0636\u0628\u0637 ADMIN_TOKEN \u0641\u064A \u0627\u0644\u0640 Worker.");
+   const ok = tok && timingSafeEqual(tok, env.ADMIN_TOKEN);
+   if (!ok) {
+     const r = await coreStub(env).fetch("https://core/op", { method: "POST", body: JSON.stringify({ op: "authfail", p: { ip } }) });
+@@ -1633,28 +1664,50 @@
+ __name(pickUser, "pickUser");
+ async function verifyUser(request, env) {
+   const tok = bearerOf(request);
+-  if (!tok || tok.length > 4e3) fail(401, "login_required", "\u0633\u062C\u0651\u0644 \u0627\u0644\u062F\u062E\u0648\u0644 \u0623\u0648\u0644\u0627\u064B.");
++  if (!tok || tok.length > 4e3) fail(401, "login_required", "سجّل الدخول أولاً.");
+   const verifyUrl = String(env.AUTH_VERIFY_URL || "https://cigram-auth-api.wwq-mixtv.workers.dev/me").trim();
+   const ck = await sha256Hex(tok);
++  const t0 = Date.now();
+   const hit = _authCache.get(ck);
+-  if (hit && hit.exp > Date.now()) return hit.user;
++  if (hit && hit.exp > t0) return hit.user;
+   let user = null;
++  let verdict = "";   // "invalid": the auth service itself said so. "unavailable": we could not find out.
+   if (env.JWT_SECRET) {
+     const claims = await verifyJwtHS256(tok, env.JWT_SECRET);
+     if (claims) user = pickUser(claims);
+   }
+   if (!user && verifyUrl) {
++    const ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
++    const timer = ctl ? setTimeout(() => ctl.abort(), 6e3) : null;
+     try {
+       const vreq = { headers: { authorization: "Bearer " + tok, accept: "application/json" } };
++      if (ctl) vreq.signal = ctl.signal;
+       const r = env.AUTH_API && typeof env.AUTH_API.fetch === "function" ? await env.AUTH_API.fetch(verifyUrl, vreq) : await fetch(verifyUrl, vreq);
+-      if (r.ok) user = pickUser(await r.json());
++      if (r.status === 401 || r.status === 403) verdict = "invalid";
++      else if (r.ok) {
++        user = pickUser(await r.json().catch(() => null));
++        if (!user) verdict = "unavailable";   // 200 without an identity: a malformed answer, not a logout
++      } else verdict = "unavailable";         // 429, 5xx, a wrong binding / URL ...
+     } catch (e) {
++      verdict = "unavailable";
++    } finally {
++      if (timer) clearTimeout(timer);
++    }
++  }
++  if (!user) {
++    const grace = verdict !== "invalid" && hit && t0 - hit.at < 30 * 6e4;
++    // route-level log only: no token, no user id
++    console.log(JSON.stringify({ evt: "chat_auth", outcome: grace ? "grace" : verdict === "invalid" ? "invalid" : "unavailable", ms: Date.now() - t0 }));
++    if (grace) return hit.user;
++    if (verdict === "invalid") {
++      _authCache.delete(ck);
++      fail(401, "invalid_token", "انتهت الجلسة. سجّل الدخول من جديد.");
+     }
++    fail(503, "auth_unavailable", "تعذر التحقق من الجلسة الآن. حاول بعد قليل — حسابك ما زال مسجّلاً.");
+   }
+-  if (!user) fail(401, "invalid_token", "\u0627\u0646\u062A\u0647\u062A \u0627\u0644\u062C\u0644\u0633\u0629. \u0633\u062C\u0651\u0644 \u0627\u0644\u062F\u062E\u0648\u0644 \u0645\u0646 \u062C\u062F\u064A\u062F.");
+   user.key = await userKeyOf(user.id, user.email);
+   if (_authCache.size > 2e3) _authCache.clear();
+-  _authCache.set(ck, { user, exp: Date.now() + 5 * 6e4 });
++  _authCache.set(ck, { user, exp: t0 + 5 * 6e4, at: t0 });
+   return user;
+ }
+ __name(verifyUser, "verifyUser");
+@@ -2211,6 +2264,7 @@
+       if (!this.socketsOf("u:" + a.thread).filter((w) => w !== ws).length) this.push("a", { t: "presence", thread: a.thread, side: "user", online: false, last_seen: Date.now() });
+     } else {
+       const others = this.socketsOf("a").filter((w) => w !== ws);
++      try { await this.s.put("admin_last_active", Date.now()); } catch (e) { }
+       if (!others.length) {
+         try {
+           for (const w of this.state.getWebSockets()) {
+@@ -2231,7 +2285,7 @@
+     await this.webSocketClose(ws);
+   }
+   // ------------------------------------------------------------ push (webhook) — اختياري
+-  async notify(side, thread, title, body) {
++  async notify(side, thread, title, body, extra) {
+     const url = this.env.PUSH_WEBHOOK_URL;
+     if (!url) return;
+     const k = side + ":" + thread;
+@@ -2239,7 +2293,7 @@
+     if (Date.now() - last < 3e4) return;
+     this._lastPush.set(k, Date.now());
+     if (this._lastPush.size > 3e3) this._lastPush.clear();
+-    const p = fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "chat", to: side, user_key: side === "user" ? thread : void 0, thread, title, body }) }).catch(() => {
++    const p = fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(Object.assign({ kind: "chat", to: side, user_key: side === "user" ? thread : void 0, thread, title, body }, extra || {})) }).catch(() => {
+     });
+     try {
+       this.state.waitUntil(p);
+@@ -2257,6 +2311,7 @@
+         adv_id: info && info.adv_id || "",
+         name: cleanText(info && info.name, 100) || "\u0645\u0639\u0644\u0646",
+         email: cleanText(info && info.email, 120),
++        uid: cleanText(info && info.uid, 120),
+         status: "open",
+         tags: [],
+         assigned: "",
+@@ -2301,16 +2356,22 @@
+       unread_admin: t.unread_admin,
+       unread_user: t.unread_user,
+       user_seen: t.user_seen,
++      user_id: t.uid || "",
+       online: this.userOnline(t.id)
+     };
+   }
+   userThreadView(t) {
+-    return { id: t.id, status: t.status, last_seq: t.last_seq, unread: t.unread_user, banned: !!t.banned, created: t.created };
++    // 18.2: no internal id in anything the user receives
++    return { status: t.status, last_seq: t.last_seq, unread: t.unread_user, banned: !!t.banned, created: t.created };
+   }
+   async op_thread_open(p) {
+     const id = cleanText(p.user_key, 120);
+     if (!id) fail(400, "invalid_user", "\u0645\u0633\u062A\u062E\u062F\u0645 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D.");
+     const t = await this.getThread(id, true, p);
++    if (p.uid && !t.uid) {
++      t.uid = cleanText(p.uid, 120);
++      await this.s.put("t:" + id, t);
++    }
+     if (p.name && t.name !== cleanText(p.name, 100) && t.name === "\u0645\u0639\u0644\u0646") {
+       t.name = cleanText(p.name, 100);
+       await this.s.put("t:" + id, t);
+@@ -2327,7 +2388,8 @@
+       if (p.unread && !t.unread_admin) continue;
+       if (p.tag && (t.tags || []).indexOf(p.tag) < 0) continue;
+       if (p.assigned && t.assigned !== p.assigned) continue;
+-      if (q && (t.name || "").toLowerCase().indexOf(q) < 0 && (t.email || "").toLowerCase().indexOf(q) < 0 && (t.tags || []).join(" ").toLowerCase().indexOf(q) < 0) continue;
++      if (q && (t.name || "").toLowerCase().indexOf(q) < 0 && (t.email || "").toLowerCase().indexOf(q) < 0 && (t.tags || []).join(" ").toLowerCase().indexOf(q) < 0
++        && String(t.id || "").toLowerCase().indexOf(q) < 0 && String(t.uid || "").toLowerCase().indexOf(q) < 0) continue;
+       out.push(t);
+     }
+     out.sort((a, b) => (b.unread_admin ? 1 : 0) - (a.unread_admin ? 1 : 0) || b.last_ts - a.last_ts);
+@@ -2371,6 +2433,7 @@
+       return v;
+     }
+     v.text = d.text || "";
++    if (d.dev) v.dev = { name: cleanText(d.dev.name, 40), avatar: String(d.dev.avatar || "") };
+     if (d.reply) v.reply = d.reply;
+     if (d.quote) v.quote = Object.assign({}, d.quote, { state: m.qstate || "pending" });
+     if (d.order) v.order = d.order;
+@@ -2412,7 +2475,11 @@
+     }
+     if (upto) this.emit(thread, { t: "delivered", thread, upto, ts: now }, [other]);
+     const out = [];
+-    for (const m of rows) out.push(await this.viewMsg(m, p.origin));
++    for (const m of rows) {
++      const v = await this.viewMsg(m, p.origin);
++      if (side === "admin" && m.dev_id) v.dev_id = m.dev_id;
++      out.push(v);
++    }
+     return { messages: out, thread: side === "admin" ? await this.threadView(t) : this.userThreadView(t), admin_online: this.adminOnline() };
+   }
+   async op_send(p) {
+@@ -2436,6 +2503,7 @@
+     const text = cleanText(p.text, CHAT_MAX_TEXT);
+     const payload = {};
+     if (text) payload.text = text;
++    if (side === "admin" && p.dev && typeof p.dev === "object") payload.dev = { name: cleanText(p.dev.name, 40), avatar: String(p.dev.avatar || "").slice(0, 400) };
+     if (p.reply_to) {
+       const rs = int(p.reply_to, 1, 1e12, 0);
+       const rm = rs ? await this.s.get("m:" + thread + ":" + padSeq(rs)) : null;
+@@ -2488,7 +2556,8 @@
+       delivered: (side === "user" ? this.adminOnline() : this.userOnline(thread)) ? now : 0,
+       read: 0,
+       deleted: false,
+-      qstate: type === "quote" ? "pending" : void 0
++      qstate: type === "quote" ? "pending" : void 0,
++      dev_id: side === "admin" ? cleanText(p.dev_id, 40) : void 0
+     };
+     await this.s.put("m:" + thread + ":" + padSeq(m.seq), m);
+     if (clientId) await this.s.put("cid:" + thread + ":" + clientId, m.seq);
+@@ -2524,7 +2593,7 @@
+     this.emit(thread, { t: "msg", thread, msg: view, thread_info: tv }, side === "user" ? ["admin", "user"] : ["user", "admin"]);
+     if (auto) this.emit(thread, { t: "msg", thread, msg: auto, thread_info: tv }, ["admin", "user"]);
+     if (side === "user" && !this.adminOnline()) await this.notify("admin", thread, "\u0631\u0633\u0627\u0644\u0629 \u062C\u062F\u064A\u062F\u0629 \u0645\u0646 \u0645\u0639\u0644\u0646", t.name + ": " + previewOf(type, payload.text));
+-    if (side === "admin" && !this.userOnline(thread)) await this.notify("user", thread, "\u0631\u0633\u0627\u0644\u0629 \u0645\u0646 \u0625\u062F\u0627\u0631\u0629 Cigram", previewOf(type, payload.text));
++    if (side === "admin" && !this.userOnline(thread)) await this.notify("user", thread, payload.dev && payload.dev.name || "Cigram", previewOf(type, payload.text), { dev_name: payload.dev && payload.dev.name || "", ts: String(now) });
+     return { message: view, auto, thread: side === "admin" ? tv : this.userThreadView(t) };
+   }
+   async op_read(p) {
+@@ -2714,7 +2783,8 @@
+     let state = "offline";
+     if (this.adminOnline()) state = "online";
+     else if (st && !inWorkHours(st, now)) state = "off_hours";
+-    return { state };
++    const last = this.adminOnline() ? now : (await this.s.get("admin_last_active")) || 0;
++    return { state, last_active: last };
+   }
+   async op_templates_get() {
+     return { templates: await this.s.get("templates") || [] };
+@@ -2921,7 +2991,9 @@
+     } catch (e) {
+     }
+     if (!env.CHAT_HUB) return reply({ ok: true, state: "offline" });
+-    return reply(await hub(env, "presence", { settings: st && { hours: st.hours } }));
++    const pr = await hub(env, "presence", { settings: st && { hours: st.hours } });
++    pr.developer = { name: cleanText(env.DEV_NAME, 40) || "\u0645\u0637\u0648\u0651\u0631 Cigram", avatar: /^https:\/\//.test(String(env.DEV_AVATAR || "")) ? String(env.DEV_AVATAR) : "" };
++    return reply(pr);
+   }
+   let m;
+   if (method === "GET" && (m = /^\/chat\/media\/([A-Za-z0-9]+)$/.exec(path))) return serveChatMedia(request, env, m[1], url);
+@@ -2929,7 +3001,7 @@
+     const user = await verifyUser(request, env);
+     const thread = user.key;
+     if (method === "GET" && path === "/chat/ws") return chatWsForward(request, env, "user", thread);
+-    if (method === "GET" && path === "/chat/thread") return reply(await hub(env, "thread_open", { user_key: thread, name: userNameOf(user), email: user.email }));
++    if (method === "GET" && path === "/chat/thread") return reply(await hub(env, "thread_open", { user_key: thread, name: userNameOf(user), email: user.email, uid: user.id }));
+     if (method === "GET" && path === "/chat/messages") {
+       return reply(await hub(env, "messages", { thread, side: "user", after: q("after"), before: q("before"), limit: q("limit"), origin }));
+     }
+@@ -2938,8 +3010,9 @@
+       return reply({ ok: true, unread: t.thread.unread, last_seq: t.thread.last_seq });
+     }
+     if (method === "POST" && path === "/chat/send") {
+-      await requireConsent(env, thread);
+       const body = await readJson(request, 12e3);
++      // 18.2: private support messages do not need the advertising consent; an advertising ORDER still does
++      if (body && body.type === "order") await requireConsent(env, thread);
+       let adv = null;
+       try {
+         adv = (await core(env, "adv_ensure_user", { user_key: thread, name: userNameOf(user), email: user.email, origin })).advertiser;
+@@ -2962,28 +3035,33 @@
+       return reply({ ok: true });
+     }
+     if (path.indexOf("/chat/upload/") === 0) {
+-      await requireConsent(env, thread);
+       const r = await chatUploadRoutes(request, env, url, path.slice("/chat/upload".length), method, { side: "user", thread });
+       if (r) return r;
+     }
+     return null;
+   }
+   if (path.indexOf("/admin/chat/") === 0) {
+-    await requireAdmin(request, env);
++    const dev = await requireAdmin(request, env);
+     const sub = path.slice("/admin/chat".length);
++    // 18.2 roles: "support" developers read / answer / archive; destructive or account-level actions are owner-only
++    if (["/purge", "/delete-message", "/convert-order", "/export"].indexOf(sub) >= 0 || (sub === "/templates" && method === "POST")) requireRole(dev, "owner");
+     if (method === "GET" && sub === "/ws") return chatWsForward(request, env, "admin", "");
+     if (method === "GET" && sub === "/threads") return reply(await hub(env, "threads_list", { q: q("q"), status: q("status"), unread: q("unread") === "1", tag: q("tag"), assigned: q("assigned"), archived: q("archived") === "1", limit: q("limit") }));
+     if (method === "GET" && sub === "/unread") return reply(await hub(env, "unread_total", {}));
+     if (method === "GET" && sub === "/messages") return reply(await hub(env, "messages", { thread: q("thread"), side: "admin", after: q("after"), before: q("before"), limit: q("limit"), origin }));
+     if (method === "POST" && sub === "/send") {
+       const body = await readJson(request, 12e3);
+-      return reply(await hub(env, "send", Object.assign({}, body, { side: "admin", origin })));
++      return reply(await hub(env, "send", Object.assign({}, body, { side: "admin", origin, dev: devPublic(dev), dev_id: dev && dev.id || "" })));
+     }
+     if (method === "POST" && sub === "/read") {
+       const body = await readJson(request, 1e3);
+       return reply(await hub(env, "read", { thread: body.thread, side: "admin", upto: body.upto }));
+     }
+-    if (method === "POST" && sub === "/thread") return reply(await hub(env, "thread_update", await readJson(request, 8e3)));
++    if (method === "POST" && sub === "/thread") {
++      const tb = await readJson(request, 8e3);
++      if (tb && tb.banned !== void 0) requireRole(dev, "owner");
++      return reply(await hub(env, "thread_update", tb));
++    }
+     if (method === "POST" && sub === "/delete-message") return reply(await hub(env, "delete_msg", await readJson(request, 1e3)));
+     if (method === "POST" && sub === "/purge") {
+       const body = await readJson(request, 1e3);

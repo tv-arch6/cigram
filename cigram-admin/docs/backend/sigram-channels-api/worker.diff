@@ -1,0 +1,40 @@
+--- live-snapshots/sigram-channels-api.live.js	2026-11-09 11:47:21.262821843 +0000
++++ /home/user/cigram/docs/backend/deploy/sigram-channels-api/worker.js	2026-11-09 11:47:27.427946336 +0000
+@@ -246,6 +246,28 @@
+   return json({ ok: true, message: "تم حذف القناة", category: categoryObject.name, channel, image_deleted: imageDeleted });
+ }
+ 
++// 18.3 — conditional GET for the public list (see apply_patch.py)
++async function handleList(request, env) {
++  const object = await env.CHANNELS_BUCKET.get(JSON_KEY, { onlyIf: request.headers });
++  if (!object) return json(await readDatabase(env));   // nothing saved yet: the same defaults as before
++  const etag = object.httpEtag || "";
++  const headers = Object.assign(
++    { "content-type": "application/json; charset=UTF-8", "cache-control": "no-cache", "access-control-expose-headers": "ETag" },
++    etag ? { etag } : {},
++    CORS
++  );
++  if (object.body === undefined) return new Response(null, { status: 304, headers });   // If-None-Match matched: not modified
++  let parsed;
++  try {
++    parsed = JSON.parse(await object.text());
++  } catch {
++    parsed = { categories: [] };
++  }
++  if (!Array.isArray(parsed.categories)) parsed.categories = [];
++  parsed.ok = true;
++  return new Response(JSON.stringify(parsed, null, 2), { status: 200, headers });
++}
++
+ // ------------------------------------------------------------------- router
+ 
+ export default {
+@@ -255,7 +277,7 @@
+ 
+       if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+ 
+-      if (request.method === "GET" && url.pathname === "/channels") return json(await readDatabase(env));
++      if (request.method === "GET" && url.pathname === "/channels") return await handleList(request, env);
+       if (request.method === "POST" && url.pathname === "/channels/add") return await handleAdd(request, env);
+       if (request.method === "POST" && url.pathname === "/channels/update") return await handleUpdate(request, env);
+       if (request.method === "POST" && url.pathname === "/channels/delete") return await handleDelete(request, env);
