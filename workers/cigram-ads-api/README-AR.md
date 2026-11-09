@@ -1,3 +1,12 @@
+# أسرع حل لمشكلة الدردشة (بدون نشر كود)
+تطبيق 18.5.0 أثبت أن حسابك سليم عند خدمة الحسابات، وأن Worker الدردشة الحي (نسخة 2026-10-07) هو الذي يرفض التحقق.
+جرّب أولاً: لوحة Cloudflare → `cigram-ads-api` → Settings → Bindings → Add → **Service binding**
+- Variable name: **`AUTH_API`** (بهذا الاسم تماماً)
+- Service: **`cigram-auth-api`**
+ثم احفظ. وتأكد في Variables أن `AUTH_VERIFY_URL` غير موجود أو يساوي تماماً `https://cigram-auth-api.wwq-mixtv.workers.dev/me`.
+افتح الدردشة من جديد (التطبيق يعيد المحاولة وحده). إن رفضت اللوحة الحفظ بنفس خطأ exports فاتبع الأسفل (wrangler).
+
+---
 # نشر cigram-ads-api (حل خطأ Durable Object exports)
 
 ## ما الخطأ؟

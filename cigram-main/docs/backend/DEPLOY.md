@@ -164,6 +164,13 @@ Two causes were found, one in each place; both are handled, one needs a dashboar
 2. **App (fixed in main 18.5.0)**: a refused token is now checked against the auth service itself from the phone before the app says «sign in again». If the auth service accepts it, the chat
    shows «خدمة الدعم لا تستطيع التحقق من حسابك الآن», keeps the queue and retries; only a token the auth service also rejects (and that cannot be renewed) is reported as expired.
 
+### 9.3a Quick fix for the chat that needs NO code deploy (found 2026-11-09 from a phone screenshot)
+The main app 18.5.0 asks the auth service itself before it says «session expired». On a signed-in account it showed «خدمة الدعم لا تستطيع التحقق من حسابك الآن» — i.e. the auth service
+accepted the token and the **live chat Worker (still the 2026-10-07 build) refused it**: the Worker's own call to the auth Worker fails (its code answers 401 for every failure of that call).
+The old code already uses a service binding when one exists: dashboard → `cigram-ads-api` → Settings → Bindings → Add → *Service binding* → variable name **exactly `AUTH_API`** →
+service `cigram-auth-api` → save. Also check Variables: `AUTH_VERIFY_URL` must be absent or exactly `https://cigram-auth-api.wwq-mixtv.workers.dev/me`. Then reopen the chat (the app retries by itself).
+If the dashboard answers with the Durable Object `exports` error (§9 / `workers/cigram-ads-api/README-AR.md`), deploy through wrangler instead; the config there already contains this binding.
+
 ### 9.4 Not verified in production
 The ads Worker is not reachable from the build environment (egress policy: 403), so nothing in §9 ran against the real Worker: the Worker code passes `tests/ads_chat19_test.mjs` (24) and the two
 older ads suites against the real code with in-memory Durable Object storage, in-memory R2 and a fake FCM endpoint; a real FCM delivery, a real R2 backup and the real auth path are unproven until you run
