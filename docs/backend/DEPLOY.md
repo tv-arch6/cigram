@@ -84,3 +84,36 @@ can stay; no existing object is modified by the patches.
 | `sigram-channels-api` | `GET /channels` is conditional the same way (`etag`, `cache-control: no-cache` instead of `no-store`, 304). | same check on `/channels`. A channel added in the admin app is visible at once (clients revalidate on every request). |
 
 Without these Worker changes the app still works exactly as before: it sends `If-None-Match`, a Worker that ignores it answers 200, and the app then skips its parse / index / save / redraw work when the body hash is unchanged.
+
+
+## 8. 18.4 additions — the incremental catalogue (cigram-admin-api). READY, NOT DEPLOYED
+Verified against the live account on 2026-11-09: `cigram-admin-api` (modified 2026-11-07) is byte-identical to `live-snapshots/cigram-admin-api.live.js`
+(sha256 `0e9c06a1…`), `cigram-ads-api` and `cigram-auth-api` match their snapshots, `sigram-channels-api` was last modified 2026-10-17. The build
+environment can only READ the account, so nothing below has run against production.
+
+| Route (public GET) | Answer |
+|---|---|
+| `/catalog/manifest` | `{ok, schema:1, rev, records, ids_digest, etag, updated_at, window_from, max_page}`, `ETag` + `If-None-Match` → `304`, `cache-control: no-cache`. |
+| `/catalog/changes?since=<rev>[&max=<n>]` | `{ok, from, to, more, upserts:[record], removed:[id], head:{rev,records,ids_digest,etag}}`, or `{ok, full:true, reason}` when the client must download `/movies` (older than the log window, a reset revision, ahead of the server). |
+
+How it works: after every `mutateMovies()` write (the only writer of `movies.json`) the Worker hashes the records, compares them with the previous
+revision (`catalog/hashes.json`) and appends exactly the changed records to a bounded log (`catalog/feed.json`: ≤120 revisions, ≤1.5 MB). A bulk change of more
+than 300 records, lost hashes or a write that cannot be proven becomes a **reset** revision: older clients download `/movies` once (never a data loss).
+A `movies.json` changed outside the Worker (dashboard upload) is reconciled by the same diff once it is older than 20 s. A failure of the feed never fails the
+admin's write and never touches `movies.json`. Measured with the real 5.2 MB catalogue (Node): bootstrap 74 ms once, afterwards 0.5 ms per manifest, a one-record
+change is a 1.2 KB answer instead of 5.2 MB.
+
+Deploy (no new binding, variable or secret): dashboard → `cigram-admin-api` → *Edit code* → replace with `deploy/cigram-admin-api/worker.js` → *Deploy*.
+Rollback: *Deployments* → previous version, or paste `live-snapshots/cigram-admin-api.live.js`. The two R2 objects are additive and may stay.
+Smoke test:
+```
+A=https://cigram-admin-api.wwq-mixtv.workers.dev
+curl -si $A/catalog/manifest | head -20                                  # 200, etag, rev, records equals the number of records of /movies
+curl -s  "$A/catalog/changes?since=<rev from above>"                     # upserts [] / removed [] while nothing changed
+# edit one title in the admin app, then:  /catalog/manifest rev is +1 and /catalog/changes?since=<old rev> contains exactly that record
+```
+Before the deploy the apps keep working: they get `404` for the two routes and use `/movies` (with `If-None-Match`) exactly as before.
+CPU: the first manifest request parses `movies.json` once (74 ms in Node for 5.2 MB; Workers Free allows 10 ms of CPU per request: if that plan is in use the
+bootstrap should be triggered by one admin write on a paid plan, or the feed left off).
+`_admin_private/` is publicly readable while no `ADMIN_BUCKET` is bound (§4): the feed holds only records that are public in `movies.json`.
+Not production-tested: the Worker change, the app's delta path against a real Worker, `ETag` behaviour behind Cloudflare's CDN.

@@ -43,6 +43,11 @@ final class CigramCatalogSync {
     static final String L_REV = "rev";
     static final String L_RECORDS = "records";
     static final String L_LAST_FULL = "last_full_at";
+    /** 1 = the last delta left a structural finding (see CigramCatalogDoctor): the next run on an unmetered network verifies with a full download. */
+    static final String L_AUDIT_NOW = "audit_now";
+    static final String S_DOCTOR = "doctor";
+    /** A structural finding schedules at most one verifying full download per this period. */
+    static final long AUDIT_MIN_GAP_MS = 6L * 3600L * 1000L;
 
     static final String PATH_MANIFEST = "/catalog/manifest";
     static final String PATH_CHANGES = "/catalog/changes";
@@ -181,6 +186,7 @@ final class CigramCatalogSync {
 
     private static boolean auditDue(CigramCatalogStore.Snapshot local, Config cfg) {
         if (cfg.metered) return false;                                   // never spend mobile data on a self-check
+        if (local.num(L_AUDIT_NOW) == 1L) return true;                   // the doctor found something a full snapshot could repair
         long last = local.num(L_LAST_FULL);
         return last > 0L && cfg.now - last > cfg.auditMs;
     }
@@ -272,6 +278,8 @@ final class CigramCatalogSync {
 
         Prepared prepared = pipe.prepare(merged.json);
         Map<String, String> s = new HashMap<String, String>(local.strings);
+        CigramCatalogDoctor.Report rep = CigramCatalogDoctor.diagnose(merged.json);
+        if (rep != null) s.put(S_DOCTOR, rep.toJson());
         s.put(S_IDS_DIGEST, merged.idsDigest);
         s.put(S_MANIFEST_ETAG, man.httpEtag);
         s.put(S_DISPLAY_HASH, CigramCatalogStore.sha256(prepared.display.getBytes(CigramCatalogStore.UTF8)));
@@ -280,6 +288,8 @@ final class CigramCatalogSync {
         l.put(L_RECORDS, (long) merged.records);
         l.put(L_UPDATED, cfg.now);
         l.put(L_SEARCH_UPDATED, cfg.now);
+        // structural finding (orphan episode, duplicate id ...): ask the server's full snapshot to confirm, at most every 6 h
+        l.put(L_AUDIT_NOW, rep != null && rep.structural() && cfg.now - local.num(L_LAST_FULL) > AUDIT_MIN_GAP_MS ? 1L : 0L);
         CigramCatalogStore.Result res = store.commit(prepared.display, prepared.index, s, l);
         if (!res.ok) return failure(acc, "commit_" + res.reason, 0, true);
         Pending.clear(store);
@@ -320,6 +330,7 @@ final class CigramCatalogSync {
             if (man != null && !local.str(S_ETAG).isEmpty() && local.str(S_ETAG).equals(man.fileEtag)) {
                 l.put(L_REV, man.rev); l.put(L_RECORDS, (long) man.records); s.put(S_IDS_DIGEST, man.idsDigest); s.put(S_MANIFEST_ETAG, man.httpEtag);
             }
+            l.put(L_AUDIT_NOW, 0L);
             l.put(L_UPDATED, cfg.now); l.put(L_SEARCH_UPDATED, cfg.now); l.put(L_LAST_FULL, cfg.now);
             store.updateProps(s, l);
             Outcome o = Outcome.of(Kind.UP_TO_DATE, "full_304");
@@ -340,6 +351,7 @@ final class CigramCatalogSync {
         if (local != null && rawHash.equals(local.str(S_RAW_HASH))) {                   // identical body: nothing to parse, index or redraw
             s.put(S_ETAG, f.etag.isEmpty() ? local.str(S_ETAG) : f.etag);
             adopt(s, l, man, facts, local.num(L_REV));
+            l.put(L_AUDIT_NOW, 0L);
             l.put(L_UPDATED, cfg.now); l.put(L_SEARCH_UPDATED, cfg.now); l.put(L_LAST_FULL, cfg.now);
             store.updateProps(s, l);
             Outcome o = Outcome.of(Kind.UP_TO_DATE, "same_body");
@@ -351,8 +363,11 @@ final class CigramCatalogSync {
         s.put(S_ETAG, f.etag);
         s.put(S_RAW_HASH, rawHash);
         s.put(S_DISPLAY_HASH, displayHash);
+        CigramCatalogDoctor.Report rep = CigramCatalogDoctor.diagnose(body);
+        if (rep != null) s.put(S_DOCTOR, rep.toJson());
         adopt(s, l, man, facts, 0L);
         l.put(L_RECORDS, (long) facts.records);
+        l.put(L_AUDIT_NOW, 0L);                                   // the server's own snapshot is the authority: the question is answered
         l.put(L_UPDATED, cfg.now); l.put(L_SEARCH_UPDATED, cfg.now); l.put(L_LAST_FULL, cfg.now);
         CigramCatalogStore.Result res = store.commit(prepared.display, prepared.index, s, l);
         if (!res.ok) return failure(acc, "commit_" + res.reason, 0, true);

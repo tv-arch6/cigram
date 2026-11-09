@@ -34,6 +34,8 @@ final class CgHttp {
         long ms;
         String contentType = "";
         long contentLength = -1;
+        /** 18.4: the response's ETag header (conditional requests / catalogue sync). */
+        String etag = "";
 
         boolean ok() {
             if (error != null) return false;
@@ -172,6 +174,8 @@ final class CgHttp {
             if (auth && res.code == 401) unauthorized = true;
             res.contentType = c.getContentType() == null ? "" : c.getContentType();
             res.contentLength = c.getContentLength();
+            String gotEtag = c.getHeaderField("ETag");
+            res.etag = gotEtag == null ? "" : gotEtag.trim();
             InputStream in = res.code >= 400 ? c.getErrorStream() : c.getInputStream();
             res.body = readAll(in, 24 * 1024 * 1024);
             String trimmed = res.body.trim();

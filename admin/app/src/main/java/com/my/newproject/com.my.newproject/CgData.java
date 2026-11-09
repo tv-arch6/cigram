@@ -73,7 +73,7 @@ final class CgData {
     long loadedAt = System.currentTimeMillis();
     boolean fromCache = false;    // true when this snapshot came from the on-device cache, not a fresh server answer
 
-    private static final String CACHE_KEY = "data_cache_v1";
+    static final String CACHE_KEY = "data_cache_v1";
     private static final String CACHE_AT_KEY = "data_cache_at_v1";
 
     private final HashMap<String, JSONObject> byId = new HashMap<String, JSONObject>();
@@ -175,9 +175,10 @@ final class CgData {
 
     private static CgData fetchSnapshot(final Activity a) throws Exception {
                 final CgHttp.Res[] r = new CgHttp.Res[3];
+                final CgCatalog.Result[] cat = new CgCatalog.Result[1];
                 Thread t0 = new Thread(new Runnable() {
                     @Override
-                    public void run() { r[0] = CgHttp.apiGet("/movies"); }
+                    public void run() { cat[0] = CgCatalog.load(a, false); }     // 18.4: manifest / delta / full, saved copy is never replaced by nothing
                 });
                 Thread t1 = new Thread(new Runnable() {
                     @Override
@@ -194,22 +195,16 @@ final class CgData {
                 t1.join();
                 t2.join();
 
-                // movies.json failed outright (no connection, DNS, server down, ...): fall back to whatever
-                // the device last saw rather than leaving the admin with a blank "تعذر التحميل" screen. The
-                // GET itself already retried transient hiccups inside CgHttp.apiGet, so a failure here means
-                // the server genuinely could not be reached this time.
-                if (r[0].error != null || r[0].code < 200 || r[0].code >= 300) {
+                // 18.4: the catalogue comes from CgCatalog (saved copy + incremental sync). An answer with no records, a malformed one,
+                // a timeout or a server error NEVER becomes an empty catalogue: the last saved copy is shown, marked as such.
+                JSONArray arr = cat[0] == null ? null : cat[0].items;
+                if (arr == null || arr.length() == 0 || (cat[0] != null && cat[0].stale)) {
                     CgData cached = loadCache(a);
                     if (cached != null) return cached;
-                    throw new Exception("تعذر تحميل movies.json: " + r[0].message());
+                    if (arr == null || arr.length() == 0) {
+                        throw new Exception("تعذر تحميل movies.json: " + (cat[0] == null ? "" : cat[0].reason));
+                    }
                 }
-                JSONArray arr = r[0].array;
-                if (arr == null && r[0].json != null) {
-                    arr = r[0].json.optJSONArray("movies");
-                    if (arr == null) arr = r[0].json.optJSONArray("items");
-                    if (arr == null) arr = r[0].json.optJSONArray("data");
-                }
-                if (arr == null) arr = new JSONArray();
 
                 CgData d = new CgData();
                 for (int i = 0; i < arr.length(); i++) {
@@ -236,8 +231,13 @@ final class CgData {
                         }
                     }
                 }
+                if (cat[0] != null && cat[0].stale) {
+                    d.fromCache = true;
+                    d.loadedAt = System.currentTimeMillis();
+                    d.warning = "تعذر الوصول إلى الخادم الآن — هذه بيانات محفوظة من آخر تحميل ناجح. اضغط «تحديث» لإعادة المحاولة.";
+                }
                 d.reindex();
-                saveCache(a, d);
+                if (!d.fromCache) saveCache(a, d);
                 return d;
     }
 
@@ -249,11 +249,9 @@ final class CgData {
     private static JSONObject toCacheJson(CgData d) {
         JSONObject o = new JSONObject();
         try {
-            JSONArray items = new JSONArray();
-            for (int i = 0; i < d.items.size(); i++) items.put(d.items.get(i));
             JSONArray secs = new JSONArray();
             for (int i = 0; i < d.sections.size(); i++) secs.put(d.sections.get(i));
-            o.put("items", items);
+            // 18.4: the records are NOT stored here any more (one 6 MB preferences string): they live in CgCatalog's crash-safe store
             o.put("meta", d.meta);
             o.put("sections", secs);
             o.put("sectionsDerived", d.sectionsDerived);
@@ -290,11 +288,13 @@ final class CgData {
             long at = sp.getLong(CACHE_AT_KEY, 0);
             JSONObject o = new JSONObject(raw);
             CgData d = new CgData();
-            JSONArray items = o.optJSONArray("items");
+            JSONArray items = CgCatalog.saved(a);                       // 18.4: the durable copy
+            if (items == null) items = o.optJSONArray("items");         // an older version's cache, not migrated yet
             for (int i = 0; items != null && i < items.length(); i++) {
                 JSONObject it = items.optJSONObject(i);
                 if (it != null) d.items.add(it);
             }
+            if (d.items.isEmpty()) return null;                         // nothing to show: the caller reports the real error
             JSONObject meta = o.optJSONObject("meta");
             if (meta != null) d.meta = meta;
             JSONArray secs = o.optJSONArray("sections");
