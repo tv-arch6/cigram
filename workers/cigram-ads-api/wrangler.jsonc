@@ -1,0 +1,43 @@
+// cigram-ads-api — deploy with `npx wrangler deploy` (Workers Builds from GitHub, or from a computer).
+// WHY THIS FILE: Cloudflare now reconciles the Durable Object classes of a Worker against an `exports` declaration. The dashboard
+// "Edit code -> Deploy" button sends none, so it fails with:
+//   [provisioned_class_missing_from_config] class 'AdsCore' / 'ChatHub' ... is not declared in `exports`
+// Declaring the two classes below keeps the existing namespaces (and every stored conversation) exactly as they are.
+//
+// CHECK BEFORE THE FIRST DEPLOY (Worker -> Settings -> Bindings): this file REPLACES the bindings of the Worker with the ones listed here.
+// Every binding that exists today and is missing here would be removed, and a wrong bucket would send chat files to another bucket.
+// Secrets are never deleted by a deploy; `keep_vars` keeps the plain-text variables that were typed in the dashboard.
+{
+  "name": "cigram-ads-api",
+  "main": "index.js",
+  "compatibility_date": "2026-10-06",
+  "workers_dev": true,
+  "keep_vars": true,
+  "observability": { "enabled": true },
+
+  "durable_objects": {
+    "bindings": [
+      { "name": "ADS_CORE", "class_name": "AdsCore" },
+      { "name": "CHAT_HUB", "class_name": "ChatHub" }
+    ]
+  },
+  // `sqlite` is what Cloudflare suggests and what new classes use. If the deploy answers `storage_type_mismatch`, these two classes were
+  // created with key-value storage: change both values to "legacy-kv" (the data is never touched by this declaration).
+  "exports": {
+    "AdsCore": { "type": "durable-object", "storage": "sqlite" },
+    "ChatHub": { "type": "durable-object", "storage": "sqlite" }
+  },
+
+  "r2_buckets": [
+    { "binding": "ADS_BUCKET", "bucket_name": "cigram-ads" },
+    { "binding": "MOVIES_BUCKET", "bucket_name": "movies" }
+  ],
+
+  // The chat's session check calls the auth Worker through this service binding (a plain fetch between two workers.dev Workers can fail).
+  "services": [
+    { "binding": "AUTH_API", "service": "cigram-auth-api" }
+  ]
+
+  // Optional read-only fallback for the session check (19.0): bind the auth database and uncomment, with the real id from Storage & databases -> D1.
+  // "d1_databases": [ { "binding": "AUTH_DB", "database_name": "cigram-users", "database_id": "<id of cigram-users>" } ]
+}
