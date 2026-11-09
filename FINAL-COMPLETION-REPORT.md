@@ -120,7 +120,7 @@ So the workload is **5,035, not ~3,800**. The app's Subtitle Center computes the
 | Edge-to-edge on Android 15+ (system bars + keyboard insets) | Main: existing central `CigramSystemBars` (pads systemBars + cutout + IME, players excluded) **VERIFIED by code**; support chat now sets its own black window background and light bar icons · Admin: `CgSystemBars` added, dormant at targetSdk 34 · **NOT PRODUCTION-TESTED on any Android 15/16 device** (only an API 31 image is installed) | |
 | Fullscreen player behaviour kept | **VERIFIED** (players are excluded from the handler; no player code changed except subtitles) | |
 | Arabic RTL | **VERIFIED** (emulator screenshots of every new screen) | |
-| ViewBinding dependencies and generated classes | **VERIFIED** (68 generated binding classes in main, 2 in admin; both build; the duplicate `androidx.viewbinding.ViewBinding` stub that broke release builds was removed in 18.2) | |
+| ViewBinding dependencies and generated classes | **VERIFIED** (68 generated binding classes in main, 2 in admin; both build; the `androidx.viewbinding.ViewBinding` stub is kept for CodeAssist and skipped by Gradle's compiler: removing it in 18.2 had broken CodeAssist builds) | |
 | Compile errors resolved; both apps build | **VERIFIED** (§6) | |
 
 ### Phase 7 — Security and release readiness

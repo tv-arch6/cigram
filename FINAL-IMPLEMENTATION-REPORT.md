@@ -171,7 +171,7 @@ Backend (both archives, `docs/backend/`): patches, diffs, Node tests, README.
 ## 4. Modified files
 Main: `app/build.gradle.kts` (testImplementation junit only), `PlayerActivity`, `CigramTogetherPlayerActivity`,
 `AdsChatActivity`, `AdsIcons` (+SMILE), `AdsNotifier`, `CigramPush`, `AdvertiseActivity` (redirect), `CigramAccountDash`,
-`CigramAccountUI`, `CigramTvPanels`, `MyAdsActivity`; deleted `androidx/viewbinding/ViewBinding.java` (duplicate class).
+`CigramAccountUI`, `CigramTvPanels`, `MyAdsActivity`; `androidx/viewbinding/ViewBinding.java` was deleted here and **restored** in the final fix (CodeAssist needs it; Gradle skips it).
 Admin: `AndroidManifest.xml`, `AdChatActivity`, `AdInboxActivity`, `AdSettingsActivity`, `CgPlayerActivity`,
 `CgSubtitleUpload`, `DxSectionActivity`, `WnActivity`, `WnDetailActivity`, `WnLogic`, test `WnLogicTest`.
 Full list: `git diff --name-status 3c042e2 HEAD`.
@@ -261,7 +261,7 @@ Release outputs are **unsigned** (no keystore is in the project or the archives;
 | | `bundleRelease` | `app-release.aab` | 5,984,905 |
 
 Pre-existing build fix: release variants of the main app failed at `mergeDex` in the supplied project
-(`androidx.viewbinding.ViewBinding` defined twice); the duplicate stub was removed (see the main app notes).
+(`androidx.viewbinding.ViewBinding` defined twice); the duplicate stub was first removed; **corrected later**: it is back for CodeAssist and excluded from Gradle's compiler (see the main app notes §4).
 
 Archive check: both archives are rebuilt from the git tree (tracked files only: no `build/`, no `local.properties`, no
 keystore), tested with `unzip -t`, extracted into new empty directories and built there on their own; the result and the

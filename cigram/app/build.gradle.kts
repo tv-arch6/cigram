@@ -69,3 +69,13 @@ dependencies {
     // 18.2: JVM unit tests for CigramSubtitleHub / CigramSubtitleSyncEngine (test classpath only, not in the APK)
     testImplementation("junit:junit:4.13.2")
 }
+
+// ViewBinding base interface, one definition per tool:
+//  * CodeAssist (the owner's IDE) generates the binding classes but does NOT add the ViewBinding library, so the tiny
+//    interface in src/main/java/androidx/viewbinding/ViewBinding.java is what its compiler resolves.
+//  * Gradle (viewBinding = true) adds the official library, which already contains the same class; compiling the stub as
+//    well made release builds fail at mergeDex ("androidx.viewbinding.ViewBinding is defined multiple times").
+// So Gradle's compiler skips the stub, CodeAssist keeps it. Do not delete the stub file.
+tasks.withType<JavaCompile>().configureEach {
+    exclude("androidx/viewbinding/ViewBinding.java")
+}

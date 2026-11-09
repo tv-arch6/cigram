@@ -46,9 +46,16 @@ that needs the viewer's delay or an approved correction in the admin — the app
   asks explicitly (nothing is accepted on the user's behalf). The backend patch in `docs/backend` removes that for
   support messages.
 
-## 4. Build fix
-Release variants failed at `mergeDex` in the supplied project (`androidx.viewbinding.ViewBinding` defined twice: a stub
-in `src/main/java` + the official library). The stub was removed (identical interface). Debug was not affected.
+## 4. Build fix (ViewBinding stub) — corrected after the first delivery
+Release variants failed at `mergeDex` under **Gradle** (`androidx.viewbinding.ViewBinding` defined twice: the stub in
+`src/main/java` + the official library that `viewBinding = true` adds). The first 18.2 delivery deleted the stub, which fixed
+Gradle but **broke CodeAssist** (the owner's IDE generates the binding classes but does not add the library, so
+`androidx.viewbinding cannot be resolved` on every `*Binding` class). Final state:
+- `app/src/main/java/androidx/viewbinding/ViewBinding.java` is back, byte-for-byte the original (CodeAssist resolves it);
+- `app/build.gradle.kts` makes **Gradle's** Java compiler skip that one file (`tasks.withType<JavaCompile>().configureEach { exclude(...) }`),
+  so Gradle uses the official library and there is no duplicate class. Do not delete the stub.
+Verified: Gradle `assemblePlay/DirectDebug`, `assemblePlay/DirectRelease`, `bundlePlayRelease` build; a CodeAssist-style binding class fails to
+compile without the stub with the same two errors and compiles with it.
 
 ## 5. Tests
 `app/src/test/java/com/Cigram/subhub/SubHubTest.java` — 24 JVM tests (`gradle testPlayDebugUnitTest`).
