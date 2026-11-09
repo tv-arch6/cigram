@@ -172,10 +172,14 @@ Arabic RTL, navigation routes and the CodeAssist `androidx.viewbinding.ViewBindi
 ## 12. Tests and builds
 | Suite | Result |
 |---|---|
-| Main app JVM tests | **73 passed, 0 failed, 0 skipped** — `SubHubTest` 24, `AdsAuthGatewayTest` 13, `AdaptiveBufferingTest` 12, `CigramRefreshPolicyTest` 12, `CigramSectionDedupeTest` 9 (two of them run on the real catalogue: `CIGRAM_CATALOGUE=<movies.json>`; skipped when absent), `NetworkClientSecurityTest` 3 |
-| Admin app JVM tests | **57 tests, 0 failed, 1 skipped (pre-existing)** — `SubHubTest` 24, `AdminSubHubTest` 12, `CgFlightTest` 5, `WnLogicTest` 15, `WnPipelineTest` 1 (skipped by its own source) |
+| Main app JVM tests | **Without a catalogue file (what you get from the ZIP): 73 tests, 71 passed, 0 failed, 2 skipped.** The two skipped tests are `CigramSectionDedupeTest.realCatalogue*`: they need a real `movies.json`, which is production data and is not in the archive (`CIGRAM_CATALOGUE=<movies.json>` or `-Dcigram.catalogue=…`). **With the real catalogue (5.37 MB copy of the live file, run once): 73 passed, 0 failed, 0 skipped.** Per class: `SubHubTest` 24, `AdsAuthGatewayTest` 13, `AdaptiveBufferingTest` 12, `CigramRefreshPolicyTest` 12, `CigramSectionDedupeTest` 9, `NetworkClientSecurityTest` 3 |
+| Admin app JVM tests | **57 tests, 56 passed, 0 failed, 1 skipped (pre-existing)** — `SubHubTest` 24, `AdminSubHubTest` 12, `CgFlightTest` 5, `WnLogicTest` 15, `WnPipelineTest` 1 (skipped by its own source) |
 | Worker tests (Node, real Worker code, stubs) | `admin_subhub_test` **31**, `ads_support_test` **23**, `channels_conditional_test` **6** — all passed; `deploy/SHA256SUMS` verified |
 | Clean builds | main: `testPlayDebugUnitTest assemblePlayDebug assemblePlayRelease assembleDirectDebug assembleDirectRelease bundlePlayRelease` → exit 0; admin: `testDebugUnitTest assembleDebug assembleRelease bundleRelease` → exit 0 |
+
+How these numbers were obtained: the archives were extracted into fresh directories and built there. `gradle.properties` enables the Gradle build cache, which can replay
+test results from an earlier run of identical inputs, so the test counts above come from a second run with `--no-build-cache` (`cleanTest… test…`), i.e. the tests were really executed.
+Nothing was run against a deployed Worker.
 
 Artifact sizes (bytes): main `app-play-debug` 20,973,354 · `app-play-release-unsigned` 17,767,685 · `app-direct-debug` 20,974,530 · `app-direct-release-unsigned` 17,768,681 ·
 `app-play-release.aab` 16,662,417 · admin `app-debug` 8,136,383 · `app-release-unsigned` 6,591,696 · `app-release.aab` 5,997,083.
