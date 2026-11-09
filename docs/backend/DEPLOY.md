@@ -100,8 +100,10 @@ How it works: after every `mutateMovies()` write (the only writer of `movies.jso
 revision (`catalog/hashes.json`) and appends exactly the changed records to a bounded log (`catalog/feed.json`: ≤120 revisions, ≤1.5 MB). A bulk change of more
 than 300 records, lost hashes or a write that cannot be proven becomes a **reset** revision: older clients download `/movies` once (never a data loss).
 A `movies.json` changed outside the Worker (dashboard upload) is reconciled by the same diff once it is older than 20 s. A failure of the feed never fails the
-admin's write and never touches `movies.json`. Measured with the real 5.2 MB catalogue (Node): bootstrap 74 ms once, afterwards 0.5 ms per manifest, a one-record
-change is a 1.2 KB answer instead of 5.2 MB.
+admin's write and never touches `movies.json`. Measured with the real catalogue (5.2 MB of JSON, 5,592 records; on the wire `/movies` is gzip-compressed to ~0.56 MB): in Node the bootstrap takes
+74 ms once, afterwards 0.5 ms per manifest; a one-record change is a 1.2 KB answer instead of the whole file.
+Live check 2026-11-09: `GET /movies` answers `etag: W/"…"` (Cloudflare weakens the R2 ETag when it compresses), `cache-control: no-store`, ignores
+`If-None-Match` (200), and `/catalog/manifest` is 404 (not deployed). The feed answers compare ETags after stripping `W/`.
 
 Deploy (no new binding, variable or secret): dashboard → `cigram-admin-api` → *Edit code* → replace with `deploy/cigram-admin-api/worker.js` → *Deploy*.
 Rollback: *Deployments* → previous version, or paste `live-snapshots/cigram-admin-api.live.js`. The two R2 objects are additive and may stay.
