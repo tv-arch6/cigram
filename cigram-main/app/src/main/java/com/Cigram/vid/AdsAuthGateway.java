@@ -34,7 +34,7 @@ final class AdsAuthGateway {
         /** True when sealed credentials exist, i.e. a renewal can work at all. */
         boolean canRenew();
         /** 19.0: asks the auth service itself (not the chat Worker) whether {@code token} is a live session. Blocking. */
-        default Probe probe(String token) { return Probe.UNKNOWN; }
+        Probe probe(String token);
     }
 
     /** The auth service's verdict about a token. UNKNOWN = it could not be asked (offline, timeout, 5xx). */

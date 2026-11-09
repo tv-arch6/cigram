@@ -18,9 +18,9 @@ public class AdPushTest {
     @Test public void aBuildWithoutFirebaseSettingsNamesEveryMissingItem() {
         List<String> m = AdFcm.missing("", "", "cigram", "");
         assertEquals(3, m.size());
-        assertTrue(m.get(0).startsWith("ADMIN_FCM_APP_ID"));
-        assertTrue(m.get(1).startsWith("ADMIN_FCM_API_KEY"));
-        assertTrue(m.get(2).startsWith("ADMIN_FCM_SENDER_ID"));
+        assertTrue(m.get(0).startsWith("AdFcmConfig.APP_ID"));
+        assertTrue(m.get(1).startsWith("AdFcmConfig.API_KEY"));
+        assertTrue(m.get(2).startsWith("AdFcmConfig.SENDER_ID"));
     }
 
     @Test public void aMalformedAppIdIsNotAccepted() {

@@ -229,7 +229,7 @@ public class AdInboxActivity extends CgBase {
         b.append("هذا الجهاز\n• Firebase في هذا البناء: ").append(AdFcm.configured() ? "مُفعّل" : "غير مُفعّل").append("\n• تسجيل الجهاز: ").append(AdFcm.localState(this)).append("\n");
         java.util.List<String> miss = AdFcm.missing();
         if (!miss.isEmpty()) {
-            b.append("ينقص لتفعيله (خصائص Gradle):\n");
+            b.append("ينقص لتفعيله (ثوابت الملف AdFcmConfig.java):\n");
             for (String m : miss) b.append("  - ").append(m).append("\n");
             b.append("حتى ذلك الحين: فحص دوري كل 15 دقيقة فقط.\n");
         }

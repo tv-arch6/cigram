@@ -143,8 +143,7 @@ reports exactly what it lacks (`GET /admin/chat/push-status`, `GET /admin/chat/b
   *Firebase Cloud Messaging API Admin*). Optional `FCM_PROJECT_ID` (default: `project_id` of the JSON). Optional legacy webhook: `PUSH_WEBHOOK_URL` + `PUSH_WEBHOOK_KEY`
   (sent as `Authorization: Bearer`). I could not read which secrets are set (the connector shows names and code, not bindings or secrets): check them in the dashboard.
 * **Admin app**: the Android app `com.my.newproject` must exist in the Firebase project `cigram` (Project settings → Your apps → Add app → Android). Then build the
-  admin app with the four PUBLIC settings in `~/.gradle/gradle.properties` (or `-P`): `ADMIN_FCM_APP_ID` (`1:<sender>:android:<hash>`), `ADMIN_FCM_API_KEY`,
-  `ADMIN_FCM_PROJECT_ID` (default `cigram`), `ADMIN_FCM_SENDER_ID`. Without them the admin build still works and keeps the 15-minute poll; the inbox menu
+  admin app with the two missing PUBLIC settings typed into `AdFcmConfig.java` (`APP_ID` = `mobilesdk_app_id` of `google-services.json`, `API_KEY` = `current_key`; `PROJECT_ID` and `SENDER_ID` are already filled with the values the main app uses). Plain Java constants on purpose: the phone IDE (CodeAssist) cannot evaluate Gradle expressions. Left empty, the admin build still works and keeps the 15-minute poll; the inbox menu
   «الإشعارات والنسخ» lists exactly which setting is missing. The main app needs nothing new (its Firebase settings are already in `CigramFcm`).
 * Check: open the admin inbox → «الإشعارات والنسخ»: *FCM على الخادم: مُفعّل*, *أجهزة الإدارة المسجّلة ≥ 1*. A real test = write from a user account, close the admin
   app, wait for the notification (do not trust any "test" that does not leave the Worker).

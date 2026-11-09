@@ -13,16 +13,6 @@ android {
         targetSdk = 34
         versionCode = 10
         versionName = "2.2.0"
-        // 19.0 — Firebase Cloud Messaging for the admin app (push of a new support message while the app is closed).
-        // These are the PUBLIC client settings of the Android app `com.my.newproject` registered in the Firebase project
-        // (Firebase console -> Project settings -> Your apps). They are not secrets. Put them in ~/.gradle/gradle.properties,
-        // local.properties or -P flags. Left empty, FCM stays off and the app falls back to the 15-minute poll (and says so on
-        // the notification-status screen). See docs/backend/DEPLOY.md section 9.
-        fun prop(name: String): String = ((project.findProperty(name) as String?) ?: "").replace("\"", "")
-        buildConfigField("String", "FCM_APP_ID", "\"" + prop("ADMIN_FCM_APP_ID") + "\"")
-        buildConfigField("String", "FCM_API_KEY", "\"" + prop("ADMIN_FCM_API_KEY") + "\"")
-        buildConfigField("String", "FCM_PROJECT_ID", "\"" + (prop("ADMIN_FCM_PROJECT_ID").ifEmpty { "cigram" }) + "\"")
-        buildConfigField("String", "FCM_SENDER_ID", "\"" + prop("ADMIN_FCM_SENDER_ID") + "\"")
     }
 
     buildTypes {
@@ -39,7 +29,6 @@ android {
 
     buildFeatures {
         viewBinding = true
-        buildConfig = true
     }
 }
 

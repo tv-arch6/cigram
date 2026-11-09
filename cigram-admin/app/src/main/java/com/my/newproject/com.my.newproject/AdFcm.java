@@ -18,8 +18,8 @@ import java.util.concurrent.TimeUnit;
  * 19.0 — Firebase Cloud Messaging for the admin app: a new user message reaches the phone while the app is closed.
  *
  * Firebase is created from code (the project has no google-services plugin) with the PUBLIC client settings of the Android app
- * {@code com.my.newproject} registered in the Firebase project; they come from Gradle properties ADMIN_FCM_APP_ID / _API_KEY /
- * _PROJECT_ID / _SENDER_ID (BuildConfig). When they are missing nothing is faked: {@link #missing()} names exactly what is
+ * {@code com.my.newproject} registered in the Firebase project; they are the constants of {@link AdFcmConfig}. When they are missing
+ * nothing is faked: {@link #missing()} names exactly what is
  * absent, the status screen shows it, and the 15-minute poll of {@link AdInboxNotifier} keeps running as the fallback.
  *
  * The device token is sent to the Worker with the admin token ({@code POST /admin/chat/device}); the Worker pushes a data
@@ -32,10 +32,10 @@ final class AdFcm {
 
     private AdFcm() { }
 
-    static String appId() { return BuildConfig.FCM_APP_ID == null ? "" : BuildConfig.FCM_APP_ID.trim(); }
+    static String appId() { return AdFcmConfig.APP_ID == null ? "" : AdFcmConfig.APP_ID.trim(); }
 
     static String senderId() {
-        String s = BuildConfig.FCM_SENDER_ID == null ? "" : BuildConfig.FCM_SENDER_ID.trim();
+        String s = AdFcmConfig.SENDER_ID == null ? "" : AdFcmConfig.SENDER_ID.trim();
         if (s.length() > 0) return s;
         String[] p = appId().split(":");           // "1:<sender>:android:<hash>"
         return p.length >= 2 ? p[1] : "";
@@ -44,15 +44,15 @@ final class AdFcm {
     /** What is still missing for FCM to work in this build ("" entries never appear). Pure, JVM-tested. */
     static List<String> missing(String appId, String apiKey, String projectId, String senderId) {
         ArrayList<String> m = new ArrayList<String>();
-        if (appId == null || !appId.matches("\\d+:\\d+:android:[0-9a-fA-F]+")) m.add("ADMIN_FCM_APP_ID (Firebase console > Project settings > Your apps > com.my.newproject > App ID, e.g. 1:123456789:android:abcdef)");
-        if (apiKey == null || apiKey.trim().length() < 20) m.add("ADMIN_FCM_API_KEY (the Android app's Web API key)");
-        if (projectId == null || projectId.trim().length() == 0) m.add("ADMIN_FCM_PROJECT_ID");
-        if (senderId == null || !senderId.matches("\\d+")) m.add("ADMIN_FCM_SENDER_ID (Project settings > Cloud Messaging > Sender ID)");
+        if (appId == null || !appId.matches("\\d+:\\d+:android:[0-9a-fA-F]+")) m.add("AdFcmConfig.APP_ID (Firebase console > Project settings > Your apps > com.my.newproject > App ID, e.g. 1:123456789:android:abcdef)");
+        if (apiKey == null || apiKey.trim().length() < 20) m.add("AdFcmConfig.API_KEY (the Android app's API key from google-services.json)");
+        if (projectId == null || projectId.trim().length() == 0) m.add("AdFcmConfig.PROJECT_ID");
+        if (senderId == null || !senderId.matches("\\d+")) m.add("AdFcmConfig.SENDER_ID (Project settings > Cloud Messaging > Sender ID)");
         return m;
     }
 
     static List<String> missing() {
-        return missing(appId(), BuildConfig.FCM_API_KEY, BuildConfig.FCM_PROJECT_ID, senderId());
+        return missing(appId(), AdFcmConfig.API_KEY, AdFcmConfig.PROJECT_ID, senderId());
     }
 
     static boolean configured() { return missing().isEmpty(); }
@@ -63,8 +63,8 @@ final class AdFcm {
             if (!FirebaseApp.getApps(app).isEmpty()) return true;
             FirebaseApp.initializeApp(app, new FirebaseOptions.Builder()
                     .setApplicationId(appId())
-                    .setApiKey(BuildConfig.FCM_API_KEY.trim())
-                    .setProjectId(BuildConfig.FCM_PROJECT_ID.trim())
+                    .setApiKey(AdFcmConfig.API_KEY.trim())
+                    .setProjectId(AdFcmConfig.PROJECT_ID.trim())
                     .setGcmSenderId(senderId())
                     .build());
             return true;
