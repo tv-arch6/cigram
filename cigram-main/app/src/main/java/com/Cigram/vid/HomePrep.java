@@ -90,13 +90,30 @@ final class HomePrep {
         }
     }
 
+    /** Dotted-number comparison ("18.5.0" vs "18.4.0"); non-numeric parts count as 0. */
+    static int compareVersions(String a, String b) {
+        String[] x = (a == null ? "" : a).split("[^0-9]+");
+        String[] y = (b == null ? "" : b).split("[^0-9]+");
+        for (int i = 0; i < Math.max(x.length, y.length); i++) {
+            long m = i < x.length && x[i].length() > 0 ? Long.parseLong(x[i].length() > 9 ? "999999999" : x[i]) : 0L;
+            long n = i < y.length && y[i].length() > 0 ? Long.parseLong(y[i].length() > 9 ? "999999999" : y[i]) : 0L;
+            if (m != n) return m < n ? -1 : 1;
+        }
+        return 0;
+    }
+
     /** Reads the snapshot (call off the main thread). Returns the marker string to hand to Home, or null. */
     static String loadSnapshot(android.content.Context context) {
         try {
             android.content.Context app = context.getApplicationContext();
             android.content.SharedPreferences p = app.getSharedPreferences(SNAP_PREFS, android.content.Context.MODE_PRIVATE);
             String json = p.getString("items", "");
-            if (json == null || json.length() < 10 || !versionOf(app).equals(p.getString("version", ""))) return null;
+            // 19.1: the snapshot of the PREVIOUS app version is used too (its format did not change): after every update the first start
+            // used to show the fixed rows only after the whole catalogue had been prepared (many seconds). Only a snapshot of a NEWER
+            // version than the running one is refused.
+            if (json == null || json.length() < 10) return null;
+            String savedVersion = p.getString("version", "");
+            if (savedVersion.length() > 0 && compareVersions(savedVersion, versionOf(app)) > 0) return null;
             JSONArray items = new JSONArray(json);
             if (items.length() == 0) return null;
             com.google.gson.Gson gson = new com.google.gson.Gson();

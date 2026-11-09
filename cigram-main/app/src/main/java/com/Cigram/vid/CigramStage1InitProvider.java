@@ -1306,6 +1306,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                         String snapHash = prefs.getString(KEY_JSON_HASH, "");
                         if (snapHash.length() == 0) snapHash = catalogHash(cached);
                         SectionsSnap snap = loadSectionsSnapshot(activity.getApplicationContext(), snapHash);
+                        if (snap == null) snap = loadSectionsSnapshot(activity.getApplicationContext(), snapHash, true);   // 19.1: stale beats nothing
                         if (snap != null) {
                             CigramOrder.primeClaims(cached, snap.claims);
                             synchronized (PRE_LOCK) {
@@ -1313,7 +1314,8 @@ public final class CigramStage1InitProvider extends ContentProvider {
                                 PRE_GROUPED = snap.grouped;
                                 PRE_FAILED = false;
                             }
-                            trace("snap" + snap.grouped.size());
+                            trace((snap.stale ? "snapStale" : "snap") + snap.grouped.size());
+                            if (snap.stale) refreshSectionsInBackground(activity, cached);
                         }
                     } catch (Throwable error) {
                         android.util.Log.w("CigramStage2", "sections snapshot skipped", error);
@@ -1335,6 +1337,19 @@ public final class CigramStage1InitProvider extends ContentProvider {
                     if (savedHash.length() > 0 && savedHash.equals(CATALOG_MEMORY_HASH) && !CATALOG_MEMORY_ITEMS.isEmpty()) return;
                 }
                 final long perfT0 = android.os.SystemClock.elapsedRealtime();
+                final int prio = lowerPriority();
+                try {
+                // 19.1: the saved catalogue IS the output of an earlier prepareCatalog (display JSON saved together with its hash and its
+                // search index). Every cold start prepared it AGAIN (re-parse, re-sort, re-index: ~2 s on a desktop, many seconds of one
+                // core on a phone, competing with the first frames). When the saved hash proves that `cached` is that output and the saved
+                // index is there, only the in-memory install is left. Any doubt (hash differs, no index) takes the old path.
+                String savedIndex = prefs.getString(KEY_SEARCH_JSON, "");
+                if (savedHash.length() > 0 && savedIndex != null && savedIndex.trim().startsWith("[") && savedHash.equals(catalogHash(cached))) {
+                    installCatalogInMemory(cached, savedIndex);
+                    preloadCatalogImages(activity.getApplicationContext(), savedIndex);
+                    CigramPerf.slow("catalog.warmup.fast", android.os.SystemClock.elapsedRealtime() - perfT0, 1500L);
+                    return;
+                }
                 PreparedCatalog prepared = prepareCatalog(cached);
                 String hash = catalogHash(prepared.displayJson);
                 installCatalogInMemory(prepared.displayJson, prepared.searchIndexJson);
@@ -1345,6 +1360,9 @@ public final class CigramStage1InitProvider extends ContentProvider {
                         .apply();
                 preloadCatalogImages(activity.getApplicationContext(), prepared.searchIndexJson);
                 CigramPerf.slow("catalog.warmup", android.os.SystemClock.elapsedRealtime() - perfT0, 1500L);
+                } finally {
+                    restorePriority(prio);
+                }
             }
         });
     }
@@ -1758,6 +1776,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             java.util.Arrays.asList("series_episodes_json", "episodes", "seasons", "_search_normalized"));
 
     private static final class SectionsSnap {
+        boolean stale;   // 19.1: saved for ANOTHER catalogue revision (drawn at once, then refreshed in the background)
         java.util.LinkedHashMap<String, DynamicHomeSection> grouped =
                 new java.util.LinkedHashMap<String, DynamicHomeSection>();
         java.util.HashSet<String> claims = new java.util.HashSet<String>();
@@ -1832,7 +1851,18 @@ public final class CigramStage1InitProvider extends ContentProvider {
 
     /** The saved sections for exactly this catalogue (hash), or null. Cheap: a few hundred KB. */
     private static SectionsSnap loadSectionsSnapshot(Context context, String expectedHash) {
-        if (context == null || expectedHash == null || expectedHash.length() == 0) return null;
+        return loadSectionsSnapshot(context, expectedHash, false);
+    }
+
+    /**
+     * 19.1: {@code allowStale} accepts the snapshot of an older catalogue revision. The catalogue changes many times a day (the administrator
+     * adds episodes), and every change used to invalidate the snapshot, so the next start rebuilt ALL sections from the 5.7 MB catalogue
+     * (15-23 s on a phone) before anything appeared. A slightly old Home that appears at once and is refreshed in the background is what
+     * the carousel already does.
+     */
+    private static SectionsSnap loadSectionsSnapshot(Context context, String expectedHash, boolean allowStale) {
+        if (context == null) return null;
+        if (!allowStale && (expectedHash == null || expectedHash.length() == 0)) return null;
         java.io.File file = new java.io.File(context.getFilesDir(), SECTIONS_SNAP_FILE);
         if (!file.isFile() || file.length() < 20L || file.length() > 8L * 1024L * 1024L) return null;
         java.io.DataInputStream in = null;
@@ -1841,10 +1871,12 @@ public final class CigramStage1InitProvider extends ContentProvider {
             in = new java.io.DataInputStream(new java.io.FileInputStream(file));
             in.readFully(data);
             JSONObject root = new JSONObject(new String(data, "UTF-8"));
-            if (!expectedHash.equals(root.optString("hash", ""))) return null;
+            boolean exact = expectedHash != null && expectedHash.length() > 0 && expectedHash.equals(root.optString("hash", ""));
+            if (!exact && !allowStale) return null;
             JSONArray sections = root.optJSONArray("sections");
             if (sections == null || sections.length() == 0) return null;
             SectionsSnap snap = new SectionsSnap();
+            snap.stale = !exact;
             for (int i = 0; i < sections.length(); i++) {
                 JSONObject so = sections.optJSONObject(i);
                 if (so == null) continue;
@@ -1927,7 +1959,39 @@ public final class CigramStage1InitProvider extends ContentProvider {
         final int rank;
         final int seq;
         final java.util.ArrayList<View> views = new java.util.ArrayList<View>();
+        DynamicHomeSection section;                 // 19.1: the section a placeholder will be filled with (null for the fixed rows)
+        android.widget.FrameLayout holder;
         OrderedRow(int rank, int seq) { this.rank = rank; this.seq = seq; }
+    }
+
+    /** How many sections are built in the very first pass (the first screen); the rest follow one or two per frame. */
+    private static final int EAGER_SECTIONS = 4;
+
+    /**
+     * 19.1: the sections beyond the first screen are built one or two per frame instead of all in the first frame (10+ sections with their first
+     * cards were one long main-thread stall right when Home appears). They yield to a scroll in flight and stop when the block was replaced.
+     */
+    private static void buildSectionsLater(final Activity activity, final java.util.ArrayList<DynamicHomeSection> sections,
+                                           final java.util.ArrayList<android.widget.FrameLayout> holders, final LinearLayout block) {
+        final int[] next = {0};
+        final Runnable step = new Runnable() {
+            @Override public void run() {
+                if (!isAlive(activity) || block.getParent() == null) return;          // page closed / Home re-rendered
+                if (homeBusyScrolling()) { MAIN.postDelayed(this, 90L); return; }
+                int end = Math.min(sections.size(), next[0] + 2);
+                for (; next[0] < end; next[0]++) {
+                    try {
+                        View v = makeDynamicSectionView(activity, sections.get(next[0]));
+                        if (holders != null) holders.get(next[0]).addView(v, new android.widget.FrameLayout.LayoutParams(-1, -2));
+                        else block.addView(v, new LinearLayout.LayoutParams(-1, -2));
+                    } catch (Throwable error) {
+                        android.util.Log.w("CigramStage2", "section skipped", error);
+                    }
+                }
+                if (next[0] < sections.size()) MAIN.postDelayed(this, 16L);
+            }
+        };
+        MAIN.postDelayed(step, 16L);
     }
 
     /**
@@ -1943,7 +2007,9 @@ public final class CigramStage1InitProvider extends ContentProvider {
         for (DynamicHomeSection section : sections) {
             if (section.items.isEmpty()) continue;
             OrderedRow row = new OrderedRow(plan.rank(section.id, section.name), seq++);
-            row.views.add(makeDynamicSectionView(activity, section));
+            row.section = section;
+            row.holder = new android.widget.FrameLayout(activity);      // filled now (first screen) or one frame later
+            row.views.add(row.holder);
             rows.add(row);
         }
         String[][] builtIns = {
@@ -1975,13 +2041,30 @@ public final class CigramStage1InitProvider extends ContentProvider {
                 return a.seq < b.seq ? -1 : (a.seq == b.seq ? 0 : 1);
             }
         });
+        java.util.ArrayList<DynamicHomeSection> deferred = new java.util.ArrayList<DynamicHomeSection>();
+        java.util.ArrayList<android.widget.FrameLayout> deferredHolders = new java.util.ArrayList<android.widget.FrameLayout>();
+        int built = 0;
         for (OrderedRow row : rows) {
+            if (row.section != null && row.holder != null) {
+                if (built < EAGER_SECTIONS) {
+                    try {
+                        row.holder.addView(makeDynamicSectionView(activity, row.section), new android.widget.FrameLayout.LayoutParams(-1, -2));
+                    } catch (Throwable error) {
+                        android.util.Log.w("CigramStage2", "section skipped", error);
+                    }
+                    built++;
+                } else {
+                    deferred.add(row.section);
+                    deferredHolders.add(row.holder);
+                }
+            }
             for (View v : row.views) {
                 ViewGroup.LayoutParams lp = v.getLayoutParams();
                 if (v.getParent() instanceof ViewGroup) ((ViewGroup) v.getParent()).removeView(v);
                 block.addView(v, lp != null ? lp : new LinearLayout.LayoutParams(-1, -2));
             }
         }
+        if (!deferred.isEmpty()) buildSectionsLater(activity, deferred, deferredHolders, block);
     }
 
     // Perf: parsing the whole catalogue (JSONTokener + section grouping) used to run right here on the
@@ -2005,16 +2088,15 @@ public final class CigramStage1InitProvider extends ContentProvider {
                 @Override public void run() {
                     java.util.LinkedHashMap<String, DynamicHomeSection> grouped = null;
                     boolean failed = false;
+                    final int prio = lowerPriority();
                     try {
-                        Object root = new JSONTokener(catalogJson).nextValue();
-                        grouped = new java.util.LinkedHashMap<String, DynamicHomeSection>();
-                        collectDynamicSectionContent(root, "", null, grouped, 0);
-                        addDerivedSections(root, grouped);   // 19.0: PrimeTV-style discovery rows (never over an administrator's section)
-                        saveSectionsSnapshot(activity.getApplicationContext(), catalogJson, grouped);
+                        grouped = groupedFor(activity.getApplicationContext(), catalogJson);
                     } catch (Throwable error) {
                         android.util.Log.w("CigramStage2", "background section parse failed", error);
                         grouped = null;
                         failed = true;
+                    } finally {
+                        restorePriority(prio);
                     }
                     synchronized (PRE_LOCK) {
                         PRE_JSON = catalogJson;
@@ -2136,17 +2218,22 @@ public final class CigramStage1InitProvider extends ContentProvider {
                 // fills its remaining cards in small batches inside makeDynamicSectionView, and the
                 // per-card build is now cheap (cached view ids), so this no longer freezes the first
                 // frame the way the original all-at-once build did.
+                java.util.ArrayList<DynamicHomeSection> deferred = new java.util.ArrayList<DynamicHomeSection>();
+                int built = 0;
                 for (DynamicHomeSection section : sections) {
                     if (section.items.isEmpty()) continue;
+                    if (built >= EAGER_SECTIONS) { deferred.add(section); continue; }   // 19.1: the rest follows, 1-2 per frame
                     try {
                         block.addView(
                                 makeDynamicSectionView(activity, section),
                                 new LinearLayout.LayoutParams(-1, -2)
                         );
+                        built++;
                     } catch (Throwable error) {
                         android.util.Log.w("CigramStage2", "section skipped", error);
                     }
                 }
+                if (!deferred.isEmpty()) buildSectionsLater(activity, deferred, null, block);
             }
 
             if (block.getChildCount() == 0) { RENDER_SIG = ""; return; }
@@ -2156,8 +2243,10 @@ public final class CigramStage1InitProvider extends ContentProvider {
             RENDER_SIG = renderSig;
             RENDER_ACTIVITY = new java.lang.ref.WeakReference<Activity>(activity);
             // v10.70: sections arrive softly instead of popping in
-            block.setAlpha(0f);
-            block.animate().alpha(1f).setDuration(220L).start();
+            if (existingBlock == null) {                      // first appearance only; a re-render over a visible Home must not blink
+                block.setAlpha(0f);
+                block.animate().alpha(1f).setDuration(220L).start();
+            }
 
             installNetflixTop(activity, home, sections);
 
@@ -2243,6 +2332,119 @@ public final class CigramStage1InitProvider extends ContentProvider {
         }
     }
 
+    // ---- 19.1: sections computed ONCE per catalogue revision per process, refreshed in the background, never rebuilt on a re-open
+    private static final Object GROUPED_LOCK = new Object();
+    private static int GROUPED_LEN = -1;
+    private static int GROUPED_HASH;
+    private static java.util.LinkedHashMap<String, DynamicHomeSection> GROUPED_TRIMMED;   // what the snapshot would hold: ≤80 trimmed cards per section
+
+    /** The IO pool's threads are reused: lower this one for the heavy grouping and give the old priority back afterwards. */
+    private static int lowerPriority() {
+        int old = android.os.Process.THREAD_PRIORITY_DEFAULT;
+        try {
+            old = android.os.Process.getThreadPriority(android.os.Process.myTid());
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
+        } catch (Throwable ignored) { }
+        return old;
+    }
+
+    private static void restorePriority(int old) {
+        try { android.os.Process.setThreadPriority(old); } catch (Throwable ignored) { }
+    }
+
+    /** Fresh sections for this catalogue text (full cards), saved as the snapshot and remembered (trimmed) for the next render. */
+    private static java.util.LinkedHashMap<String, DynamicHomeSection> groupedFor(Context context, String catalogJson) throws Exception {
+        java.util.LinkedHashMap<String, DynamicHomeSection> hit = groupedCacheCopy(catalogJson);
+        if (hit != null) return hit;
+        Object root = new JSONTokener(catalogJson).nextValue();
+        java.util.LinkedHashMap<String, DynamicHomeSection> grouped = new java.util.LinkedHashMap<String, DynamicHomeSection>();
+        collectDynamicSectionContent(root, "", null, grouped, 0);
+        addDerivedSections(root, grouped);   // PrimeTV-style discovery rows (never over an administrator's section)
+        saveSectionsSnapshot(context, catalogJson, grouped);
+        groupedCachePut(catalogJson, grouped);
+        return grouped;
+    }
+
+    private static java.util.LinkedHashMap<String, DynamicHomeSection> groupedCacheCopy(String catalogJson) {
+        synchronized (GROUPED_LOCK) {
+            if (GROUPED_TRIMMED == null || catalogJson == null || catalogJson.length() != GROUPED_LEN || catalogJson.hashCode() != GROUPED_HASH) return null;
+            return copyGrouped(GROUPED_TRIMMED);
+        }
+    }
+
+    private static void groupedCachePut(String catalogJson, java.util.LinkedHashMap<String, DynamicHomeSection> grouped) {
+        try {
+            java.util.LinkedHashMap<String, DynamicHomeSection> trimmed = new java.util.LinkedHashMap<String, DynamicHomeSection>();
+            for (DynamicHomeSection s : grouped.values()) {
+                if (s == null || s.items.isEmpty()) continue;
+                java.util.ArrayList<JSONObject> list = new java.util.ArrayList<JSONObject>(s.items.values());
+                if (!s.keepOrder) CigramOrder.sortJson(list);
+                DynamicHomeSection t = shell(s);
+                for (int i = 0; i < list.size() && i < SECTIONS_SNAP_ITEMS; i++) {
+                    JSONObject item = trimForSnapshot(list.get(i));
+                    String key = dynamicDisplayItemKey(item);
+                    t.items.put(key.length() == 0 ? "item:" + i : key, item);
+                }
+                trimmed.put(t.key, t);
+            }
+            synchronized (GROUPED_LOCK) {
+                GROUPED_TRIMMED = trimmed;
+                GROUPED_LEN = catalogJson.length();
+                GROUPED_HASH = catalogJson.hashCode();
+            }
+        } catch (Throwable error) {
+            android.util.Log.w("CigramStage2", "sections cache not kept", error);
+        }
+    }
+
+    private static DynamicHomeSection shell(DynamicHomeSection s) {
+        DynamicHomeSection t = new DynamicHomeSection(s.key);
+        t.id = s.id;
+        t.name = s.name;
+        t.rank = s.rank;
+        t.keepOrder = s.keepOrder;
+        t.noMore = s.noMore;
+        t.style = s.style;
+        return t;
+    }
+
+    /** The render mutates sections (admin titles, order): every render gets its own shells over the same cards. */
+    private static java.util.LinkedHashMap<String, DynamicHomeSection> copyGrouped(java.util.LinkedHashMap<String, DynamicHomeSection> src) {
+        java.util.LinkedHashMap<String, DynamicHomeSection> out = new java.util.LinkedHashMap<String, DynamicHomeSection>();
+        for (java.util.Map.Entry<String, DynamicHomeSection> e : src.entrySet()) {
+            DynamicHomeSection t = shell(e.getValue());
+            t.items.putAll(e.getValue().items);
+            out.put(e.getKey(), t);
+        }
+        return out;
+    }
+
+    /** A stale snapshot was drawn: compute the real sections at background priority and draw them (a no-op when nothing visible changed). */
+    private static void refreshSectionsInBackground(final Activity activity, final String catalogJson) {
+        IO.execute(new Runnable() {
+            @Override public void run() {
+                final int prio = lowerPriority();
+                try {
+                    java.util.LinkedHashMap<String, DynamicHomeSection> grouped = groupedFor(activity.getApplicationContext(), catalogJson);
+                    synchronized (PRE_LOCK) {
+                        PRE_JSON = catalogJson;
+                        PRE_GROUPED = grouped;
+                        PRE_FAILED = false;
+                    }
+                    MAIN.post(new Runnable() {
+                        @Override public void run() {
+                            if (isAlive(activity)) renderDynamicSections(activity, catalogJson);
+                        }
+                    });
+                } catch (Throwable error) {
+                    android.util.Log.w("CigramStage2", "background sections refresh failed", error);
+                } finally {
+                    restorePriority(prio);
+                }
+            }
+        });
+    }
+
     /** Signature of what the last render drew (and in which activity). Empty = unknown: the next render always draws. */
     private static volatile String RENDER_SIG = "";
     private static volatile java.lang.ref.WeakReference<Activity> RENDER_ACTIVITY;
@@ -2266,7 +2468,13 @@ public final class CigramStage1InitProvider extends ContentProvider {
                 String style = CigramLayoutConfig.styleFor(activity, s.id, s.name);
                 md.update(("|S|" + s.key + '|' + s.id + '|' + s.name + '|' + title + '|' + style + '|' + s.style + '|' + s.keepOrder + '|' + s.noMore
                         + '|' + s.items.size() + '|' + plan.rank(s.id, s.name)).getBytes("UTF-8"));
-                for (JSONObject item : s.items.values()) md.update(item.toString().getBytes("UTF-8"));
+                // only what a card shows (19.1: the old version hashed the whole item, episode lists included: 12 MB on the main thread)
+                for (java.util.Map.Entry<String, JSONObject> e : s.items.entrySet()) {
+                    JSONObject item = e.getValue();
+                    md.update(('|' + e.getKey() + '|' + jsonText(item, "title", "series_title", "name") + '|' + jsonText(item, "year") + '|' + jsonText(item, "imdb")
+                            + '|' + jsonText(item, "poster", "series_poster", "image") + '|' + jsonText(item, "backdrop") + '|' + jsonText(item, "quality")
+                            + '|' + jsonText(item, "type") + '|' + CigramOrder.stampHint(item)).getBytes("UTF-8"));
+                }
             }
             StringBuilder hex = new StringBuilder();
             for (byte x : md.digest()) hex.append(String.format(java.util.Locale.US, "%02x", x & 255));
@@ -2274,6 +2482,22 @@ public final class CigramStage1InitProvider extends ContentProvider {
         } catch (Throwable error) {
             return "";
         }
+    }
+
+    /**
+     * 19.1: a top-level copy (keys and values; nested values are shared, the section code only ever puts top-level keys). The grouping
+     * used to clone every record with toString() + parse several times (a stack sampler on the real catalogue put ~85% of the time there);
+     * this is ~15x cheaper and gives byte-identical results (HomeGroupingDigestTest).
+     */
+    static JSONObject shallowCopy(JSONObject source) {
+        JSONObject out = new JSONObject();
+        if (source == null) return out;
+        java.util.Iterator<String> it = source.keys();
+        while (it.hasNext()) {
+            String k = it.next();
+            try { out.put(k, source.opt(k)); } catch (Throwable ignored) { }
+        }
+        return out;
     }
 
     static boolean isDerivedId(String id) {
@@ -2300,18 +2524,52 @@ public final class CigramStage1InitProvider extends ContentProvider {
                 if (existing.name != null) names.add(existing.name);
             }
             java.util.List<CigramHomeGroups.Group> groups = CigramHomeGroups.compute(records, names);
+            // 19.1: a title that already sits in an administrator's section is REUSED (same card data, episodes included): no clone, no
+            // second pass over thousands of episode rows. Only a title that is in no section goes through addDynamicSectionItem.
+            java.util.HashMap<String, JSONObject> existingByKey = new java.util.HashMap<String, JSONObject>();
+            for (DynamicHomeSection existing : grouped.values()) {
+                if (existing == null) continue;
+                for (java.util.Map.Entry<String, JSONObject> e : existing.items.entrySet()) {
+                    if (!existingByKey.containsKey(e.getKey())) existingByKey.put(e.getKey(), e.getValue());
+                }
+            }
+            boolean needFinalize = false;
             for (CigramHomeGroups.Group g : groups) {
                 String key = "id:" + normalizeSearch(g.id);
                 if (grouped.containsKey(key)) continue;
-                for (JSONObject head : g.heads) addDynamicSectionItem(grouped, derivedCopy(head, g));
-                for (JSONObject episode : g.episodes) addDynamicSectionItem(grouped, derivedCopy(episode, g));
-                DynamicHomeSection section = grouped.get(key);
-                if (section == null) continue;
+                DynamicHomeSection section = new DynamicHomeSection(key);
+                section.id = g.id;
+                section.name = g.name;
                 section.rank = 1L;            // after every administrator section in the default order
                 section.keepOrder = true;     // best first
                 section.noMore = true;        // a discovery row has no «المزيد» page
+                grouped.put(key, section);
+                java.util.HashSet<String> missing = new java.util.HashSet<String>();
+                for (JSONObject head : g.heads) {
+                    String itemKey = dynamicDisplayItemKey(head);
+                    JSONObject have = itemKey.length() == 0 ? null : existingByKey.get(itemKey);
+                    if (have != null) {
+                        JSONObject card = shallowCopy(have);
+                        card.put("section_id", g.id);
+                        card.put("section_name", g.name);
+                        section.items.put(itemKey, card);
+                    } else {
+                        addDynamicSectionItem(grouped, derivedCopy(head, g));
+                        if (itemKey.length() > 0) missing.add(itemKey);
+                    }
+                }
+                if (!missing.isEmpty()) {
+                    for (JSONObject episode : g.episodes) {
+                        if (missing.contains(dynamicDisplayItemKey(episode))) addDynamicSectionItem(grouped, derivedCopy(episode, g));
+                    }
+                    needFinalize = true;
+                    section.rank = 1L;
+                    section.keepOrder = true;
+                    section.noMore = true;
+                }
+                if (section.items.isEmpty()) grouped.remove(key);
             }
-            if (!groups.isEmpty()) finalizeDynamicSections(grouped);
+            if (needFinalize) finalizeDynamicSections(grouped);
             android.util.Log.i("CigramHome", "derived rows " + CigramHomeGroups.sizes(groups));
         } catch (Throwable error) {
             android.util.Log.w("CigramStage2", "derived rows skipped", error);
@@ -2319,7 +2577,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
     }
 
     private static JSONObject derivedCopy(JSONObject record, CigramHomeGroups.Group g) throws Exception {
-        JSONObject copy = new JSONObject(record.toString());
+        JSONObject copy = shallowCopy(record);
         copy.put("section_id", g.id);
         copy.put("section_name", g.name);
         return copy;
@@ -2528,7 +2786,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
 
         JSONObject old = section.items.get(itemKey);
         if (old == null) {
-            section.items.put(itemKey, new JSONObject(item.toString()));
+            section.items.put(itemKey, shallowCopy(item));
         } else {
             JSONObject merged = mergeSearchItems(old, item);
 
@@ -2845,8 +3103,12 @@ public final class CigramStage1InitProvider extends ContentProvider {
             final Runnable step = new Runnable() {
                 @Override public void run() {
                     if (!isAlive(activity) || outer.getParent() == null) return;   // page closed / section re-rendered
+                    // 19.1: the user is browsing THIS row -> finish it quickly; a row far below the fold waits (it used to keep adding
+                    // cards, two every 75 ms for ~10 s, to rows nobody was looking at: continuous layout passes while scrolling)
+                    final boolean userRow = CigramRowAnchor.touched(scroll);
+                    if (!userRow && !rowNearViewport(activity, outer)) { MAIN.postDelayed(this, 400L); return; }
                     if (homeBusyScrolling()) { MAIN.postDelayed(this, 90L); return; }   // yield the main thread while the user scrolls
-                    int end = Math.min(content.size(), next[0] + 2);
+                    int end = Math.min(content.size(), next[0] + (userRow ? 6 : 2));
                     int added = 0;
                     final CigramRowAnchor.Mark anchorBefore = CigramRowAnchor.mark(scroll);
                     for (; next[0] < end; next[0]++) {
@@ -2861,7 +3123,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                         // cards are added on the LEFT: the newest stays at the far right until the user scrolls
                         CigramRowAnchor.restore(scroll, anchorBefore);
                     }
-                    if (next[0] < content.size()) MAIN.postDelayed(this, 75L);
+                    if (next[0] < content.size()) MAIN.postDelayed(this, userRow ? 30L : 75L);
                 }
             };
             MAIN.postDelayed(step, 150L);
@@ -2877,6 +3139,19 @@ public final class CigramStage1InitProvider extends ContentProvider {
         CigramRowAnchor.restore(scroll, null);   // newest card at the far right as soon as the row is laid out
 
         return outer;
+    }
+
+    /** True when the row is within two screens of the viewport (above or below). Unknown geometry counts as near. */
+    private static boolean rowNearViewport(Activity activity, View row) {
+        try {
+            if (row.getHeight() <= 0 || row.getWindowToken() == null) return true;
+            int[] at = new int[2];
+            row.getLocationOnScreen(at);
+            int h = activity.getResources().getDisplayMetrics().heightPixels;
+            return at[1] < h * 2 && at[1] + row.getHeight() > -h;
+        } catch (Throwable ignored) {
+            return true;
+        }
     }
 
     private static void addDynamicRowCard(Activity activity, LinearLayout row, JSONObject item, int cardWidth)
@@ -9517,7 +9792,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             String inheritedType,
             JSONObject parentSection
     ) throws Exception {
-        JSONObject item = new JSONObject(source.toString());
+        JSONObject item = shallowCopy(source);
         String type = inferContentType(item, inheritedType);
         item.put("type", type);
 
@@ -9603,7 +9878,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
         if (olderEp != newerEp) {
             JSONObject header = olderEp ? newer : older;
             JSONObject ep = olderEp ? older : newer;
-            JSONObject base = new JSONObject(header.toString());
+            JSONObject base = shallowCopy(header);
             String[] borrow = {"category", "year", "imdb", "quality", "backdrop", "series_poster",
                     "poster", "description", "section_id", "section_name", "imdb_id", "tmdb", "slug"};
             for (String key : borrow) {
@@ -9622,7 +9897,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             return base;
         }
         boolean newerWins = contentRecency(newer) > contentRecency(older);
-        JSONObject base = new JSONObject((newerWins ? newer : older).toString());
+        JSONObject base = shallowCopy(newerWins ? newer : older);
         JSONObject fallback = newerWins ? older : newer;
 
         java.util.Iterator<String> iterator = fallback.keys();
@@ -9753,7 +10028,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             String inheritedSeason,
             java.util.LinkedHashMap<String, JSONObject> out
     ) throws Exception {
-        JSONObject episode = new JSONObject(source.toString());
+        JSONObject episode = shallowCopy(source);
         String season = jsonText(episode, "season", "season_number");
         if (season.length() == 0) season = inheritedSeason;
         if (season.length() == 0) season = "1";

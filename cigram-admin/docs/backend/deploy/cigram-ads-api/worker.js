@@ -2445,6 +2445,7 @@ var ChatHub = class {
   async viewMsg(m, origin) {
     const d = await decJson(this.env, m.thread, m.enc);
     const v = { seq: m.seq, id: m.id, from: m.from, type: m.type, ts: m.ts, delivered: m.delivered || 0, read: m.read || 0, deleted: !!m.deleted };
+    if (m.client_id) v.client_id = m.client_id;
     if (m.deleted) {
       v.text = "";
       return v;

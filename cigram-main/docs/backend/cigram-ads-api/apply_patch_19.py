@@ -138,6 +138,11 @@ rep('''    if (path.indexOf("/chat/upload/") === 0) {
 rep('''    pr.developer = { name: cleanText(env.DEV_NAME, 40)''', '''    pr.features = chat19Features(env);
     pr.developer = { name: cleanText(env.DEV_NAME, 40)''')
 
+# 19.1: the client id of a message travels with its view (WebSocket event, history, send answer): both apps drop their pending copy by it
+rep('''    const v = { seq: m.seq, id: m.id, from: m.from, type: m.type, ts: m.ts, delivered: m.delivered || 0, read: m.read || 0, deleted: !!m.deleted };''',
+    '''    const v = { seq: m.seq, id: m.id, from: m.from, type: m.type, ts: m.ts, delivered: m.delivered || 0, read: m.read || 0, deleted: !!m.deleted };
+    if (m.client_id) v.client_id = m.client_id;''')
+
 # ---------------------------------------------------------------- 2) per-thread serialisation
 for op in ["op_send", "op_read", "op_send_system", "op_thread_update", "op_quote_respond", "op_messages"]:
     rep("  async %s(p) {\n" % op, "  async %s(p) {\n    return this.withThread(cleanText(p.thread, 120), () => this.%s_locked(p));\n  }\n  async %s_locked(p) {\n" % (op, op, op))

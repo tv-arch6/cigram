@@ -91,6 +91,7 @@ public class AdsChatActivity extends Activity {
             m.order = o.optJSONObject("order");
             m.reply = o.optJSONObject("reply");
             m.dev = o.optJSONObject("dev");
+            m.clientId = o.optString("client_id", "");
             return m;
         }
     }
@@ -538,6 +539,12 @@ public class AdsChatActivity extends Activity {
             m.state = 2;
             if (m.clientId.length() > 0) items.add(m);
         }
+        // a pending copy whose confirmed copy is already stored (same client id) is a leftover of an older build: drop it
+        for (int k = items.size() - 1; k >= 0; k--) {
+            Msg p = items.get(k);
+            if (p.seq != 0 || p.clientId.length() == 0) continue;
+            for (Msg q : items) if (q.seq > 0 && p.clientId.equals(q.clientId)) { items.remove(k); break; }
+        }
         adapter.notifyDataSetChanged();
         scrollToEnd();
     }
@@ -551,6 +558,7 @@ public class AdsChatActivity extends Activity {
                     JSONObject o = new JSONObject();
                     o.put("seq", m.seq); o.put("id", m.id); o.put("from", m.from); o.put("type", m.type); o.put("text", m.text);
                     o.put("ts", m.ts); o.put("delivered", m.delivered); o.put("read", m.read); o.put("deleted", m.deleted);
+                    if (m.clientId.length() > 0) o.put("client_id", m.clientId);
                     if (m.media != null) o.put("media", m.media);
                     if (m.quote != null) o.put("quote", m.quote);
                     if (m.order != null) o.put("order", m.order);
@@ -657,6 +665,14 @@ public class AdsChatActivity extends Activity {
         });
     }
 
+    /** Removes the not-yet-confirmed local copy (seq 0) of the message that was sent with this client id. */
+    private void removePending(String cid) {
+        for (int k = items.size() - 1; k >= 0; k--) {
+            Msg p = items.get(k);
+            if (p.seq == 0 && p.clientId.length() > 0 && p.clientId.equals(cid)) items.remove(k);
+        }
+    }
+
     /** يدمج رسائل الخادم ويعيد عدد العناصر المضافة قبل أول عنصر ظاهر. */
     private int applyServer(JSONArray arr, boolean replace) {
         if (arr == null) return 0;
@@ -675,15 +691,13 @@ public class AdsChatActivity extends Activity {
             if (o == null) continue;
             Msg n = Msg.fromJson(o);
             String cid = o.optString("client_id", "");
+            // 19.1: the local pending copy of a message is ALWAYS dropped when its server copy shows up, wherever that copy came from.
+            // Before, the WebSocket event (no HTTP answer yet) added the server copy first, then the HTTP answer found it by seq and
+            // `continue`d: the pending bubble (clock icon) stayed next to the real one, and was restored again at every start.
+            if (cid.length() > 0 && "user".equals(n.from)) removePending(cid);
             int idx = -1;
             for (int k = 0; k < items.size(); k++) if (items.get(k).seq == n.seq && n.seq > 0) { idx = k; break; }
             if (idx >= 0) { items.set(idx, n); continue; }
-            // رسالة معلّقة أرسلناها نحن
-            for (int k = 0; k < items.size(); k++) {
-                Msg p = items.get(k);
-                if (p.seq == 0 && "user".equals(n.from) && p.clientId.length() > 0 && p.clientId.equals(cid)) { idx = k; break; }
-            }
-            if (idx >= 0) { items.remove(idx); }
             int pos = 0;
             while (pos < items.size() && (items.get(pos).seq > 0 && items.get(pos).seq < n.seq)) pos++;
             items.add(pos, n);

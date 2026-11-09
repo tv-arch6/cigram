@@ -48,6 +48,11 @@ final class CigramRowAnchor {
         });
     }
 
+    /** 19.1: true once the user has put a finger on this row (it is then completed quickly instead of lazily). */
+    static boolean touched(HorizontalScrollView s) {
+        return s != null && TOUCHED.contains(s);
+    }
+
     /** Call BEFORE cards are added. */
     static Mark mark(HorizontalScrollView s) {
         if (s == null) return null;

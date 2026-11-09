@@ -255,7 +255,11 @@ final class CigramHomeGroups {
     // ------------------------------------------------------------------ fields
 
     static String type(JSONObject r) {
-        String t = norm(text(r, "type", "content_type", "media_type"));
+        String raw = text(r, "type", "content_type", "media_type");
+        if (raw.equals("episode")) return "episode";            // the live catalogue's three values: no normalisation needed
+        if (raw.equals("series")) return "series";
+        if (raw.equals("movie")) return "movie";
+        String t = norm(raw);
         if (t.equals("episode") || t.equals("حله")) return "episode";
         if (t.equals("series") || t.equals("tv") || t.equals("show") || t.contains("مسلسل")) return "series";
         if (t.equals("movie") || t.equals("film") || t.equals("فيلم")) return "movie";

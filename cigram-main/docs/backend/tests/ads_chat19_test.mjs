@@ -474,6 +474,29 @@ await test("when the auth Worker cannot be asked, an AUTH_DB binding verifies th
   assert.equal(un.json.error, "auth_unavailable");
 });
 
+// ================================================================ client id on every view (both apps drop their pending copy by it)
+await test("every message view carries the sender's client_id: the send answer, the WebSocket event and the history of both sides", async () => {
+  const eve = await jwt({ sub: "auth-user-eve", email: "eve@example.invalid", name: "Eve", exp: exp() });
+  const wsUser = makeSocket(["u:" + (await (async () => { await call("POST", "/chat/send", eve, { client_id: "e-0", type: "text", text: "أول" }); return (await threadOf("auth-user-eve")).id; })())], { side: "user" });
+  const E = (await threadOf("auth-user-eve")).id;
+  wsUser.tags = ["u:" + E];
+  const wsAdmin = makeSocket(["a"], { side: "admin" });
+  const r = await call("POST", "/chat/send", eve, { client_id: "cid-eve-1", type: "text", text: "رسالة بمعرّف" });
+  assert.equal(r.json.message.client_id, "cid-eve-1");
+  const ev = wsUser.sent.map((x) => JSON.parse(x)).find((x) => x.t === "msg" && x.msg.text === "رسالة بمعرّف");
+  assert.ok(ev, "the user's own socket receives the event");
+  assert.equal(ev.msg.client_id, "cid-eve-1", "the event carries the client id, so the pending copy is matched even before the HTTP answer");
+  const evA = wsAdmin.sent.map((x) => JSON.parse(x)).find((x) => x.t === "msg" && x.msg.text === "رسالة بمعرّف");
+  assert.equal(evA.msg.client_id, "cid-eve-1");
+  const hist = (await call("GET", "/chat/messages?limit=20", eve)).json.messages.find((m) => m.text === "رسالة بمعرّف");
+  assert.equal(hist.client_id, "cid-eve-1");
+  const adm = await call("POST", "/admin/chat/send", ADMIN, { thread: E, client_id: "cid-admin-1", type: "text", text: "رد المطوّر" });
+  assert.equal(adm.json.message.client_id, "cid-admin-1");
+  const evU = wsUser.sent.map((x) => JSON.parse(x)).find((x) => x.t === "msg" && x.msg.text === "رد المطوّر");
+  assert.equal(evU.msg.client_id, "cid-admin-1");
+  wsUser.readyState = 3; wsAdmin.readyState = 3;
+});
+
 // ================================================================ websocket foreground flag, backup budget
 await test("the app's {t:'fg'} message marks its socket as background / foreground (push decision)", async () => {
   const w = makeSocket(["u:" + C], { side: "user", thread: C });
@@ -500,6 +523,7 @@ await test("a backlog larger than the per-run budget is backed up over several r
     runs++;
   }
   assert.equal(runs, 2, "111 messages with a budget of 100 need exactly two runs (" + runs + ")");
+  await call("POST", "/admin/chat/backup", ADMIN, {});                               // the other threads (created since the first backup) too
   assert.equal((await call("GET", "/admin/chat/backup/verify", ADMIN)).json.ok, true);
   // the whole thread vanishes from the live store; the restore brings back every message in order
   const keys = [...(await hubState.storage.list({ prefix: "m:" + D + ":" })).keys()];

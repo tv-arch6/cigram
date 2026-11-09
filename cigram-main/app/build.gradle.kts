@@ -11,8 +11,8 @@ android {
     defaultConfig {
         minSdk = 24
         targetSdk = 36
-        versionCode = 92
-        versionName = "18.5.0"
+        versionCode = 93
+        versionName = "18.5.1"
     }
 
     buildTypes {

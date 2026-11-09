@@ -4,8 +4,8 @@ Two Android projects (original structures and package ids kept) + the Cloudflare
 
 | Folder | What | Version |
 |---|---|---|
-| `cigram-main/` | Cigram main app (`com.Cigram.vid`) | 18.5.0 (92) |
-| `cigram-admin/` | Cigram administration app (`com.my.newproject`) | 2.2.0 (10) |
+| `cigram-main/` | Cigram main app (`com.Cigram.vid`) | 18.5.1 (93) |
+| `cigram-admin/` | Cigram administration app (`com.my.newproject`) | 2.2.1 (11) |
 | `*/docs/backend/` | Worker sources, patches, deploy bundles, tests, owner scripts (identical copy in both projects) | 19.0 |
 
 Start with `cigram-main/UPDATE-19.0-REPORT.md` (what was done, what was verified, what is still yours to deploy).

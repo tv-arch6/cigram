@@ -369,6 +369,7 @@ public class AdChatActivity extends CgBase {
         m.text = o.optString("text"); m.ts = o.optLong("ts"); m.delivered = o.optLong("delivered"); m.read = o.optLong("read");
         m.deleted = o.optBoolean("deleted"); m.media = o.optJSONObject("media"); m.quote = o.optJSONObject("quote");
         m.order = o.optJSONObject("order"); m.reply = o.optJSONObject("reply");
+        m.clientId = o.optString("client_id", "");
         return m;
     }
 
@@ -389,10 +390,13 @@ public class AdChatActivity extends CgBase {
             if (o == null) continue;
             Msg n = parse(o);
             String cid = o.optString("client_id");
+            // 19.1: the local pending copy of a message is ALWAYS dropped when its server copy shows up, wherever that copy came from.
+            // Before, the WebSocket event (no HTTP answer yet) added the server copy first, then the HTTP answer found it by seq and
+            // `continue`d, so the pending bubble («…») stayed next to the real one for good.
+            if (cid.length() > 0) removePending(cid);
             int idx = -1;
             for (int k = 0; k < items.size(); k++) if (n.seq > 0 && items.get(k).seq == n.seq) { idx = k; break; }
             if (idx >= 0) { items.set(idx, n); continue; }
-            for (int k = 0; k < items.size(); k++) { Msg p = items.get(k); if (p.seq == 0 && p.clientId.length() > 0 && p.clientId.equals(cid)) { items.remove(k); break; } }
             int pos = 0;
             while (pos < items.size() && items.get(pos).seq > 0 && items.get(pos).seq < n.seq) pos++;
             items.add(pos, n);
@@ -403,6 +407,14 @@ public class AdChatActivity extends CgBase {
         adapter.notifyDataSetChanged();
         if (!replace && incoming && atBottom) { scrollEnd(); markRead(); }
         return addedBefore;
+    }
+
+    /** Removes the not-yet-confirmed local copy (seq 0) of the message that was sent with this client id. */
+    private void removePending(String cid) {
+        for (int k = items.size() - 1; k >= 0; k--) {
+            Msg p = items.get(k);
+            if (p.seq == 0 && p.clientId.length() > 0 && p.clientId.equals(cid)) items.remove(k);
+        }
     }
 
     private void scrollEnd() {

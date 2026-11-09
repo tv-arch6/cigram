@@ -1,5 +1,5 @@
 --- live-snapshots/cigram-ads-api.live.js	2026-11-09 12:46:54.000000000 +0000
-+++ /home/user/cigram/cigram-main/docs/backend/deploy/cigram-ads-api/worker.js	2026-11-09 20:02:11.469089245 +0000
++++ /home/user/cigram/cigram-main/docs/backend/deploy/cigram-ads-api/worker.js	2026-11-09 21:14:56.545259508 +0000
 @@ -1583,10 +1583,41 @@
    return body;
  }
@@ -238,7 +238,13 @@
      const t = await this.s.get("t:" + p.thread);
      if (!t) fail(404, "not_found", "\u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629.");
      if (p.status !== void 0) t.status = oneOf(p.status, CHAT_STATUSES, t.status);
-@@ -2371,6 +2450,7 @@
+@@ -2366,11 +2445,13 @@
+   async viewMsg(m, origin) {
+     const d = await decJson(this.env, m.thread, m.enc);
+     const v = { seq: m.seq, id: m.id, from: m.from, type: m.type, ts: m.ts, delivered: m.delivered || 0, read: m.read || 0, deleted: !!m.deleted };
++    if (m.client_id) v.client_id = m.client_id;
+     if (m.deleted) {
+       v.text = "";
        return v;
      }
      v.text = d.text || "";
@@ -246,7 +252,7 @@
      if (d.reply) v.reply = d.reply;
      if (d.quote) v.quote = Object.assign({}, d.quote, { state: m.qstate || "pending" });
      if (d.order) v.order = d.order;
-@@ -2383,19 +2463,24 @@
+@@ -2383,19 +2464,24 @@
      return v;
    }
    async op_messages(p) {
@@ -272,7 +278,7 @@
        if (before) opts.end = "m:" + thread + ":" + padSeq(before);
        const all = await this.s.list(opts);
        rows = [...all.values()].reverse();
-@@ -2412,13 +2497,21 @@
+@@ -2412,13 +2498,21 @@
      }
      if (upto) this.emit(thread, { t: "delivered", thread, upto, ts: now }, [other]);
      const out = [];
@@ -295,7 +301,7 @@
      if (!t) fail(404, "not_found", "\u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629.");
      if (side === "user" && t.banned) fail(403, "banned", "\u062A\u0645 \u062A\u0642\u064A\u064A\u062F \u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0629 \u0645\u0646 \u0642\u0628\u0644 \u0627\u0644\u0625\u062F\u0627\u0631\u0629.");
      if (!this.rl("send:" + side + ":" + thread, side === "user" ? 20 : 120, 6e4)) fail(429, "rate_limited", "\u0631\u0633\u0627\u0626\u0644 \u0643\u062B\u064A\u0631\u0629. \u0627\u0646\u062A\u0638\u0631 \u0642\u0644\u064A\u0644\u0627\u064B.");
-@@ -2436,6 +2529,7 @@
+@@ -2436,6 +2530,7 @@
      const text = cleanText(p.text, CHAT_MAX_TEXT);
      const payload = {};
      if (text) payload.text = text;
@@ -303,7 +309,7 @@
      if (p.reply_to) {
        const rs = int(p.reply_to, 1, 1e12, 0);
        const rm = rs ? await this.s.get("m:" + thread + ":" + padSeq(rs)) : null;
-@@ -2488,12 +2582,14 @@
+@@ -2488,12 +2583,14 @@
        delivered: (side === "user" ? this.adminOnline() : this.userOnline(thread)) ? now : 0,
        read: 0,
        deleted: false,
@@ -319,7 +325,7 @@
      t.prev_enc = await encJson(this.env, thread, { text: previewOf(type, payload.text) });
      if (side === "user") {
        t.unread_admin = (t.unread_admin || 0) + 1;
-@@ -2520,14 +2616,18 @@
+@@ -2520,14 +2617,18 @@
        }
      }
      await this.s.put("t:" + thread, t);
@@ -340,7 +346,7 @@
      const thread = cleanText(p.thread, 120);
      const t = await this.s.get("t:" + thread);
      if (!t) return {};
-@@ -2544,33 +2644,29 @@
+@@ -2544,33 +2645,29 @@
        await this.s.put("m:" + thread + ":" + padSeq(m.seq), m);
        changed++;
      }
@@ -385,7 +391,7 @@
      const thread = cleanText(p.thread, 120);
      const key = "m:" + thread + ":" + padSeq(int(p.seq, 1, 1e12, 0));
      const m = await this.s.get(key);
-@@ -2586,11 +2682,14 @@
+@@ -2586,11 +2683,14 @@
        t.status = accept ? "won" : "pending";
        await this.s.put("t:" + thread, t);
      }
@@ -401,7 +407,7 @@
      const thread = cleanText(p.thread, 120);
      const t = await this.s.get("t:" + thread);
      if (!t) return null;
-@@ -2689,24 +2788,471 @@
+@@ -2689,24 +2789,471 @@
      }
      await this.s.delete("media:" + id);
    }
@@ -886,7 +892,7 @@
    }
    async op_presence(p) {
      const st = p.settings || null;
-@@ -2714,7 +3260,8 @@
+@@ -2714,7 +3261,8 @@
      let state = "offline";
      if (this.adminOnline()) state = "online";
      else if (st && !inWorkHours(st, now)) state = "off_hours";
@@ -896,7 +902,7 @@
    }
    async op_templates_get() {
      return { templates: await this.s.get("templates") || [] };
-@@ -2734,15 +3281,9 @@
+@@ -2734,15 +3282,9 @@
      const now = Date.now();
      const metas = await this.s.list({ prefix: "media:" });
      for (const meta of metas.values()) if (!meta.used && now - meta.created > 24 * 36e5) await this.dropMedia(meta.id);
@@ -915,7 +921,7 @@
    }
  };
  function hubStub(env) {
-@@ -2886,9 +3427,10 @@
+@@ -2886,9 +3428,10 @@
  }
  __name(serveChatMedia, "serveChatMedia");
  async function purgeChatForUser(env, userKey) {
@@ -927,7 +933,7 @@
    } catch (e) {
    }
  }
-@@ -2921,7 +3463,10 @@
+@@ -2921,7 +3464,10 @@
      } catch (e) {
      }
      if (!env.CHAT_HUB) return reply({ ok: true, state: "offline" });
@@ -939,7 +945,7 @@
    }
    let m;
    if (method === "GET" && (m = /^\/chat\/media\/([A-Za-z0-9]+)$/.exec(path))) return serveChatMedia(request, env, m[1], url);
-@@ -2929,7 +3474,7 @@
+@@ -2929,7 +3475,7 @@
      const user = await verifyUser(request, env);
      const thread = user.key;
      if (method === "GET" && path === "/chat/ws") return chatWsForward(request, env, "user", thread);
@@ -948,7 +954,7 @@
      if (method === "GET" && path === "/chat/messages") {
        return reply(await hub(env, "messages", { thread, side: "user", after: q("after"), before: q("before"), limit: q("limit"), origin }));
      }
-@@ -2938,14 +3483,15 @@
+@@ -2938,14 +3484,15 @@
        return reply({ ok: true, unread: t.thread.unread, last_seq: t.thread.last_seq });
      }
      if (method === "POST" && path === "/chat/send") {
@@ -966,7 +972,7 @@
        return reply(r);
      }
      if (method === "POST" && path === "/chat/read") {
-@@ -2959,35 +3505,59 @@
+@@ -2959,35 +3506,59 @@
      }
      if (method === "POST" && path === "/chat/delete-all") {
        await purgeChatForUser(env, thread);
@@ -1036,7 +1042,7 @@
      }
      if (method === "GET" && sub === "/export") return reply(await hub(env, "export", { thread: q("thread"), origin }));
      if (method === "GET" && sub === "/templates") return reply(await hub(env, "templates_get", {}));
-@@ -3023,6 +3593,99 @@
+@@ -3023,6 +3594,99 @@
    return null;
  }
  __name(routeChat, "routeChat");
