@@ -47,6 +47,11 @@ android {
         viewBinding = true
         buildConfig = true
     }
+
+    // JVM unit tests call code that logs through android.util.Log: the stub android.jar returns defaults instead of throwing.
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -68,4 +73,10 @@ dependencies {
     implementation("com.google.android.exoplayer:exoplayer-rtsp:2.19.1")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20231013")
+}
+
+// The ViewBinding stub in src/main/java exists for CodeAssist (which generates the binding classes but does not add
+// the library). Gradle adds the official library itself, so its Java compiler skips the stub: no duplicate class.
+tasks.withType<JavaCompile>().configureEach {
+    exclude("androidx/viewbinding/ViewBinding.java")
 }
