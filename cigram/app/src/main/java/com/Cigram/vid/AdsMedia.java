@@ -160,6 +160,8 @@ public final class AdsMedia {
         p.name = name;
         p.kind = kind;
         if ("image".equals(kind) && (mime == null || !mime.equals("image/gif"))) {
+            Prepared full = fullQualityImage(c, uri, name);              // 19.2: original resolution and quality
+            if (full != null) return full;
             File out = new File(upDir(c), "u_" + UUID.randomUUID().toString().replace("-", "") + ".jpg");
             int[] wh = compressImage(c, uri, out);
             p.file = out;
@@ -239,6 +241,105 @@ public final class AdsMedia {
     private static String stripExt(String n) {
         int i = n.lastIndexOf('.');
         return i > 0 ? n.substring(0, i) : n;
+    }
+
+    /**
+     * 19.2 «الدقة الكاملة»: a photo is no longer shrunk to 1600 px before it is sent.
+     * <ul>
+     *   <li>JPEG / PNG / WebP that is already upright: the file is uploaded byte for byte (no decoding, no memory, no
+     *   quality loss) — what the other side saves is exactly the original;</li>
+     *   <li>a photo stored sideways (EXIF rotation) or in a format the server does not take (HEIC …): re-encoded ONCE at
+     *   its full resolution, upright, JPEG quality 96;</li>
+     *   <li>only when that does not fit (more than 25 MB, or more pixels than this phone's memory can hold) the caller
+     *   falls back to the previous 1600 px path, so sending never fails because of quality.</li>
+     * </ul>
+     * Returns null for "use the fallback".
+     */
+    static Prepared fullQualityImage(Context c, Uri uri, String name) {
+        File out = null;
+        try {
+            ContentResolver cr = c.getContentResolver();
+            BitmapFactory.Options o = new BitmapFactory.Options();
+            o.inJustDecodeBounds = true;
+            InputStream in = cr.openInputStream(uri);
+            if (in == null) return null;
+            try { BitmapFactory.decodeStream(in, null, o); } finally { try { in.close(); } catch (Throwable ignored) { } }
+            if (o.outWidth <= 0 || o.outHeight <= 0) return null;
+            String type = o.outMimeType == null ? "" : o.outMimeType;
+            int rotation = 0;
+            boolean mirrored = false;
+            try {
+                InputStream ei = cr.openInputStream(uri);
+                if (ei != null) {
+                    try {
+                        int ori = new android.media.ExifInterface(ei).getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, 1);
+                        if (ori == 6) rotation = 90;
+                        else if (ori == 3) rotation = 180;
+                        else if (ori == 8) rotation = 270;
+                        else if (ori == 2 || ori == 4 || ori == 5 || ori == 7) mirrored = true;
+                    } finally { try { ei.close(); } catch (Throwable ignored) { } }
+                }
+            } catch (Throwable ignored) { }
+            if (mirrored) return null;                                   // rare: the tested path handles it
+            String ext = "image/jpeg".equals(type) ? ".jpg" : "image/png".equals(type) ? ".png" : "image/webp".equals(type) ? ".webp" : null;
+            Prepared p = new Prepared();
+            p.kind = "image";
+            String id = UUID.randomUUID().toString().replace("-", "");
+            if (ext != null && rotation == 0) {
+                out = new File(upDir(c), "u_" + id + ext);
+                in = cr.openInputStream(uri);
+                if (in == null) return null;
+                long total = 0;
+                OutputStream os = new FileOutputStream(out);
+                try {
+                    byte[] buf = new byte[64 * 1024];
+                    int n;
+                    while ((n = in.read(buf)) > 0) {
+                        total += n;
+                        if (total > MAX_BYTES) break;
+                        os.write(buf, 0, n);
+                    }
+                } finally {
+                    try { os.close(); } catch (Throwable ignored) { }
+                    try { in.close(); } catch (Throwable ignored) { }
+                }
+                if (total == 0 || total > MAX_BYTES) { out.delete(); return null; }
+                p.file = out;
+                p.w = o.outWidth;
+                p.h = o.outHeight;
+                p.size = total;
+                p.name = stripExt(name) + ext;
+                return p;
+            }
+            // decoded bitmap (+ a rotated copy) must fit comfortably in this app's memory
+            long need = (long) o.outWidth * o.outHeight * 4L * (rotation != 0 ? 2 : 1);
+            if (need > Runtime.getRuntime().maxMemory() / 3) return null;
+            in = cr.openInputStream(uri);
+            if (in == null) return null;
+            Bitmap bmp;
+            try { bmp = BitmapFactory.decodeStream(in); } finally { try { in.close(); } catch (Throwable ignored) { } }
+            if (bmp == null) return null;
+            if (rotation != 0) {
+                Matrix m = new Matrix();
+                m.postRotate(rotation);
+                Bitmap nb = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(), bmp.getHeight(), m, true);
+                if (nb != bmp) { bmp.recycle(); bmp = nb; }
+            }
+            out = new File(upDir(c), "u_" + id + ".jpg");
+            OutputStream os = new FileOutputStream(out);
+            try { bmp.compress(Bitmap.CompressFormat.JPEG, 96, os); } finally { try { os.close(); } catch (Throwable ignored) { } }
+            p.w = bmp.getWidth();
+            p.h = bmp.getHeight();
+            bmp.recycle();
+            if (out.length() == 0 || out.length() > MAX_BYTES) { out.delete(); return null; }
+            p.file = out;
+            p.size = out.length();
+            p.name = stripExt(name) + ".jpg";
+            return p;
+        } catch (Throwable t) {                                          // includes OutOfMemoryError
+            if (out != null) try { out.delete(); } catch (Throwable ignored) { }
+            return null;
+        }
     }
 
     /** يصغّر الصورة إلى 1600px كحد أقصى ويصحح الدوران ويحفظها JPEG جودة 82. */

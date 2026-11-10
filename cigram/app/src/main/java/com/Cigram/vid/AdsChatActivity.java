@@ -123,7 +123,10 @@ public class AdsChatActivity extends Activity {
     // 18.2 support UI
     private TextView devName;
     private AdsViews.Round devAvatar;
-    private LinearLayout emojiPanel;
+    private CigramEmojiPanel emojiPanel;
+    private CigramChatSuggest suggest;
+    private boolean recLocked;
+    private TextView recHint;
     private LinearLayout voicePreview;
     private TextView voicePreviewTime;
     private AdsIcons.Icon voicePreviewIcon;
@@ -169,6 +172,7 @@ public class AdsChatActivity extends Activity {
         AdsFileProvider.cleanOld(this);
         AdsMedia.cleanOld(this);
         restoreCache();
+        refreshSuggest();
         bootstrap();
         askNotifPermission();
         AdsNotifier.cancelChatNotification(this);
@@ -220,6 +224,7 @@ public class AdsChatActivity extends Activity {
         if (pendingVoice != null && pendingVoice.file != null) pendingVoice.file.delete();
         AdsVoice.setListener(null);
         h.removeCallbacksAndMessages(null);
+        CigramEmoji.trimMemory();
         super.onDestroy();
     }
 
@@ -341,6 +346,19 @@ public class AdsChatActivity extends Activity {
         replyBar.setVisibility(View.GONE);
         col.addView(replyBar, new LinearLayout.LayoutParams(-1, -2));
 
+        // 19.2: suggestion chips (ready sentences; a tap writes one into the field, nothing is sent by itself)
+        suggest = new CigramChatSuggest(this);
+        suggest.setBackgroundColor(CigramSupport.BG);
+        suggest.setListener(new CigramChatSuggest.Listener() {
+            @Override public void onPick(String text) {
+                if (banned) return;
+                input.setText(text);
+                input.setSelection(input.getText().length());
+                input.requestFocus();
+            }
+        });
+        col.addView(suggest, new LinearLayout.LayoutParams(-1, -2));
+
         // الكتابة
         composer = AdsUi.hbox(this);
         composer.setPadding(AdsUi.dp(this, 6), AdsUi.dp(this, 6), AdsUi.dp(this, 6), AdsUi.dp(this, 8));
@@ -387,7 +405,11 @@ public class AdsChatActivity extends Activity {
         ((LinearLayout) recBar).addView(dot);
         timerText = AdsUi.text(this, "0:00", 16f, CigramSupport.TEXT, true);
         ((LinearLayout) recBar).addView(timerText, AdsUi.lp(-2, -2, AdsUi.dp(this, 8), 0, AdsUi.dp(this, 12), 0));
-        ((LinearLayout) recBar).addView(AdsUi.text(this, "اسحب للإلغاء", 13f, CigramSupport.MUTED, false));
+        recHint = AdsUi.text(this, "اسحب للإلغاء", 13f, CigramSupport.MUTED, false);
+        ((LinearLayout) recBar).addView(recHint);
+        recBar.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { if (recLocked) { stopRecording(true); AdsUi.toast(AdsChatActivity.this, "أُلغي التسجيل."); } }
+        });
         recBar.setVisibility(View.GONE);
         inputBox.addView(recBar, new FrameLayout.LayoutParams(-1, AdsUi.dp(this, 48)));
         inputBox.addView(buildVoicePreview(), new FrameLayout.LayoutParams(-1, AdsUi.dp(this, 48)));
@@ -416,9 +438,14 @@ public class AdsChatActivity extends Activity {
         compLine.setBackgroundColor(CigramSupport.HAIRLINE);
         col.addView(compLine, new LinearLayout.LayoutParams(-1, Math.max(1, AdsUi.dp(this, 0.5f))));
         col.addView(composer, new LinearLayout.LayoutParams(-1, -2));
-        emojiPanel = buildEmojiPanel();
+        // 19.2: the app's own emoji keyboard (all groups, drawn from the atlas: the same artwork on every phone)
+        emojiPanel = new CigramEmojiPanel(this, 0xFF0A0A0B, 0xFFE21B14, new CigramEmojiPanel.Listener() {
+            @Override public void onEmoji(String e) { CigramEmoji.insert(input, e); }
+            @Override public void onBackspace() { CigramEmoji.backspace(input); }
+        });
         emojiPanel.setVisibility(View.GONE);
-        col.addView(emojiPanel, new LinearLayout.LayoutParams(-1, AdsUi.dp(this, 252)));
+        col.addView(emojiPanel, new LinearLayout.LayoutParams(-1, AdsUi.dp(this, 286)));
+        CigramEmoji.attach(input);
 
         input.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
@@ -427,6 +454,7 @@ public class AdsChatActivity extends Activity {
                 sendBtn.setVisibility(has ? View.VISIBLE : View.GONE);
                 micBtn.setVisibility(has ? View.GONE : View.VISIBLE);
                 if (has) notifyTyping();
+                refreshSuggest();
             }
             @Override public void afterTextChanged(Editable s) { }
         });
@@ -1026,6 +1054,11 @@ public class AdsChatActivity extends Activity {
         }, m.cancel);
     }
 
+    /**
+     * The round button: with text it sends. Without text it records, in the two ways people expect:
+     * hold → talk → release (slide sideways to cancel), or ONE TAP → hands-free recording until the button is tapped
+     * again (the bar shows how to cancel). Either way the recording goes to the preview first (listen / delete / send).
+     */
     private boolean onActionTouch(MotionEvent e) {
         int a = e.getActionMasked();
         boolean hasText = input.getText().toString().trim().length() > 0;
@@ -1034,7 +1067,12 @@ public class AdsChatActivity extends Activity {
             return true;
         }
         if (banned) return true;
+        if (recLocked) {                                   // hands-free recording: this tap finishes it
+            if (a == MotionEvent.ACTION_UP) finishRecording(false);
+            return true;
+        }
         if (a == MotionEvent.ACTION_DOWN) {
+            if (pendingVoice != null) return true;         // a recording is waiting in the preview
             if (!CigramPermissions.ensure(this, "android.permission.RECORD_AUDIO", REQ_PERM_AUDIO,
                     "يحتاج Cigram إلى الميكروفون لتسجيل رسالتك الصوتية فقط، ولا يستمع إليك في أي وقت آخر.")) {
                 return true;
@@ -1045,13 +1083,18 @@ public class AdsChatActivity extends Activity {
             if (!recorder.start(this, new AdsVoice.Recorder.Tick() {
                 @Override public void onTick(int ms, int amp) { timerText.setText(AdsMedia.durLabel(ms)); }
             })) {
+                String why = recorder.lastError;
                 recorder = null;
-                AdsUi.toast(this, "تعذر بدء التسجيل.");
+                AdsUi.toast(this, why.length() > 0 ? why : "تعذر بدء التسجيل.");
                 return true;
             }
+            if (emojiPanel != null) emojiPanel.setVisibility(View.GONE);
             input.setVisibility(View.INVISIBLE);
             recBar.setVisibility(View.VISIBLE);
+            recHint.setText("اسحب للإلغاء");
             timerText.setText("0:00");
+            refreshSuggest();
+            try { getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); } catch (Throwable ignored) { }
             return true;
         }
         if (recorder == null) return true;
@@ -1063,27 +1106,51 @@ public class AdsChatActivity extends Activity {
             }
         } else if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) {
             boolean cancel = recCancelled || a == MotionEvent.ACTION_CANCEL;
-            int dur = recorder.elapsed();
-            AdsVoice.Recorder.Result r = recorder.stop(cancel || dur < 1000);
-            recorder = null;
-            recBar.setVisibility(View.GONE);
-            input.setVisibility(View.VISIBLE);
-            timerText.setTextColor(CigramSupport.TEXT);
-            if (r != null) {
-                showVoicePreview(r);   // 18.2: listen, delete or send — nothing leaves the phone before «إرسال»
-            } else if (!cancel && dur < 1000) {
-                AdsUi.toast(this, "اضغط مطولاً للتسجيل");
+            if (!cancel && recorder.elapsed() < 600) {     // a tap, not a hold: keep recording hands-free
+                recLocked = true;
+                recHint.setText("اضغط الزر للإنهاء · اضغط هنا للإلغاء");
+                micBtn.setVisibility(View.GONE);
+                sendBtn.setVisibility(View.VISIBLE);
+                return true;
             }
+            finishRecording(cancel);
         }
         return true;
+    }
+
+    private void finishRecording(boolean cancel) {
+        if (recorder == null) return;
+        int dur = recorder.elapsed();
+        AdsVoice.Recorder.Result r = recorder.stop(cancel || dur < 1000);
+        recorder = null;
+        endRecordingUi();
+        if (r != null) {
+            showVoicePreview(r);   // 18.2: listen, delete or send — nothing leaves the phone before «إرسال»
+        } else if (!cancel && dur < 1000) {
+            AdsUi.toast(this, "التسجيل قصير جداً.");
+        }
+        refreshSuggest();
+    }
+
+    private void endRecordingUi() {
+        recLocked = false;
+        if (recBar != null) recBar.setVisibility(View.GONE);
+        if (input != null) input.setVisibility(View.VISIBLE);
+        if (timerText != null) timerText.setTextColor(CigramSupport.TEXT);
+        if (input != null && sendBtn != null && micBtn != null) {
+            boolean has = input.getText().toString().trim().length() > 0;
+            sendBtn.setVisibility(has ? View.VISIBLE : View.GONE);
+            micBtn.setVisibility(has ? View.GONE : View.VISIBLE);
+        }
+        try { getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); } catch (Throwable ignored) { }
     }
 
     private void stopRecording(boolean cancel) {
         if (recorder != null) {
             recorder.stop(cancel);
             recorder = null;
-            if (recBar != null) recBar.setVisibility(View.GONE);
-            if (input != null) input.setVisibility(View.VISIBLE);
+            endRecordingUi();
+            refreshSuggest();
         }
     }
 
@@ -1330,6 +1397,7 @@ public class AdsChatActivity extends Activity {
         boolean show = emojiPanel.getVisibility() != View.VISIBLE;
         emojiPanel.setVisibility(show ? View.VISIBLE : View.GONE);
         if (show) {
+            emojiPanel.refresh();
             input.clearFocus();
             try {
                 android.view.inputmethod.InputMethodManager im = (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
@@ -1338,57 +1406,31 @@ public class AdsChatActivity extends Activity {
         }
     }
 
-    private LinearLayout buildEmojiPanel() {
-        final LinearLayout panel = AdsUi.vbox(this);
-        panel.setBackgroundColor(0xFF0A0A0B);
-        final LinearLayout tabs = AdsUi.hbox(this);
-        tabs.setGravity(Gravity.CENTER);
-        final android.widget.ScrollView sv = new android.widget.ScrollView(this);
-        final LinearLayout grid = AdsUi.vbox(this);
-        grid.setPadding(AdsUi.dp(this, 6), AdsUi.dp(this, 4), AdsUi.dp(this, 6), AdsUi.dp(this, 4));
-        sv.addView(grid);
-        final TextView[] tabViews = new TextView[CigramSupport.EMOJI_TABS.length];
-        for (int t = 0; t < CigramSupport.EMOJI_TABS.length; t++) {
-            final int tab = t;
-            TextView tv = AdsUi.text(this, CigramSupport.EMOJI_TABS[t], 20f, CigramSupport.TEXT, false);
-            tv.setGravity(Gravity.CENTER);
-            tv.setContentDescription("مجموعة رموز " + (t + 1));
-            tv.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View v) { fillEmoji(grid, tab); for (int k = 0; k < tabViews.length; k++) tabViews[k].setAlpha(k == tab ? 1f : 0.45f); }
-            });
-            tabViews[t] = tv;
-            tabs.addView(tv, new LinearLayout.LayoutParams(0, AdsUi.dp(this, 44), 1f));
-        }
-        panel.addView(tabs, new LinearLayout.LayoutParams(-1, AdsUi.dp(this, 44)));
-        View line = new View(this);
-        line.setBackgroundColor(CigramSupport.HAIRLINE);
-        panel.addView(line, new LinearLayout.LayoutParams(-1, 1));
-        panel.addView(sv, new LinearLayout.LayoutParams(-1, 0, 1f));
-        fillEmoji(grid, 0);
-        for (int k = 0; k < tabViews.length; k++) tabViews[k].setAlpha(k == 0 ? 1f : 0.45f);
-        return panel;
+    @Override public void onBackPressed() {
+        if (emojiPanel != null && emojiPanel.getVisibility() == View.VISIBLE) { emojiPanel.setVisibility(View.GONE); return; }
+        if (recLocked) { stopRecording(true); return; }
+        super.onBackPressed();
     }
 
-    private void fillEmoji(LinearLayout grid, int tab) {
-        grid.removeAllViews();
-        String[] all = CigramSupport.EMOJI[tab];
-        int cols = 8;
-        LinearLayout row = null;
-        for (int i = 0; i < all.length; i++) {
-            if (i % cols == 0) { row = AdsUi.hbox(this); grid.addView(row, new LinearLayout.LayoutParams(-1, AdsUi.dp(this, 46))); }
-            final String e = all[i];
-            TextView tv = AdsUi.text(this, e, 24f, CigramSupport.TEXT, false);
-            tv.setGravity(Gravity.CENTER);
-            tv.setContentDescription(e);
-            tv.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View v) {
-                    int a = Math.max(0, input.getSelectionStart()), b = Math.max(0, input.getSelectionEnd());
-                    input.getText().replace(Math.min(a, b), Math.max(a, b), e, 0, e.length());
-                }
-            });
-            row.addView(tv, new LinearLayout.LayoutParams(0, -1, 1f));
+    /** Which chips are offered follows the conversation; the row hides while the user types, records or is restricted. */
+    private void refreshSuggest() {
+        if (suggest == null) return;
+        boolean typing = input != null && input.getText().toString().trim().length() > 0;
+        boolean busy = recorder != null || pendingVoice != null || banned;
+        if (typing || busy) { suggest.setVisibility(View.GONE); return; }
+        Msg last = null, lastDev = null;
+        int real = 0;
+        for (int i = items.size() - 1; i >= 0; i--) {
+            Msg m = items.get(i);
+            if ("system".equals(m.type)) continue;
+            real++;
+            if (last == null) last = m;
+            if (lastDev == null && !"user".equals(m.from)) lastDev = m;
+            if (real > 40) break;
         }
-        while (row != null && row.getChildCount() < cols) row.addView(new View(this), new LinearLayout.LayoutParams(0, -1, 1f));
+        boolean pendingQuote = lastDev != null && "quote".equals(lastDev.type) && lastDev.quote != null && "pending".equals(lastDev.quote.optString("state", "pending"));
+        suggest.setItems(CigramChatSuggest.forUser(real == 0, pendingQuote ? "quote" : "", last != null && "user".equals(last.from) && !pendingQuote));
+        suggest.setVisibility(View.VISIBLE);
     }
 
     private View buildVoicePreview() {
@@ -1445,6 +1487,7 @@ public class AdsChatActivity extends Activity {
         pendingVoice = null;
         voicePreview.setVisibility(View.GONE);
         input.setVisibility(View.VISIBLE);
+        refreshSuggest();
     }
 
     private void sendVoice() {
@@ -1453,13 +1496,18 @@ public class AdsChatActivity extends Activity {
         pendingVoice = null;
         voicePreview.setVisibility(View.GONE);
         input.setVisibility(View.VISIBLE);
+        refreshSuggest();
         if (r == null) return;
         AdsMedia.Prepared p = new AdsMedia.Prepared();
-        p.file = r.file; p.kind = "voice"; p.name = "voice.m4a"; p.size = r.file.length();
+        p.file = r.file; p.kind = "voice"; p.name = r.name; p.size = r.file.length();
         startUpload(p, "voice", r.durMs, r.wave);
     }
 
     private final class ChatAdapter extends BaseAdapter {
+        @Override public void notifyDataSetChanged() {
+            super.notifyDataSetChanged();
+            refreshSuggest();          // the chips follow the conversation (same chips = nothing is rebuilt)
+        }
         @Override public int getCount() { return items.size(); }
         @Override public Object getItem(int i) { return items.get(i); }
         @Override public long getItemId(int i) { return i; }
@@ -1524,7 +1572,8 @@ public class AdsChatActivity extends Activity {
             rp.setPadding(AdsUi.dp(c, 8), AdsUi.dp(c, 4), AdsUi.dp(c, 8), AdsUi.dp(c, 4));
             rp.setBackground(CigramSupport.round(mine ? 0x33000000 : 0x22000000, 8, c));
             rp.addView(AdsUi.text(c, "رد على: " + ("user".equals(m.reply.optString("from")) ? "أنت" : CigramSupport.developer(c).name), 11f, sub, true));
-            TextView pv = AdsUi.text(c, m.reply.optString("preview"), 13f, tx, false);
+            TextView pv = AdsUi.text(c, "", 13f, tx, false);
+            CigramEmoji.bind(pv, m.reply.optString("preview"));
             pv.setMaxLines(2);
             rp.addView(pv);
             bubble.addView(rp, AdsUi.lp(-1, -2, 0, 0, 0, AdsUi.dp(c, 6)));
@@ -1548,7 +1597,9 @@ public class AdsChatActivity extends Activity {
         }
         boolean cardOnly = "quote".equals(m.type) || "order".equals(m.type);
         if (!m.deleted && m.text != null && m.text.length() > 0 && !cardOnly && !"voice".equals(m.type)) {
-            TextView t = AdsUi.text(c, m.text, 15f, tx, false);
+            boolean jumbo = m.media == null && m.reply == null && CigramEmoji.isJumbo(c, m.text);
+            TextView t = AdsUi.text(c, "", jumbo ? 34f : 15f, tx, false);
+            CigramEmoji.bind(t, m.text);
             t.setLineSpacing(0f, 1.15f);
             // Arabic right-aligned, English left-aligned and never reversed (paragraph direction = first strong letter)
             t.setGravity(CigramSupport.startsRtl(m.text) ? Gravity.RIGHT : Gravity.LEFT);
@@ -1603,41 +1654,64 @@ public class AdsChatActivity extends Activity {
         return holder;
     }
 
+    /**
+     * 19.2: a compact preview that shows the WHOLE picture in its own shape (portrait stays portrait, wide stays wide)
+     * with rounded corners; only an extreme panorama / strip is cropped. A tap opens it inside the app
+     * ({@link CigramMediaViewer}): zoom + save for a photo, the player with seek / sound for a video.
+     */
     private View imageView(final Msg m, final boolean video) {
         int w = m.media.optInt("w"), hh = m.media.optInt("h");
-        int bw = Math.min(maxBubble - AdsUi.dp(this, 24), AdsUi.dp(this, 240));
-        int bh = (w > 0 && hh > 0) ? (int) (bw * (float) hh / w) : bw * 3 / 4;
-        bh = Math.max(AdsUi.dp(this, 110), Math.min(AdsUi.dp(this, 320), bh));
+        float ratio = (w > 0 && hh > 0) ? (float) w / hh : (video ? 16f / 9f : 4f / 3f);
+        boolean extreme = ratio > 2.2f || ratio < 0.5f;
+        ratio = Math.max(0.5f, Math.min(2.2f, ratio));
+        int maxW = Math.min(maxBubble - AdsUi.dp(this, 24), AdsUi.dp(this, 232)), maxH = AdsUi.dp(this, 264);
+        int bw = maxW, bh = Math.round(bw / ratio);
+        if (bh > maxH) { bh = maxH; bw = Math.round(bh * ratio); }
+        bw = Math.max(bw, AdsUi.dp(this, 132));
         FrameLayout f = new FrameLayout(this);
-        AdsViews.Round iv = new AdsViews.Round(this, AdsUi.dp(this, 10));
-        iv.setBackgroundColor(0x33000000);
-        iv.setContentDescription(video ? "فيديو" : "صورة");
+        AdsViews.Round iv = new AdsViews.Round(this, AdsUi.dp(this, 14));
+        iv.setBackgroundColor(0xFF0C0C0E);
+        iv.setScaleType(extreme || w <= 0 ? android.widget.ImageView.ScaleType.CENTER_CROP : android.widget.ImageView.ScaleType.FIT_CENTER);
+        iv.setContentDescription(video ? "فيديو — اضغط للتشغيل" : "صورة — اضغط للعرض");
         f.addView(iv, new FrameLayout.LayoutParams(bw, bh));
-        if (m.localPath != null && !video) {
+        if (m.localPath != null && !video && new File(m.localPath).isFile()) {
             try {
                 BitmapFactory.Options o = new BitmapFactory.Options();
-                o.inSampleSize = 4;
-                Bitmap b = BitmapFactory.decodeFile(m.localPath, o);
+                o.inJustDecodeBounds = true;
+                BitmapFactory.decodeFile(m.localPath, o);
+                int sample = 1;
+                while (Math.max(o.outWidth, o.outHeight) / sample > 1280) sample *= 2;
+                BitmapFactory.Options o2 = new BitmapFactory.Options();
+                o2.inSampleSize = sample;
+                Bitmap b = BitmapFactory.decodeFile(m.localPath, o2);
                 if (b != null) iv.setImageBitmap(b);
             } catch (Throwable ignored) { }
         } else if (m.media.optString("url").length() > 0) {
             AdsMedia.loadInto(this, iv, m.media.optString("url"), 640, video);
         }
         if (video) {
-            f.addView(new AdsIcons.Icon(this, AdsIcons.PLAY, 0xFFFFFFFF), new FrameLayout.LayoutParams(AdsUi.dp(this, 44), AdsUi.dp(this, 44), Gravity.CENTER));
+            FrameLayout badge = new FrameLayout(this);
+            badge.setBackground(CigramSupport.round(0x8C000000, 0x59FFFFFF, 26, this));
+            badge.addView(new AdsIcons.Icon(this, AdsIcons.PLAY, 0xFFFFFFFF), new FrameLayout.LayoutParams(AdsUi.dp(this, 24), AdsUi.dp(this, 24), Gravity.CENTER));
+            f.addView(badge, new FrameLayout.LayoutParams(AdsUi.dp(this, 52), AdsUi.dp(this, 52), Gravity.CENTER));
             if (m.media.optInt("dur") > 0) {
                 TextView d = AdsUi.text(this, AdsMedia.durLabel(m.media.optInt("dur")), 11f, 0xFFFFFFFF, true);
-                d.setBackground(CigramSupport.round(0x99000000, 8, this));
-                d.setPadding(AdsUi.dp(this, 6), AdsUi.dp(this, 2), AdsUi.dp(this, 6), AdsUi.dp(this, 2));
-                f.addView(d, new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.LEFT));
+                d.setBackground(CigramSupport.round(0xB3000000, 9, this));
+                d.setPadding(AdsUi.dp(this, 7), AdsUi.dp(this, 2), AdsUi.dp(this, 7), AdsUi.dp(this, 2));
+                FrameLayout.LayoutParams dl = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.LEFT);
+                dl.setMargins(AdsUi.dp(this, 7), 0, 0, AdsUi.dp(this, 7));
+                f.addView(d, dl);
             }
         }
-        if (m.progress >= 0 && m.state == 1) f.addView(uploadOverlay(m), new FrameLayout.LayoutParams(-1, -1));
+        if (m.progress >= 0 && m.state == 1) f.addView(uploadOverlay(m), new FrameLayout.LayoutParams(bw, bh));
         final String url = m.media.optString("url");
         f.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
-                if (m.state != 0 || url.length() == 0) return;
-                if (video) openExternal(url, "video/*"); else showImage(url);
+                String localFile = m.localPath != null && new File(m.localPath).isFile() ? m.localPath : null;
+                if (url.length() == 0 && localFile == null) return;
+                if (m.state == 1 && m.progress >= 0) return;         // still uploading: the overlay owns the tap
+                AdsVoice.stop();
+                CigramMediaViewer.open(AdsChatActivity.this, url, video, m.media.optString("name"), localFile);
             }
         });
         f.setOnLongClickListener(new View.OnLongClickListener() {
@@ -1785,27 +1859,5 @@ public class AdsChatActivity extends Activity {
         } catch (Throwable t) {
             AdsUi.toast(this, "لا يوجد تطبيق لفتح هذا الملف.");
         }
-    }
-
-    private void showImage(String url) {
-        final Dialog d = new Dialog(this);
-        FrameLayout f = new FrameLayout(this);
-        f.setBackgroundColor(0xFF000000);
-        final AdsViews.Zoom z = new AdsViews.Zoom(this);
-        z.setOnSingleTap(new Runnable() { @Override public void run() { d.dismiss(); } });
-        f.addView(z, new FrameLayout.LayoutParams(-1, -1));
-        TextView close = AdsUi.text(this, "✕", 22f, 0xFFFFFFFF, true);
-        close.setGravity(Gravity.CENTER);
-        close.setContentDescription("إغلاق");
-        close.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { d.dismiss(); } });
-        FrameLayout.LayoutParams cl = new FrameLayout.LayoutParams(AdsUi.dp(this, 48), AdsUi.dp(this, 48), Gravity.TOP | Gravity.RIGHT);
-        cl.setMargins(0, AdsUi.dp(this, 24), AdsUi.dp(this, 8), 0);
-        f.addView(close, cl);
-        d.requestWindowFeature(1);
-        d.setContentView(f);
-        try { d.getWindow().setBackgroundDrawable(new ColorDrawable(0xFF000000)); d.getWindow().setLayout(-1, -1); } catch (Throwable ignored) { }
-        d.show();
-        AdsMedia.loadInto(this, z, url, 2048, false);
-        z.postDelayed(new Runnable() { @Override public void run() { z.fit(); } }, 400);
     }
 }

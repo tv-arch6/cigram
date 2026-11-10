@@ -10,6 +10,8 @@
 	<uses-permission android:name="android.permission.WAKE_LOCK" />
 	<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 	<uses-permission android:name="android.permission.RECORD_AUDIO" />
+	<!-- 19.2: «حفظ» of a chat photo / video on Android 9 and older (Android 10+ needs no permission) -->
+	<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 	<application
 		android:allowBackup="false"
 		android:icon="@mipmap/ic_launcher"
@@ -334,6 +336,9 @@
     android:configChanges="orientation|screenSize|keyboardHidden"
     android:theme="@android:style/Theme.Material.NoActionBar"
     android:windowSoftInputMode="adjustResize" />
+
+<!-- 19.2: photos and videos of a conversation open inside the app (zoom / player / save) -->
+<activity android:name="com.my.newproject.CigramMediaViewer" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode" android:hardwareAccelerated="true" android:theme="@android:style/Theme.Material.NoActionBar" />
 
 	</application>
 </manifest>

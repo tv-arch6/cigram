@@ -6,6 +6,8 @@
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 	<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 	<uses-permission android:name="android.permission.RECORD_AUDIO" />
+	<!-- 19.2: «حفظ» of a chat photo / video on Android 9 and older (Android 10+ saves through MediaStore without any permission) -->
+	<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 	<!-- REQUEST_INSTALL_PACKAGES lives only in src/direct/AndroidManifest.xml (side-load flavor). -->
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -499,5 +501,12 @@
     android:exported="false"
     android:grantUriPermissions="true" />
 
-	</application>
+	<!-- 19.2: photos and videos of the private conversation open inside the app (zoom / player / save) -->
+<activity
+    android:name="com.Cigram.vid.CigramMediaViewer"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode"
+    android:hardwareAccelerated="true"
+    android:theme="@android:style/Theme.Material.NoActionBar" />
+</application>
 </manifest>

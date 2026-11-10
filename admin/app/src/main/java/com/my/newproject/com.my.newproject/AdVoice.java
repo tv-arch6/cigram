@@ -45,34 +45,84 @@ public final class AdVoice {
             public File file;
             public int durMs;
             public int[] wave;
+            /** "voice.m4a" (AAC) or "voice.3gp" (AMR, only on phones whose AAC encoder refuses to start). */
+            public String name = "voice.m4a";
         }
 
+        /** Why the last {@link #start} failed, in Arabic (shown to the user), "" when it did not fail. */
+        public String lastError = "";
+        private android.media.AudioManager focusManager;
+        private String fileName = "voice.m4a";
+
+        /**
+         * 19.2: the recorder no longer depends on ONE encoder setting. Each profile is tried in turn until the phone
+         * accepts one (some chipsets refuse 24 kHz AAC, some refuse the plain MIC source while another app holds it):
+         * AAC 24 kHz → AAC 44.1 kHz → AAC 16 kHz → AAC 8 kHz, each on MIC then on VOICE_RECOGNITION, and as the last
+         * resort AMR-NB in a 3GP file. Playback of a voice message is stopped first and audio focus is taken, so the
+         * microphone is not fighting the speaker.
+         */
         public boolean start(Context c, Tick t) {
+            this.tick = t;
+            lastError = "";
+            try { AdVoice.stop(); } catch (Throwable ignored) { }
+            File dir = new File(c.getCacheDir(), "ads_up");
+            if (!dir.exists()) dir.mkdirs();
             try {
-                this.tick = t;
-                File dir = new File(c.getCacheDir(), "ads_up");
-                if (!dir.exists()) dir.mkdirs();
-                file = File.createTempFile("v_", ".m4a", dir);
-                rec = new MediaRecorder();
-                rec.setAudioSource(MediaRecorder.AudioSource.MIC);
-                rec.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-                rec.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
-                rec.setAudioChannels(1);
-                rec.setAudioSamplingRate(24000);
-                rec.setAudioEncodingBitRate(32000);
-                rec.setMaxDuration(180000);
-                rec.setOutputFile(file.getAbsolutePath());
-                rec.prepare();
-                rec.start();
-                startedAt = System.currentTimeMillis();
-                running = true;
-                amps.clear();
-                MAIN.postDelayed(sampler, 100);
-                return true;
-            } catch (Throwable e) {
-                cleanup(true);
-                return false;
+                focusManager = (android.media.AudioManager) c.getApplicationContext().getSystemService(Context.AUDIO_SERVICE);
+                if (focusManager != null) focusManager.requestAudioFocus(null, android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
+            } catch (Throwable ignored) { }
+            // {output format, encoder, sample rate, bit rate}
+            int[][] profiles = {
+                    {MediaRecorder.OutputFormat.MPEG_4, MediaRecorder.AudioEncoder.AAC, 24000, 32000},
+                    {MediaRecorder.OutputFormat.MPEG_4, MediaRecorder.AudioEncoder.AAC, 44100, 64000},
+                    {MediaRecorder.OutputFormat.MPEG_4, MediaRecorder.AudioEncoder.AAC, 16000, 24000},
+                    {MediaRecorder.OutputFormat.MPEG_4, MediaRecorder.AudioEncoder.AAC, 8000, 16000},
+                    {MediaRecorder.OutputFormat.THREE_GPP, MediaRecorder.AudioEncoder.AMR_NB, 8000, 12200},
+            };
+            int[] sources = {MediaRecorder.AudioSource.MIC, MediaRecorder.AudioSource.VOICE_RECOGNITION, MediaRecorder.AudioSource.DEFAULT};
+            Throwable last = null;
+            for (int[] p : profiles) {
+                for (int src : sources) {
+                    boolean amr = p[1] == MediaRecorder.AudioEncoder.AMR_NB;
+                    try {
+                        file = File.createTempFile("v_", amr ? ".3gp" : ".m4a", dir);
+                        fileName = amr ? "voice.3gp" : "voice.m4a";
+                        rec = android.os.Build.VERSION.SDK_INT >= 31 ? new MediaRecorder(c.getApplicationContext()) : new MediaRecorder();
+                        rec.setAudioSource(src);
+                        rec.setOutputFormat(p[0]);
+                        rec.setAudioEncoder(p[1]);
+                        rec.setAudioChannels(1);
+                        rec.setAudioSamplingRate(p[2]);
+                        rec.setAudioEncodingBitRate(p[3]);
+                        rec.setMaxDuration(180000);
+                        rec.setOutputFile(file.getAbsolutePath());
+                        rec.prepare();
+                        rec.start();
+                        startedAt = System.currentTimeMillis();
+                        running = true;
+                        amps.clear();
+                        MAIN.postDelayed(sampler, 100);
+                        return true;
+                    } catch (Throwable e) {
+                        last = e;
+                        cleanup(true);
+                    }
+                }
             }
+            releaseFocus();
+            android.util.Log.w("CigramVoice", "no recorder profile worked", last);
+            boolean busy = false;
+            try {
+                int mode = focusManager == null ? 0 : focusManager.getMode();
+                busy = mode == android.media.AudioManager.MODE_IN_CALL || mode == android.media.AudioManager.MODE_IN_COMMUNICATION;
+            } catch (Throwable ignored) { }
+            lastError = busy ? "الميكروفون مشغول بمكالمة جارية. أنهِ المكالمة ثم سجّل رسالتك."
+                    : "الميكروفون مستخدم من تطبيق آخر الآن. أغلق التطبيق الذي يسجّل الصوت ثم أعد المحاولة.";
+            return false;
+        }
+
+        private void releaseFocus() {
+            try { if (focusManager != null) focusManager.abandonAudioFocus(null); } catch (Throwable ignored) { }
         }
 
         public int elapsed() {
@@ -90,6 +140,7 @@ public final class AdVoice {
             running = false;
             MAIN.removeCallbacks(sampler);
             boolean okStop = true;
+            releaseFocus();
             try {
                 rec.stop();
             } catch (Throwable e) {
@@ -103,6 +154,7 @@ public final class AdVoice {
             }
             Result r = new Result();
             r.file = file;
+            r.name = fileName;
             r.durMs = dur;
             r.wave = waveform(amps, 48);
             file = null;

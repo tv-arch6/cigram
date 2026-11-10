@@ -74,6 +74,12 @@ public class AdChatActivity extends CgBase {
     private float recDownX;
     private int maxBubble;
     private JSONObject settings;
+    // 19.2: the app's own emoji keyboard, suggestion chips, hands-free recording
+    private CigramEmojiPanel emojiPanel;
+    private CigramChatSuggest suggest;
+    private boolean recLocked;
+    private TextView recHint;
+    private JSONArray savedTemplates = new JSONArray();
 
     private final Runnable pollRun = new Runnable() {
         @Override public void run() {
@@ -131,6 +137,17 @@ public class AdChatActivity extends CgBase {
         replyBar.setVisibility(View.GONE);
         body.addView(replyBar, new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP));
 
+        suggest = new CigramChatSuggest(this);
+        suggest.setBackgroundColor(CgCfg.PAGE);
+        suggest.setListener(new CigramChatSuggest.Listener() {
+            @Override public void onPick(String text) {
+                input.setText(text);
+                input.setSelection(input.getText().length());
+                input.requestFocus();
+            }
+        });
+        body.addView(suggest, new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP));
+
         LinearLayout comp = CgUi.hbox(this);
         comp.setBackgroundColor(CgCfg.CARD);
         comp.setPadding(CgUi.dp(this, 6), CgUi.dp(this, 6), CgUi.dp(this, 6), CgUi.dp(this, 8));
@@ -145,6 +162,11 @@ public class AdChatActivity extends CgBase {
         quoteBtn.setContentDescription("إرسال عرض سعر");
         quoteBtn.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { showQuoteDialog(); } });
         comp.addView(quoteBtn, CgUi.lp(this, CgUi.dp(this, 48) / 1, CgUi.dp(this, 48), 4, 0, 0, 0));
+        TextView emojiBtn = CgUi.button(this, "☺", 1);
+        emojiBtn.setTextSize(20);
+        emojiBtn.setContentDescription("الرموز التعبيرية");
+        emojiBtn.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { toggleEmoji(); } });
+        comp.addView(emojiBtn, CgUi.lp(this, CgUi.dp(this, 44), CgUi.dp(this, 48), 4, 0, 0, 0));
         FrameLayout box = new FrameLayout(this);
         input = CgUi.field(this, "اكتب رد الإدارة...", true);
         input.setMinLines(1);
@@ -156,7 +178,11 @@ public class AdChatActivity extends CgBase {
         ((LinearLayout) recBar).addView(CgUi.text(this, "● ", 16, CgCfg.BAD, true));
         timerText = CgUi.text(this, "0:00", 15, CgCfg.TEXT, true);
         ((LinearLayout) recBar).addView(timerText);
-        ((LinearLayout) recBar).addView(CgUi.text(this, "   اسحب للإلغاء", 12.5f, CgCfg.MUTED, false));
+        recHint = CgUi.text(this, "   اسحب للإلغاء", 12.5f, CgCfg.MUTED, false);
+        ((LinearLayout) recBar).addView(recHint);
+        recBar.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { if (recLocked) { stopRec(true); CgUi.toast(AdChatActivity.this, "أُلغي التسجيل."); } }
+        });
         recBar.setVisibility(View.GONE);
         box.addView(recBar, new FrameLayout.LayoutParams(-1, CgUi.dp(this, 46)));
         comp.addView(box, CgUi.lp(this, 0, CgUi.WRAP, 4, 0, 4, 0));
@@ -176,6 +202,15 @@ public class AdChatActivity extends CgBase {
             @Override public boolean onTouch(View v, MotionEvent e) { return onActionTouch(e); }
         });
         body.addView(comp, new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP));
+        emojiPanel = new CigramEmojiPanel(this, CgCfg.PAGE, CgCfg.ACCENT_D, new CigramEmojiPanel.Listener() {
+            @Override public void onEmoji(String e) { CigramEmoji.insert(input, e); }
+            @Override public void onBackspace() { CigramEmoji.backspace(input); }
+        });
+        emojiPanel.setVisibility(View.GONE);
+        body.addView(emojiPanel, new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.dp(this, 286)));
+        CigramEmoji.attach(input);
+        input.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { emojiPanel.setVisibility(View.GONE); } });
+        input.setOnFocusChangeListener(new View.OnFocusChangeListener() { @Override public void onFocusChange(View v, boolean has) { if (has) emojiPanel.setVisibility(View.GONE); } });
         input.addTextChangedListener(new android.text.TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
@@ -183,6 +218,7 @@ public class AdChatActivity extends CgBase {
                 sendIcon.setVisibility(has ? View.VISIBLE : View.GONE);
                 micIcon.setVisibility(has ? View.GONE : View.VISIBLE);
                 if (has) typing();
+                refreshSuggest();
             }
             @Override public void afterTextChanged(android.text.Editable s) { }
         });
@@ -191,6 +227,59 @@ public class AdChatActivity extends CgBase {
         AdApi.get(this, "/ads/config", new AdApi.Cb() {
             @Override public void on(AdApi.Result r) { if (r.ok) settings = r.json.optJSONObject("settings"); }
         });
+        AdApi.get(this, "/admin/chat/templates", new AdApi.Cb() {
+            @Override public void on(AdApi.Result r) {
+                if (!alive() || !r.ok || r.json == null) return;
+                JSONArray t = r.json.optJSONArray("templates");
+                if (t != null) { savedTemplates = t; refreshSuggest(); }
+            }
+        });
+        refreshSuggest();
+    }
+
+    private void toggleEmoji() {
+        boolean show = emojiPanel.getVisibility() != View.VISIBLE;
+        emojiPanel.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (show) {
+            emojiPanel.refresh();
+            input.clearFocus();
+            try {
+                android.view.inputmethod.InputMethodManager im = (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                if (im != null) im.hideSoftInputFromWindow(input.getWindowToken(), 0);
+            } catch (Throwable ignored) { }
+        }
+    }
+
+    @Override public void onBackPressed() {
+        if (emojiPanel != null && emojiPanel.getVisibility() == View.VISIBLE) { emojiPanel.setVisibility(View.GONE); return; }
+        if (recLocked) { stopRec(true); return; }
+        super.onBackPressed();
+    }
+
+    /** The usual answers for where the conversation stands, then the admin's own saved templates. Hidden while typing / recording. */
+    private void refreshSuggest() {
+        if (suggest == null || input == null) return;
+        if (input.getText().toString().trim().length() > 0 || recorder != null) { suggest.setVisibility(View.GONE); return; }
+        Msg lastUser = null;
+        int real = 0;
+        for (int i = items.size() - 1; i >= 0 && real < 40; i--) {
+            Msg m = items.get(i);
+            if ("system".equals(m.type)) continue;
+            real++;
+            if (lastUser == null && !"admin".equals(m.from)) lastUser = m;
+        }
+        boolean lastIsUser = lastUser != null && !items.isEmpty() && items.get(items.size() - 1) == lastUser;
+        String[][] base = CigramChatSuggest.forDeveloper(real == 0, lastIsUser ? lastUser.type : "");
+        ArrayList<String[]> all = new ArrayList<String[]>();
+        for (String[] b : base) all.add(b);
+        for (int i = 0; i < savedTemplates.length() && i < 8; i++) {
+            JSONObject t = savedTemplates.optJSONObject(i);
+            if (t == null || t.optString("body").trim().length() == 0) continue;
+            String title = t.optString("title").trim();
+            all.add(new String[]{"\uD83D\uDCCC", title.length() > 0 ? title : "قالب " + (i + 1), t.optString("body")});
+        }
+        suggest.setItems(all.toArray(new String[0][]));
+        suggest.setVisibility(View.VISIBLE);
     }
 
     private static volatile String OPEN_THREAD = "";
@@ -595,9 +684,17 @@ public class AdChatActivity extends CgBase {
         }, m.cancel);
     }
 
+    /**
+     * With text the round button sends. Without text it records: hold → talk → release (slide sideways to cancel), or
+     * ONE TAP → hands-free recording until the button is tapped again (tap the bar to cancel).
+     */
     private boolean onActionTouch(MotionEvent e) {
         int a = e.getActionMasked();
         if (input.getText().toString().trim().length() > 0) { if (a == MotionEvent.ACTION_UP) doSend(); return true; }
+        if (recLocked) {
+            if (a == MotionEvent.ACTION_UP) finishRec(false);
+            return true;
+        }
         if (a == MotionEvent.ACTION_DOWN) {
             if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission("android.permission.RECORD_AUDIO") != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(new String[]{"android.permission.RECORD_AUDIO"}, REQ_PERM_AUDIO);
@@ -606,9 +703,16 @@ public class AdChatActivity extends CgBase {
             recDownX = e.getRawX(); recCancelled = false;
             recorder = new AdVoice.Recorder();
             if (!recorder.start(this, new AdVoice.Recorder.Tick() { @Override public void onTick(int ms, int amp) { timerText.setText(AdMedia.durLabel(ms)); } })) {
-                recorder = null; CgUi.toast(this, "تعذر بدء التسجيل."); return true;
+                String why = recorder.lastError;
+                recorder = null;
+                CgUi.toast(this, why.length() > 0 ? why : "تعذر بدء التسجيل.");
+                return true;
             }
+            if (emojiPanel != null) emojiPanel.setVisibility(View.GONE);
             input.setVisibility(View.INVISIBLE); recBar.setVisibility(View.VISIBLE);
+            recHint.setText("   اسحب للإلغاء");
+            timerText.setText("0:00");
+            refreshSuggest();
             return true;
         }
         if (recorder == null) return true;
@@ -617,25 +721,51 @@ public class AdChatActivity extends CgBase {
             timerText.setTextColor(recCancelled ? CgCfg.BAD : CgCfg.TEXT);
         } else if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) {
             boolean cancel = recCancelled || a == MotionEvent.ACTION_CANCEL;
-            int dur = recorder.elapsed();
-            AdVoice.Recorder.Result r = recorder.stop(cancel || dur < 1000);
-            recorder = null; recBar.setVisibility(View.GONE); input.setVisibility(View.VISIBLE); timerText.setTextColor(CgCfg.TEXT);
-            if (r != null) {
-                AdMedia.Prepared p = new AdMedia.Prepared();
-                p.file = r.file; p.kind = "voice"; p.name = "voice.m4a"; p.size = r.file.length();
-                startUpload(p, "voice", r.durMs, r.wave);
-            } else if (!cancel && dur < 1000) CgUi.toast(this, "اضغط مطولاً للتسجيل");
+            if (!cancel && recorder.elapsed() < 600) {       // a tap, not a hold: keep recording hands-free
+                recLocked = true;
+                recHint.setText("   اضغط الزر للإرسال · اضغط هنا للإلغاء");
+                micIcon.setVisibility(View.GONE);
+                sendIcon.setVisibility(View.VISIBLE);
+                return true;
+            }
+            finishRec(cancel);
         }
         return true;
     }
 
+    private void finishRec(boolean cancel) {
+        if (recorder == null) return;
+        int dur = recorder.elapsed();
+        AdVoice.Recorder.Result r = recorder.stop(cancel || dur < 1000);
+        recorder = null;
+        endRecUi();
+        if (r != null) {
+            AdMedia.Prepared p = new AdMedia.Prepared();
+            p.file = r.file; p.kind = "voice"; p.name = r.name; p.size = r.file.length();
+            startUpload(p, "voice", r.durMs, r.wave);
+        } else if (!cancel && dur < 1000) CgUi.toast(this, "التسجيل قصير جداً.");
+        refreshSuggest();
+    }
+
+    private void endRecUi() {
+        recLocked = false;
+        if (recBar != null) recBar.setVisibility(View.GONE);
+        if (input != null) input.setVisibility(View.VISIBLE);
+        if (timerText != null) timerText.setTextColor(CgCfg.TEXT);
+        if (input != null && sendIcon != null && micIcon != null) {
+            boolean has = input.getText().toString().trim().length() > 0;
+            sendIcon.setVisibility(has ? View.VISIBLE : View.GONE);
+            micIcon.setVisibility(has ? View.GONE : View.VISIBLE);
+        }
+    }
+
     private void stopRec(boolean cancel) {
-        if (recorder != null) { recorder.stop(cancel); recorder = null; recBar.setVisibility(View.GONE); input.setVisibility(View.VISIBLE); }
+        if (recorder != null) { recorder.stop(cancel); recorder = null; endRecUi(); refreshSuggest(); }
     }
 
     @Override public void onRequestPermissionsResult(int req, String[] perms, int[] results) {
         super.onRequestPermissionsResult(req, perms, results);
-        if (req == REQ_PERM_AUDIO) CgUi.toast(this, results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED ? "اضغط مطولاً على الميكروفون للتسجيل." : "يلزم إذن الميكروفون.");
+        if (req == REQ_PERM_AUDIO) CgUi.toast(this, results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED ? "اضغط على الميكروفون للتسجيل (ضغطة واحدة أو ضغط مطوّل)." : "يلزم إذن الميكروفون.");
     }
 
     // ------------------------------------------------------------------ عرض السعر والقوالب
@@ -855,6 +985,10 @@ public class AdChatActivity extends CgBase {
     }
 
     private final class ChatAdapter extends BaseAdapter {
+        @Override public void notifyDataSetChanged() {
+            super.notifyDataSetChanged();
+            refreshSuggest();
+        }
         @Override public int getCount() { return items.size(); }
         @Override public Object getItem(int i) { return items.get(i); }
         @Override public long getItemId(int i) { return i; }
@@ -897,7 +1031,8 @@ public class AdChatActivity extends CgBase {
         bubble.setBackground(CgUi.bg(c, mine ? CgCfg.ACCENT_D : CgCfg.CARD2, 14, mine ? 0 : CgCfg.STROKE));
         int tx = CgCfg.TEXT, sub = mine ? 0xCCFFFFFF : CgCfg.MUTED;
         if (m.reply != null && !m.deleted) {
-            TextView r = CgUi.text(c, "↩ " + m.reply.optString("preview"), 12, sub, false);
+            TextView r = CgUi.text(c, "", 12, sub, false);
+            CigramEmoji.bind(r, "↩ " + m.reply.optString("preview"));
             r.setMaxLines(2);
             r.setBackground(CgUi.bg(c, 0x33000000, 8, 0));
             r.setPadding(CgUi.dp(c, 8), CgUi.dp(c, 4), CgUi.dp(c, 8), CgUi.dp(c, 4));
@@ -932,7 +1067,9 @@ public class AdChatActivity extends CgBase {
         }
         boolean cardOnly = "quote".equals(m.type) || "order".equals(m.type);
         if (!m.deleted && m.text != null && m.text.length() > 0 && !cardOnly && !"voice".equals(m.type)) {
-            TextView t = CgUi.text(c, m.text, 14.5f, tx, false);
+            boolean jumbo = m.media == null && m.reply == null && CigramEmoji.isJumbo(c, m.text);
+            TextView t = CgUi.text(c, "", jumbo ? 34f : 14.5f, tx, false);
+            CigramEmoji.bind(t, m.text);
             t.setAutoLinkMask(android.text.util.Linkify.WEB_URLS | android.text.util.Linkify.PHONE_NUMBERS);
             t.setLinkTextColor(0xFF7FE9F5);
             bubble.addView(t, CgUi.lp(c, CgUi.WRAP, CgUi.WRAP, 0, ("image".equals(m.type) || "video".equals(m.type)) ? 5 : 0, 0, 0));
@@ -955,32 +1092,69 @@ public class AdChatActivity extends CgBase {
         root.addView(holder, hl);
     }
 
+    /**
+     * 19.2: a compact preview in the picture's own shape with rounded corners (only an extreme strip is cropped).
+     * A tap opens it inside the app ({@link CigramMediaViewer}): zoom + save for a photo, the player for a video.
+     */
     private View mediaView(final Msg m, final boolean video) {
         int w = m.media.optInt("w"), h = m.media.optInt("h");
-        int bw = Math.min(maxBubble - CgUi.dp(this, 24), CgUi.dp(this, 230));
-        int bh = (w > 0 && h > 0) ? (int) (bw * (float) h / w) : bw * 3 / 4;
-        bh = Math.max(CgUi.dp(this, 100), Math.min(CgUi.dp(this, 300), bh));
+        float ratio = (w > 0 && h > 0) ? (float) w / h : (video ? 16f / 9f : 4f / 3f);
+        boolean extreme = ratio > 2.2f || ratio < 0.5f;
+        ratio = Math.max(0.5f, Math.min(2.2f, ratio));
+        int maxW = Math.min(maxBubble - CgUi.dp(this, 24), CgUi.dp(this, 232)), maxH = CgUi.dp(this, 264);
+        int bw = maxW, bh = Math.round(bw / ratio);
+        if (bh > maxH) { bh = maxH; bw = Math.round(bh * ratio); }
+        bw = Math.max(bw, CgUi.dp(this, 132));
         FrameLayout f = new FrameLayout(this);
-        AdViews.Round iv = new AdViews.Round(this, CgUi.dp(this, 10));
-        iv.setBackgroundColor(0x33000000);
+        AdViews.Round iv = new AdViews.Round(this, CgUi.dp(this, 14));
+        iv.setBackgroundColor(0xFF0C0C0E);
+        iv.setScaleType(extreme || w <= 0 ? android.widget.ImageView.ScaleType.CENTER_CROP : android.widget.ImageView.ScaleType.FIT_CENTER);
+        iv.setContentDescription(video ? "فيديو — اضغط للتشغيل" : "صورة — اضغط للعرض");
         f.addView(iv, new FrameLayout.LayoutParams(bw, bh));
-        if (m.localPath != null && !video) {
-            try { BitmapFactory.Options o = new BitmapFactory.Options(); o.inSampleSize = 4; Bitmap b = BitmapFactory.decodeFile(m.localPath, o); if (b != null) iv.setImageBitmap(b); } catch (Throwable ignored) { }
+        final boolean hasLocal = m.localPath != null && new java.io.File(m.localPath).isFile();
+        if (hasLocal && !video) {
+            try {
+                BitmapFactory.Options o = new BitmapFactory.Options();
+                o.inJustDecodeBounds = true;
+                BitmapFactory.decodeFile(m.localPath, o);
+                int sample = 1;
+                while (Math.max(o.outWidth, o.outHeight) / sample > 1280) sample *= 2;
+                BitmapFactory.Options o2 = new BitmapFactory.Options();
+                o2.inSampleSize = sample;
+                Bitmap b = BitmapFactory.decodeFile(m.localPath, o2);
+                if (b != null) iv.setImageBitmap(b);
+            } catch (Throwable ignored) { }
         } else if (m.media.optString("url").length() > 0) AdMedia.loadInto(this, iv, m.media.optString("url"), 640, video);
         if (video) {
-            TextView p = CgUi.text(this, "▶", 34, 0xFFFFFFFF, true);
+            TextView p = CgUi.text(this, "▶", 22, 0xFFFFFFFF, true);
             p.setGravity(Gravity.CENTER);
-            f.addView(p, new FrameLayout.LayoutParams(-1, -1));
+            p.setBackground(CgUi.bg(this, 0x8C000000, 26, 0x59FFFFFF));
+            f.addView(p, new FrameLayout.LayoutParams(CgUi.dp(this, 52), CgUi.dp(this, 52), Gravity.CENTER));
+            if (m.media.optInt("dur") > 0) {
+                TextView d = CgUi.text(this, AdMedia.durLabel(m.media.optInt("dur")), 11, 0xFFFFFFFF, true);
+                d.setBackground(CgUi.bg(this, 0xB3000000, 9, 0));
+                d.setPadding(CgUi.dp(this, 7), CgUi.dp(this, 2), CgUi.dp(this, 7), CgUi.dp(this, 2));
+                FrameLayout.LayoutParams dl = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.LEFT);
+                dl.setMargins(CgUi.dp(this, 7), 0, 0, CgUi.dp(this, 7));
+                f.addView(d, dl);
+            }
         }
-        if (m.progress >= 0 && m.state == 1) {
+        final boolean uploading = m.progress >= 0 && m.state == 1;
+        if (uploading) {
             TextView o = CgUi.text(this, m.progress + "%  (اضغط للإلغاء)", 14, 0xFFFFFFFF, true);
             o.setGravity(Gravity.CENTER);
-            o.setBackgroundColor(0x88000000);
+            o.setBackground(CgUi.bg(this, 0x88000000, 14, 0));
             o.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { if (m.cancel != null) m.cancel.set(true); items.remove(m); adapter.notifyDataSetChanged(); } });
-            f.addView(o, new FrameLayout.LayoutParams(-1, -1));
+            f.addView(o, new FrameLayout.LayoutParams(bw, bh));
         }
         final String url = m.media.optString("url");
-        f.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { if (m.state == 0 && url.length() > 0) openUrl(url, video ? "video/*" : "image/*"); } });
+        f.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                if (uploading || (url.length() == 0 && !hasLocal)) return;
+                AdVoice.stop();
+                CigramMediaViewer.open(AdChatActivity.this, url, video, m.media.optString("name"), hasLocal ? m.localPath : null);
+            }
+        });
         f.setOnLongClickListener(new View.OnLongClickListener() { @Override public boolean onLongClick(View v) { actions(m); return true; } });
         return f;
     }
