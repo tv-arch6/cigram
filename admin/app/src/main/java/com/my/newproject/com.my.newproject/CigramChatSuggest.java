@@ -37,6 +37,15 @@ final class CigramChatSuggest extends HorizontalScrollView {
     private final float d;
     private Listener listener;
     private String signature = "";
+    private boolean openAtRight;
+
+    @Override protected void onLayout(boolean changed, int l, int t, int r, int b) {
+        super.onLayout(changed, l, t, r, b);
+        if (openAtRight && row.getWidth() > 0) {
+            openAtRight = false;
+            scrollTo(Math.max(0, row.getWidth() + getPaddingLeft() + getPaddingRight() - getWidth()), 0);
+        }
+    }
 
     CigramChatSuggest(Context c) {
         super(c);
@@ -65,32 +74,25 @@ final class CigramChatSuggest extends HorizontalScrollView {
         if (sig.toString().equals(signature)) return;      // same chips: nothing is rebuilt (no flicker on new messages)
         signature = sig.toString();
         row.removeAllViews();
-        // the app builds RTL screens by hand: the first suggestion sits on the right
-        setLayoutDirection(LAYOUT_DIRECTION_RTL);
-        row.setLayoutDirection(LAYOUT_DIRECTION_RTL);
-        for (int i = 0; i < items.length; i++) {
+        // The app has no RTL layout support switched on (the screens are mirrored by hand): the chips are added in
+        // reverse so the FIRST suggestion is the right-most one, and the row opens scrolled to its right end.
+        for (int i = items.length - 1; i >= 0; i--) {
             final String[] it = items[i];
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, dp(38));
             lp.setMargins(dp(4), 0, dp(4), 0);
             row.addView(chip(it[0], it[1], it.length > 2 && it[2] != null && it[2].length() > 0 ? it[2] : it[1]), lp);
         }
-        post(new Runnable() { @Override public void run() { fullScroll(FOCUS_RIGHT); } });
+        openAtRight = true;
+        requestLayout();
     }
 
     private View chip(final String emoji, String label, final String sentence) {
         final LinearLayout chip = new LinearLayout(getContext());
         chip.setOrientation(LinearLayout.HORIZONTAL);
         chip.setGravity(Gravity.CENTER_VERTICAL);
-        chip.setLayoutDirection(LAYOUT_DIRECTION_RTL);
         chip.setPadding(dp(13), 0, dp(13), 0);
         chip.setBackground(new Ring(d));
         chip.setContentDescription(label);
-        if (emoji != null && emoji.length() > 0) {
-            EmojiDot dot = new EmojiDot(getContext(), emoji);
-            LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(dp(19), dp(19));
-            dl.setMargins(dp(7), 0, 0, 0);
-            chip.addView(dot, dl);
-        }
         TextView t = new TextView(getContext());
         t.setText(label);
         t.setTextColor(0xFFFFFFFF);
@@ -98,6 +100,12 @@ final class CigramChatSuggest extends HorizontalScrollView {
         t.setMaxLines(1);
         t.setIncludeFontPadding(false);
         chip.addView(t, new LinearLayout.LayoutParams(-2, -2));
+        if (emoji != null && emoji.length() > 0) {            // Arabic reads from the right: the emoji leads on the right
+            EmojiDot dot = new EmojiDot(getContext(), emoji);
+            LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(dp(19), dp(19));
+            dl.setMargins(dp(7), 0, 0, 0);
+            chip.addView(dot, dl);
+        }
         chip.setOnTouchListener(new OnTouchListener() {
             @Override public boolean onTouch(View v, MotionEvent e) {
                 int a = e.getActionMasked();

@@ -51,6 +51,8 @@ android {
     // JVM unit tests call code that logs through android.util.Log: the stub android.jar returns defaults instead of throwing.
     testOptions {
         unitTests.isReturnDefaultValues = true
+        // 19.2: the UI tests (Robolectric) run the real Android view code on the JVM and need the app's assets
+        unitTests.isIncludeAndroidResources = true
     }
 }
 
@@ -72,6 +74,7 @@ dependencies {
     implementation("com.google.android.exoplayer:exoplayer-dash:2.19.1")
     implementation("com.google.android.exoplayer:exoplayer-rtsp:2.19.1")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("org.json:json:20231013")
 }
 
@@ -79,4 +82,15 @@ dependencies {
 // the library). Gradle adds the official library itself, so its Java compiler skips the stub: no duplicate class.
 tasks.withType<JavaCompile>().configureEach {
     exclude("androidx/viewbinding/ViewBinding.java")
+}
+
+// The UI tests (Robolectric) need the Android runtime jar. Where Maven Central cannot be reached from the test JVM,
+// download it once and point ROBOLECTRIC_DEPS at its folder; without the variable Robolectric fetches it itself.
+tasks.withType<Test>().configureEach {
+    val deps = System.getenv("ROBOLECTRIC_DEPS")
+    if (deps != null && deps.isNotEmpty()) {
+        systemProperty("robolectric.offline", "true")
+        systemProperty("robolectric.dependency.dir", deps)
+    }
+    maxHeapSize = "2g"
 }

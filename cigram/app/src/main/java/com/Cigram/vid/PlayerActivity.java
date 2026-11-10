@@ -642,9 +642,12 @@ public class PlayerActivity extends AppCompatActivity {
 			}
 		} catch (Throwable ignored) { }
 		
+		// 19.2 Subtitle Auto Sync: a title that opens with a subtitle is "heard" through a pass-through wrapper on the audio
+		// output (speech-band loudness per 50 ms, nothing recorded). No subtitle / switched off = the stock factory.
+		final CigramAudioTap cgAudioTap = CigramAudioTap.wanted(this, subtitleValue) ? CigramAudioTap.create() : null;
 		final com.google.android.exoplayer2.ExoPlayer exoPlayer =
 		new com.google.android.exoplayer2.ExoPlayer.Builder(this,
-		new com.google.android.exoplayer2.DefaultRenderersFactory(this)
+		(cgAudioTap != null ? cgAudioTap.renderersFactory(this) : new com.google.android.exoplayer2.DefaultRenderersFactory(this))
 		.setEnableDecoderFallback(true))   // try the next decoder when the first one cannot start (audio / video)
 		.setTrackSelector(trackSelector)
 		.setLoadControl(loadControl)
@@ -1768,36 +1771,14 @@ public class PlayerActivity extends AppCompatActivity {
 			}
 			
 			android.graphics.drawable.Drawable makeBackground(int kind) {
-				android.graphics.drawable.GradientDrawable shape = new android.graphics.drawable.GradientDrawable();
-				android.graphics.drawable.GradientDrawable mask = new android.graphics.drawable.GradientDrawable();
-				mask.setColor(android.graphics.Color.WHITE);
-				if (kind == 2) {
-					shape.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-					shape.setCornerRadius(26f * dp);
-					shape.setOrientation(android.graphics.drawable.GradientDrawable.Orientation.TL_BR);
-					shape.setColors(new int[]{0xFFFF3B2F, 0xFFE21B14, 0xFFB0100C});
-					shape.setStroke(Math.max(1, (int) (1f * dp)), 0x40FFFFFF);
-					mask.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-					mask.setCornerRadius(26f * dp);
-				} else if (kind == 1) {
-					shape.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-					shape.setColor(0x4D000000);
-					shape.setStroke(Math.max(1, (int) (1.2f * dp)), 0x33FFFFFF);
-					mask.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-				} else {
-					shape.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-					shape.setColor(0x00000000);
-					mask.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-				}
-				return new android.graphics.drawable.RippleDrawable(
-				android.content.res.ColorStateList.valueOf(kind == 2 ? 0x55FFFFFF : 0x33FFFFFF), shape, mask);
+				// 19.2 «Cigram Signature»: round red play button in a red-to-gold ring, glass discs for the seek buttons
+				return CigramPlayerButtons.background(kind, dp);
 			}
 			
 			void apply(android.widget.ImageButton button, int iconType, boolean mainButton) {
 				boolean plain = iconType == ICON_PREVIOUS || iconType == ICON_NEXT;
 				button.setBackground(makeBackground(mainButton ? 2 : plain ? 0 : 1));
-				button.setImageDrawable(new ControlIcon(iconType));
-				button.setColorFilter(android.graphics.Color.WHITE, android.graphics.PorterDuff.Mode.SRC_IN);
+				button.setImageDrawable(new CigramPlayerButtons.Icon(iconType, cgPlayerPrefs));
 				button.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
 				int padding = (int) ((mainButton ? 19f : plain ? 11f : 12f) * dp);
 				button.setPadding(padding, padding, padding, padding);
@@ -1812,8 +1793,7 @@ public class PlayerActivity extends AppCompatActivity {
 			}
 			
 			void setPlayState(android.widget.ImageButton button, boolean playing) {
-				button.setImageDrawable(new ControlIcon(playing ? ICON_PAUSE : ICON_PLAY));
-				button.setColorFilter(android.graphics.Color.WHITE, android.graphics.PorterDuff.Mode.SRC_IN);
+				button.setImageDrawable(new CigramPlayerButtons.Icon(playing ? ICON_PAUSE : ICON_PLAY, cgPlayerPrefs));
 			}
 			
 			void press(final android.view.View button) {
@@ -2520,6 +2500,8 @@ public class PlayerActivity extends AppCompatActivity {
 		// =====================================================
 		
 		final boolean[] subtitlesEnabled = { subtitlePrefs.getBoolean("subtitle_enabled", true) };
+		// 19.2: Cigram Auto Repair / Broken Stream Repair (created right after the loader below)
+		final CigramAutoRepair[] cgAutoRepair = { null };
 		
 		class MediaLoader {
 			
@@ -2656,6 +2638,7 @@ public class PlayerActivity extends AppCompatActivity {
 				} catch (Exception ignored) {}
 				
 				endedHandled[0] = false;
+				if (cgAutoRepair[0] != null) cgAutoRepair[0].onLoadStarted();
 				
 				final int thisLoad = ++mediaLoadGeneration[0];
 				
@@ -2752,6 +2735,8 @@ public class PlayerActivity extends AppCompatActivity {
 						if (
 						exoPlayer.getPlayerError() != null
 						) {
+							// 19.2: the repair ladder takes a failed load from here (reopen / renew the link / lower the quality)
+							if (cgAutoRepair[0] != null && cgAutoRepair[0].onLoadFailed()) return;
 							android.widget.Toast.makeText(
 							PlayerActivity.this,
 							"تعذر تشغيل الفيديو",
@@ -2771,6 +2756,84 @@ public class PlayerActivity extends AppCompatActivity {
 		}
 		
 		final MediaLoader mediaLoader = new MediaLoader();
+		
+		// =====================================================
+		// 19.2 CIGRAM AUTO REPAIR — a cut connection, an expired link, a stuck stream or a decoder that gives up in the
+		// middle of a film is repaired in place (same second, same screen). See CigramAutoRepair / CigramRepairPlan.
+		// =====================================================
+		try {
+			final android.widget.TextView cgRepairChip = new android.widget.TextView(this);
+			cgRepairChip.setTextColor(android.graphics.Color.WHITE);
+			cgRepairChip.setTextSize(13f);
+			cgRepairChip.setGravity(android.view.Gravity.CENTER);
+			cgRepairChip.setPadding((int) (16f * dp), (int) (8f * dp), (int) (16f * dp), (int) (8f * dp));
+			android.graphics.drawable.GradientDrawable cgRepairBg = new android.graphics.drawable.GradientDrawable();
+			cgRepairBg.setColor(0xE6141416);
+			cgRepairBg.setCornerRadius(20f * dp);
+			cgRepairBg.setStroke(Math.max(1, (int) dp), 0x55E21B14);
+			cgRepairChip.setBackground(cgRepairBg);
+			cgRepairChip.setVisibility(android.view.View.GONE);
+			android.widget.FrameLayout.LayoutParams cgRepairLp = new android.widget.FrameLayout.LayoutParams(-2, -2,
+			android.view.Gravity.TOP | android.view.Gravity.CENTER_HORIZONTAL);
+			cgRepairLp.setMargins((int) (24f * dp), (int) (64f * dp), (int) (24f * dp), 0);
+			playerHost.addView(cgRepairChip, cgRepairLp);
+			cgAutoRepair[0] = CigramAutoRepair.attach(this, new CigramAutoRepair.Host() {
+				@Override public boolean alive() { return !isFinishing() && !isDestroyed(); }
+				@Override public com.google.android.exoplayer2.ExoPlayer player() { return exoPlayer; }
+				@Override public void reopen(long positionMs) {
+					// the stream being played is reopened; the link the title was opened with stays the saved source
+					if (!currentVideo[0].equals(sourceVideo[0])) fromResolver[0] = true;
+					mediaLoader.load(currentVideo[0], currentSubtitle[0], positionMs);
+				}
+				@Override public void reopenFromSource(long positionMs) {
+					mediaLoader.load(sourceVideo[0].equals("") ? currentVideo[0] : sourceVideo[0], currentSubtitle[0], positionMs);
+				}
+				@Override public boolean hasSeparateSource() {
+					return !sourceVideo[0].equals("") && !sourceVideo[0].equals(currentVideo[0]);
+				}
+				@Override public boolean setMaxVideoHeight(int height) {
+					try {
+						// never above what the account's plan allows (a free account stays at its own ceiling)
+						int plan = CigramPlus.isPlus(PlayerActivity.this) ? Integer.MAX_VALUE : CigramPlus.FREE_MAX_HEIGHT;
+						int cap = height <= 0 ? plan : Math.min(plan, height);
+						trackSelector.setParameters(trackSelector.buildUponParameters().setMaxVideoSize(Integer.MAX_VALUE, cap));
+						return true;
+					} catch (Throwable cgCapError) {
+						return false;
+					}
+				}
+				@Override public void status(String text) {
+					try {
+						if (text == null) { cgRepairChip.setVisibility(android.view.View.GONE); return; }
+						cgRepairChip.setText(text);
+						cgRepairChip.setVisibility(android.view.View.VISIBLE);
+						cgRepairChip.bringToFront();
+					} catch (Throwable ignored) { }
+				}
+				@Override public void failed(String message, final Runnable retry) {
+					if (isFinishing() || isDestroyed()) return;
+					try {
+						new android.app.AlertDialog.Builder(PlayerActivity.this)
+						.setTitle("تعذّر إصلاح البث")
+						.setMessage(message)
+						.setCancelable(false)
+						.setPositiveButton("إعادة المحاولة", new android.content.DialogInterface.OnClickListener() {
+							@Override public void onClick(android.content.DialogInterface d, int w) { retry.run(); }
+						})
+						.setNegativeButton("رجوع", new android.content.DialogInterface.OnClickListener() {
+							@Override public void onClick(android.content.DialogInterface d, int w) { finish(); }
+						})
+						.show();
+					} catch (Throwable ignored) { }
+				}
+				@Override public String titleKey() {
+					return mediaIdentity + "|" + currentSeason[0] + "|" + currentEpisode[0];
+				}
+			}, uiHandler);
+			cgAutoRepair[0].applyLearnedCeiling();
+		} catch (Throwable cgRepairError) {
+			android.util.Log.w("CigramAutoRepair", "not attached", cgRepairError);
+		}
 		
 		// =====================================================
 		// EPISODE CONTROLLER
@@ -4412,8 +4475,8 @@ public class PlayerActivity extends AppCompatActivity {
 				});
 				// 18.2: «توقيت الترجمة» — the viewer's delay (CigramSubtitleSyncEngine), presets + fine tuning with preview
 				if(cgSubEngine[0]!=null&&cgSubEngine[0].isActive()){
-					final long[] cgDelayValues={Long.MIN_VALUE,-2000L,-1000L,-500L,-250L,0L,250L,500L,1000L,2000L};
-					final String[] cgDelayLabels={"تعديل دقيق مع معاينة…","\u22122 ث","\u22121 ث","\u22120.5 ث","\u22120.25 ث","0 (متزامنة)","+0.25 ث","+0.5 ث","+1 ث","+2 ث"};
+					final long[] cgDelayValues={Long.MIN_VALUE,-2000L,-1000L,-500L,-250L,0L,250L,500L,1000L,2000L,Long.MAX_VALUE};
+					final String[] cgDelayLabels={"تعديل دقيق مع معاينة…","\u22122 ث","\u22121 ث","\u22120.5 ث","\u22120.25 ث","0 (متزامنة)","+0.25 ث","+0.5 ث","+1 ث","+2 ث","ضبط تلقائي من صوت الفيلم…"};
 					long cgDelayNow=cgSubEngine[0].delayMs();
 					sheet.item("توقيت الترجمة",cgDelayNow==0?"متزامنة":com.Cigram.subhub.SubSync.delayLabel(cgDelayNow),new CigramPlayerSheet.Source(){
 						@Override public CigramPlayerSheet.Options load(){
@@ -4427,6 +4490,14 @@ public class PlayerActivity extends AppCompatActivity {
 								uiHandler.postDelayed(new java.lang.Runnable(){@Override public void run(){
 									try{sheet.dismiss();}catch(Throwable ignored){}
 									uiHandler.postDelayed(new java.lang.Runnable(){@Override public void run(){CigramSubtitleDelayPanel.show(PlayerActivity.this,cgSubEngine[0]);}},300L);
+								}},120L);
+								return null;
+							}
+							if(cgDelayValues[which]==Long.MAX_VALUE){
+								// 19.2 Auto Sync: the delay is measured against the film's own sound; the viewer confirms it
+								uiHandler.postDelayed(new java.lang.Runnable(){@Override public void run(){
+									try{sheet.dismiss();}catch(Throwable ignored){}
+									uiHandler.postDelayed(new java.lang.Runnable(){@Override public void run(){CigramAutoSyncUi.run(PlayerActivity.this,cgSubEngine[0],cgAudioTap);}},300L);
 								}},120L);
 								return null;
 							}
@@ -4905,6 +4976,7 @@ public class PlayerActivity extends AppCompatActivity {
 			) {
 				episodeController.saveCurrentProgress();
 				
+				if (cgAutoRepair[0] != null) cgAutoRepair[0].stop();
 				uiHandler.removeCallbacksAndMessages(null);
 				
 				if (subtitleView != null) {
