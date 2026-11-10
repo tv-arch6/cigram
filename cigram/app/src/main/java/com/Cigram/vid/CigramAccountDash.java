@@ -59,6 +59,7 @@ final class CigramAccountDash {
     private static final String TAG_AD_REQUEST = "cigram_row_ad_request";
     private static final String TAG_ABOUT = "cigram_row_about";
     private static final String TAG_TERMS = "cigram_row_terms";
+    private static final String TAG_TELEGRAM = "cigram_row_telegram";
 
     /** Row positions inside a group. */
     private static final int SINGLE = 0, FIRST = 1, MIDDLE = 2, LAST = 3;
@@ -138,6 +139,11 @@ final class CigramAccountDash {
                 new View.OnClickListener() {
                     @Override public void onClick(View v) { openPage(a, CigramTermsActivity.class); }
                 });
+        // 19.2: the last section of the page — the official channel, opened straight in the Telegram app
+        View telegram = ensureRow(a, host, TAG_TELEGRAM, "تابعنا على Telegram", "قناة Cigram الرسمية · @" + CigramTelegram.CHANNEL,
+                AdsIcons.TELEGRAM, 0, new View.OnClickListener() {
+                    @Override public void onClick(View v) { CigramTelegram.open(a); }
+                });
         setSubtitle(theme, themeLabel(a));
         setSubtitle(plus, plusLabel(a));
         setSubtitle(switchRow, switchLabel(a));
@@ -185,6 +191,8 @@ final class CigramAccountDash {
         add(info, about, terms);
         ArrayList<View> actions = new ArrayList<View>();
         add(actions, logout);
+        ArrayList<View> follow = new ArrayList<View>();
+        add(follow, telegram);
 
         View link = host.findViewWithTag(CigramExternalLink.TAG);
         ArrayList<View> sequence = new ArrayList<View>();
@@ -199,6 +207,8 @@ final class CigramAccountDash {
         sequence.addAll(info);
         sequence.add(title(a, "actions", "إجراءات الحساب"));
         sequence.addAll(actions);
+        sequence.add(title(a, "follow", "تابعنا"));
+        sequence.addAll(follow);
         for (int i = 0; i < sequence.size(); i++) detach(sequence.get(i));
         int at = link != null && link.getParent() == host ? host.indexOfChild(link) : host.getChildCount();
         for (int i = 0; i < sequence.size(); i++) {
@@ -217,6 +227,7 @@ final class CigramAccountDash {
         style(a, pal, support, host.findViewWithTag(TAG_TITLE + "support"));
         style(a, pal, info, host.findViewWithTag(TAG_TITLE + "info"));
         style(a, pal, actions, host.findViewWithTag(TAG_TITLE + "actions"));
+        style(a, pal, follow, host.findViewWithTag(TAG_TITLE + "follow"));
         // the custom boxes keep their own content, but sit on the page with the same margins and colours
         if (plusBox != null) CigramAccountUI.sideMargins(a, plusBox);
     }

@@ -30,7 +30,39 @@ public final class AdsIcons {
             AUDIO = 80, SPEED = 81, APPS = 82, REPLAY10 = 83, FORWARD10 = 84, SKIP_NEXT = 85, PALETTE = 86,
             DOC = 87, SKIP_PREV = 88,
             // 18.2 Private Support
-            SMILE = 89;
+            SMILE = 89,
+            // 19.2: the real Telegram paper plane (filled, no disc) for «تابعنا على Telegram»
+            TELEGRAM = 90;
+
+    /**
+     * The Telegram logo's paper plane, exactly as in the official mark (path of the 24-unit brand icon), enlarged to
+     * fill the icon box. Parsed once; null when the path parser is not available (then a plain plane is drawn).
+     */
+    private static Path TELEGRAM_PLANE;
+    private static boolean TELEGRAM_TRIED;
+
+    private static Path telegramPlane() {
+        if (TELEGRAM_TRIED) return TELEGRAM_PLANE;
+        TELEGRAM_TRIED = true;
+        try {
+            Path p = androidx.core.graphics.PathParser.createPathFromPathData(
+                    "M16.906 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472"
+                            + "-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902"
+                            + "-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23"
+                            + ".007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345"
+                            + "-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789"
+                            + ".027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z");
+            if (p != null) {
+                android.graphics.Matrix m = new android.graphics.Matrix();
+                m.postTranslate(-11.4f, -12.6f);
+                m.postScale(1.5f, 1.5f);
+                m.postTranslate(12f, 12f);
+                p.transform(m);
+                TELEGRAM_PLANE = p;
+            }
+        } catch (Throwable ignored) { }
+        return TELEGRAM_PLANE;
+    }
 
     public static final class Icon extends View {
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -88,6 +120,17 @@ public final class AdsIcons {
             p.setStrokeWidth(1.9f);
             path.reset();
             switch (kind) {
+                case TELEGRAM: {
+                    Path plane = telegramPlane();
+                    p.setStyle(Paint.Style.FILL);
+                    if (plane != null) c.drawPath(plane, p);
+                    else {
+                        path.moveTo(3f, 11.2f); path.lineTo(20.6f, 4.2f); path.lineTo(17.6f, 19.8f); path.lineTo(11.4f, 15.2f);
+                        path.lineTo(16.2f, 9f); path.lineTo(8.6f, 13.6f); path.close(); c.drawPath(path, p);
+                    }
+                    p.setStyle(Paint.Style.STROKE);
+                    break;
+                }
                 case MEGAPHONE:
                     path.moveTo(3.5f, 10f); path.lineTo(7.5f, 10f); path.lineTo(15f, 5.5f); path.lineTo(15f, 18.5f);
                     path.lineTo(7.5f, 14f); path.lineTo(3.5f, 14f); path.close(); pth(c, false);

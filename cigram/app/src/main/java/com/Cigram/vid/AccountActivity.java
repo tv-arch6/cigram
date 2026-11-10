@@ -220,6 +220,7 @@ public class AccountActivity extends AppCompatActivity {
 				register_params.put("password", binding.edittextRegisterPassword.getText().toString());
 				register_params.put("gender", "unspecified");
 				// accepted terms version + time, so the auth worker can keep its own record of the consent
+				register_params.put("accept_terms", "true");   // 19.2: without this field the auth worker never stored the consent
 				register_params.put("terms_version", String.valueOf(CigramTerms.VERSION));
 				register_params.put("terms_accepted_at", String.valueOf(System.currentTimeMillis()));
 				req_register.setParams(register_params, RequestNetworkController.REQUEST_PARAM);
@@ -385,6 +386,7 @@ public class AccountActivity extends AppCompatActivity {
 					String token = root.optString("token", "").trim();
 					String expiresAt = root.optString("expires_at", "");
 					org.json.JSONObject user = root.optJSONObject("user");
+					CigramTerms.learn(getApplicationContext(), user, token);   // 19.2: the account's consent is remembered for good
 					
 					if (token.isEmpty() || user == null) {
 						SketchwareUtil.showMessage(
@@ -468,6 +470,7 @@ public class AccountActivity extends AppCompatActivity {
 					String token = root.optString("token", "").trim();
 					String expiresAt = root.optString("expires_at", "");
 					org.json.JSONObject user = root.optJSONObject("user");
+					CigramTerms.learn(getApplicationContext(), user, token);   // 19.2: the account's consent is remembered for good
 					
 					if (token.isEmpty() || user == null) {
 						SketchwareUtil.showMessage(
