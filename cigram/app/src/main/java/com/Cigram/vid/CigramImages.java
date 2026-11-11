@@ -41,6 +41,8 @@ final class CigramImages {
     }
 
     private static volatile BitmapCache CACHE;
+    /** Set from the Performance Engine before the first cache is made (0 = the old 48 MB ceiling). */
+    private static volatile long PERF_CACHE_KB;
 
     static BitmapCache bitmaps() {
         BitmapCache c = CACHE;
@@ -48,7 +50,9 @@ final class CigramImages {
             synchronized (CigramImages.class) {
                 if (CACHE == null) {
                     long heapKb = Runtime.getRuntime().maxMemory() / 1024L;
-                    CACHE = new BitmapCache((int) Math.max(8 * 1024L, Math.min(48 * 1024L, heapKb / 10L)));
+                    // 19.2 Performance Engine: the ceiling follows the phone (16 MB on a weak one, 64 MB on a strong one)
+                    long cap = PERF_CACHE_KB > 0 ? PERF_CACHE_KB : 48 * 1024L;
+                    CACHE = new BitmapCache((int) Math.max(8 * 1024L, Math.min(cap, heapKb / 10L)));
                 }
                 c = CACHE;
             }
@@ -66,7 +70,13 @@ final class CigramImages {
         final Context app = context.getApplicationContext() != null ? context.getApplicationContext() : context;
         synchronized (CigramImages.class) {
             if (QUEUE == null) {
-                QUEUE = new CigramImageQueue(3, new CigramImageQueue.Fetcher() {
+                int parallel = 3;
+                try {
+                    CigramPerformance.Profile perf = CigramPerformance.get(app);
+                    parallel = perf.imageParallel;
+                    PERF_CACHE_KB = perf.posterCacheKbCap;
+                } catch (Throwable ignored) { }
+                QUEUE = new CigramImageQueue(parallel, new CigramImageQueue.Fetcher() {
                     @Override public boolean fetch(String url) throws Exception { return ensureOnDisk(app, url); }
                 }, null, "cigram-img");
                 watchNetwork(app, QUEUE);
@@ -164,6 +174,8 @@ final class CigramImages {
     /** A freshly decoded poster fades in over 140 ms instead of popping in; a poster already in memory is set at once by the caller. */
     static void fadeIn(ImageView view) {
         try {
+            // 19.2 Performance Engine: a weak / hot phone sets posters at once (one animator per card less while scrolling)
+            if (!CigramPerformance.get(view.getContext()).animations) { view.setAlpha(1f); return; }
             view.setAlpha(0f);
             view.animate().alpha(1f).setDuration(140L).start();
         } catch (Throwable ignored) {

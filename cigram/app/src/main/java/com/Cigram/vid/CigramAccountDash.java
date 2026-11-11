@@ -60,6 +60,9 @@ final class CigramAccountDash {
     private static final String TAG_ABOUT = "cigram_row_about";
     private static final String TAG_TERMS = "cigram_row_terms";
     private static final String TAG_TELEGRAM = "cigram_row_telegram";
+    private static final String TAG_PROFILES = "cigram_row_profiles";
+    private static final String TAG_CALENDAR = "cigram_row_calendar";
+    private static final String TAG_PERF = "cigram_row_performance";
 
     /** Row positions inside a group. */
     private static final int SINGLE = 0, FIRST = 1, MIDDLE = 2, LAST = 3;
@@ -139,6 +142,26 @@ final class CigramAccountDash {
                 new View.OnClickListener() {
                     @Override public void onClick(View v) { openPage(a, CigramTermsActivity.class); }
                 });
+        // 19.2: Cigram Profiles · Watch Calendar · Performance Engine
+        final View profiles = ensureRow(a, host, TAG_PROFILES, "الملفات الشخصية", "تشاهد الآن باسم: " + CigramProfiles.active(a).name,
+                AdsIcons.USERS, 0, new View.OnClickListener() {
+                    @Override public void onClick(View v) {
+                        CigramProfiles.showPicker(a, new Runnable() { @Override public void run() { CigramProfiles.restartHome(a); } });
+                    }
+                });
+        View calendar = ensureRow(a, host, TAG_CALENDAR, "تقويم المشاهدة", "ما شاهدته وما أضيف لمسلسلاتك يوماً بيوم",
+                AdsIcons.CALENDAR, 0, new View.OnClickListener() {
+                    @Override public void onClick(View v) { openPage(a, CigramWatchCalendarActivity.class); }
+                });
+        final View perf = ensureRow(a, host, TAG_PERF, "محرك الأداء", CigramPerformance.label(a), AdsIcons.BOLT, 0,
+                new View.OnClickListener() {
+                    @Override public void onClick(final View v) {
+                        CigramPerformance.choose(a, new Runnable() { @Override public void run() { setSubtitle(v, CigramPerformance.label(a)); } });
+                    }
+                });
+        setSubtitle(profiles, "تشاهد الآن باسم: " + CigramProfiles.active(a).name);
+        setSubtitle(perf, CigramPerformance.label(a));
+        profiles.setVisibility(logged ? View.VISIBLE : View.GONE);
         // 19.2: the last section of the page — the official channel, opened straight in the Telegram app
         View telegram = ensureRow(a, host, TAG_TELEGRAM, "تابعنا على Telegram", "قناة Cigram الرسمية · @" + CigramTelegram.CHANNEL,
                 AdsIcons.TELEGRAM, 0, new View.OnClickListener() {
@@ -184,7 +207,7 @@ final class CigramAccountDash {
         add(plusRows, plus, plusCode);
         ArrayList<View> experience = new ArrayList<View>();
         if (mine != null && !accountRows.contains(mine)) experience.add(mine);
-        add(experience, switchRow, theme, fonts, widget);
+        add(experience, profiles, calendar, switchRow, theme, fonts, perf, widget);
         ArrayList<View> support = new ArrayList<View>();
         add(support, adRequest, contact, help, update);
         ArrayList<View> info = new ArrayList<View>();

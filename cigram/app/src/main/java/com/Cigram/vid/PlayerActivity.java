@@ -628,6 +628,23 @@ public class PlayerActivity extends AppCompatActivity {
 			}
 		} catch (Throwable ignored) { }
 		
+		// 19.2 Smart Playback Intelligence: data saver on a metered network, battery saver, a low battery or a hot phone
+		// cap the AUTOMATIC quality (a manual choice still wins; the plan ceiling above still applies)
+		try {
+			CigramSmartPlayback.Decision cgSmart = CigramSmartPlayback.decide(CigramSmartPlayback.read(this));
+			if (cgSmart.maxHeight > 0) {
+				int cgPlanCap = CigramPlus.isPlus(PlayerActivity.this) ? Integer.MAX_VALUE : CigramPlus.FREE_MAX_HEIGHT;
+				trackSelector.setParameters(trackSelector.buildUponParameters()
+				.setMaxVideoSize(Integer.MAX_VALUE, Math.min(cgPlanCap, cgSmart.maxHeight)));
+				android.content.SharedPreferences cgSmartPrefs = getSharedPreferences(CigramSmartPlayback.PREFS, MODE_PRIVATE);
+				long cgSmartLast = cgSmartPrefs.getLong("said::" + cgSmart.reason, 0L);
+				if (System.currentTimeMillis() - cgSmartLast > 3600000L) {
+					cgSmartPrefs.edit().putLong("said::" + cgSmart.reason, System.currentTimeMillis()).apply();
+					android.widget.Toast.makeText(this, cgSmart.reason, android.widget.Toast.LENGTH_LONG).show();
+				}
+			}
+		} catch (Throwable ignored) { }
+		
 		final CigramBufferPolicy cgBuffer = CigramBufferPolicy.of(this);   // smaller buffers on weak phones (no out-of-memory crashes)
 		// 18.3: the start / re-buffer thresholds follow the connection (0.8 s / 1.5 s on a good one, 2.5-4 s / 5-8 s on a weak or
 		// stalling one) instead of a fixed 0.7 s / 1 s, which on a weak network ended in a stall every second; the RAM-class
@@ -673,6 +690,8 @@ public class PlayerActivity extends AppCompatActivity {
 		getSharedPreferences("cigram_player_prefs", MODE_PRIVATE);
 		try {
 			float cgSavedSpeed = cgPlayerPrefs.getFloat("speed", 1f);
+			// 19.2: a series remembers its own speed (episodes of the same series keep it, films keep the global one)
+			cgSavedSpeed = CigramSmartPlayback.speedFor(this, CigramSmartPlayback.seriesKey(isSeries, getIntent().getStringExtra("series_id"), seriesTitle), cgSavedSpeed);
 			if (cgSavedSpeed >= 0.5f && cgSavedSpeed <= 2f) {
 				exoPlayer.setPlaybackSpeed(cgSavedSpeed);
 			}
@@ -887,7 +906,7 @@ public class PlayerActivity extends AppCompatActivity {
 		// موضع المشاهدة مفصول لكل حساب. مفاتيح قائمة "أكمل المشاهدة" تبقى كما هي.
 		final String progressOwner = continueLoggedIn
 		&& continueToken != null && !continueToken.trim().isEmpty()
-		? "account_" + CigramUserData.accountHash(getApplicationContext())
+		? "account_" + CigramUserData.viewerHash(getApplicationContext())   // 19.2: per profile
 		: "guest";
 		class ScopedProgressKey {
 			String make() { return progressOwner + "|" + progressKeyFactory.make(); }
@@ -897,7 +916,7 @@ public class PlayerActivity extends AppCompatActivity {
 		
 		final String continueItemsKey =
 		"items_"
-		+ CigramUserData.accountHash(getApplicationContext());
+		+ CigramUserData.viewerHash(getApplicationContext());              // 19.2: per profile
 		
 		
 		class ContinueWatchingStore {
@@ -2952,8 +2971,8 @@ public class PlayerActivity extends AppCompatActivity {
 					saved = continueWatchingStore.savedPositionForCurrent();
 					if (saved > 0L) watchProgress.edit().putLong(watchProgressKey[0], saved).apply();
 				}
-				// v10.62: آخر موضع محفوظ في الحساب (من جهاز آخر)
-				if (saved <= 0L) {
+				// v10.62: آخر موضع محفوظ في الحساب (من جهاز آخر) — 19.2: للملف الرئيسي فقط
+				if (saved <= 0L && CigramProfiles.isMainActive(PlayerActivity.this.getApplicationContext())) {
 					try {
 						saved = CigramResume.position(PlayerActivity.this.getApplicationContext(), isSeries,
 						seriesTitle, mediaTitle, mediaId, currentSeason[0], currentEpisode[0]);
@@ -4474,6 +4493,34 @@ public class PlayerActivity extends AppCompatActivity {
 					}
 				});
 				// 18.2: «توقيت الترجمة» — the viewer's delay (CigramSubtitleSyncEngine), presets + fine tuning with preview
+				// 19.2 «ترجمة من الإنترنت»: Podnapisi / TVSubtitles, Arabic first; the file goes through the subtitle doctor
+				if(cgSubEngine[0]!=null){
+					final String[] cgFindLabels={"بحث عن ترجمة عربية (ثم إنكليزية)","بحث عن ترجمة إنكليزية فقط"};
+					sheet.item("ترجمة من الإنترنت",cgSubEngine[0].isActive()?"استبدال الترجمة الحالية":"لا توجد ترجمة؟ ابحث عنها",new CigramPlayerSheet.Source(){
+						@Override public CigramPlayerSheet.Options load(){
+							return new CigramPlayerSheet.Options(cgFindLabels,-1,"يُبحث باسم العنوان في مواقع الترجمة المجانية. الملف يُصلَح تلقائياً ويبقى على جهازك فقط.");
+						}
+						@Override public String pick(final int which){
+							uiHandler.postDelayed(new java.lang.Runnable(){@Override public void run(){
+								try{sheet.dismiss();}catch(Throwable ignored){}
+								int cgS=0,cgE=0;
+								try{cgS=Integer.parseInt(currentSeason[0].trim());}catch(Throwable ignored){}
+								try{cgE=Integer.parseInt(currentEpisode[0].trim());}catch(Throwable ignored){}
+								String cgName=isSeries&&seriesTitle.length()>0?seriesTitle:mediaTitle;
+								CigramSubtitleFinder.run(PlayerActivity.this,cgName,isSeries?cgS:0,isSeries?cgE:0,which==1?"en":"ar",new CigramSubtitleFinder.Done(){
+									@Override public void loaded(String fileUrl,String label){
+										currentSubtitle[0]=fileUrl;
+										subtitlesEnabled[0]=true;
+										cgSubEngine[0].load(fileUrl);
+										if(subtitleView!=null)subtitleView.setVisibility(android.view.View.VISIBLE);
+										android.widget.Toast.makeText(PlayerActivity.this,"الترجمة: "+label,android.widget.Toast.LENGTH_LONG).show();
+									}
+								});
+							}},120L);
+							return null;
+						}
+					});
+				}
 				if(cgSubEngine[0]!=null&&cgSubEngine[0].isActive()){
 					final long[] cgDelayValues={Long.MIN_VALUE,-2000L,-1000L,-500L,-250L,0L,250L,500L,1000L,2000L,Long.MAX_VALUE};
 					final String[] cgDelayLabels={"تعديل دقيق مع معاينة…","\u22122 ث","\u22121 ث","\u22120.5 ث","\u22120.25 ث","0 (متزامنة)","+0.25 ث","+0.5 ث","+1 ث","+2 ث","ضبط تلقائي من صوت الفيلم…"};
@@ -4521,7 +4568,10 @@ public class PlayerActivity extends AppCompatActivity {
 						return new CigramPlayerSheet.Options(speedLabels,selected);
 					}
 					@Override public String pick(int which){
-						exoPlayer.setPlaybackSpeed(speedValues[which]);cgPlayerPrefs.edit().putFloat("speed",speedValues[which]).apply();
+						exoPlayer.setPlaybackSpeed(speedValues[which]);
+						String cgSpeedKey=CigramSmartPlayback.seriesKey(isSeries,getIntent().getStringExtra("series_id"),seriesTitle);
+						if(cgSpeedKey.length()>0)CigramSmartPlayback.rememberSpeed(PlayerActivity.this,cgSpeedKey,speedValues[which]);   // 19.2: this series only
+						else cgPlayerPrefs.edit().putFloat("speed",speedValues[which]).apply();
 						return speedLabels[which];
 					}
 				});
@@ -4911,7 +4961,7 @@ public class PlayerActivity extends AppCompatActivity {
 			if (savedPosition > 0L) watchProgress.edit().putLong(watchProgressKey[0], savedPosition).apply();
 		}
 		// v10.62: آخر موضع محفوظ في الحساب (من جهاز آخر) إذا لم يوجد موضع على هذا الجهاز
-		if (savedPosition <= 0L) {
+		if (savedPosition <= 0L && CigramProfiles.isMainActive(getApplicationContext())) {
 			try {
 				savedPosition = CigramResume.position(getApplicationContext(), isSeries,
 				seriesTitle, mediaTitle, mediaId, currentSeason[0], currentEpisode[0]);

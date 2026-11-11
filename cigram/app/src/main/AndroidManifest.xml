@@ -508,5 +508,11 @@
     android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode"
     android:hardwareAccelerated="true"
     android:theme="@android:style/Theme.Material.NoActionBar" />
+<!-- 19.2: Cigram Watch Calendar -->
+<activity
+    android:name="com.Cigram.vid.CigramWatchCalendarActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode"
+    android:theme="@android:style/Theme.Material.NoActionBar" />
 </application>
 </manifest>

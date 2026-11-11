@@ -40,9 +40,13 @@ final class CigramTvHome {
             if (CigramTvCards.isSeries(o)) series.add(o); else movies.add(o);
         }
 
-        // ---- hero ----
-        JSONObject featured = pickFeatured(all);
-        if (featured != null) col.addView(hero(a, featured), new LinearLayout.LayoutParams(-1, -2));
+        // ---- 19.2 Cinema Spotlight (TV only): up to six titles in turn on full-bleed backdrops ----
+        List<JSONObject> spotlight = CigramTvSpotlight.pick(all, 6);
+        if (!spotlight.isEmpty()) col.addView(CigramTvSpotlight.build(a, spotlight));
+        else {
+            JSONObject featured = pickFeatured(all);
+            if (featured != null) col.addView(hero(a, featured), new LinearLayout.LayoutParams(-1, -2));
+        }
 
         // ---- rows (inset) ----
         LinearLayout rows = new LinearLayout(a);

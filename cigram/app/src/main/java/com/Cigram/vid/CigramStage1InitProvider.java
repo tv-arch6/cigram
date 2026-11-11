@@ -7441,7 +7441,8 @@ public final class CigramStage1InitProvider extends ContentProvider {
         } catch (Throwable ignored) {
             owner = "";
         }
-        return owner == null || owner.length() == 0 ? null : KEY_STAGE3_ITEMS + "::" + owner;
+        if (owner == null || owner.length() == 0) return null;
+        return KEY_STAGE3_ITEMS + "::" + owner + CigramProfiles.suffix(context);       // 19.2: «شاهد لاحقاً» per profile
     }
 
     static boolean stage3WatchLaterAvailable(Context context) {

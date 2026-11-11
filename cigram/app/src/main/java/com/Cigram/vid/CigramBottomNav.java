@@ -372,7 +372,8 @@ public final class CigramBottomNav {
                 if (home != null) {
                     // home first, then the tab: the stack ends ... home, tab  (Back from the tab = home)
                     from.startActivities(new Intent[]{home, target});
-                    from.overridePendingTransition(R.anim.cg_fade_in, R.anim.cg_fade_out);   // v10.70: soft switch
+                    if (CigramPerformance.get(from).animations) from.overridePendingTransition(R.anim.cg_fade_in, R.anim.cg_fade_out);   // v10.70: soft switch
+                    else from.overridePendingTransition(0, 0);                                                  // 19.2: LITE profile switches instantly
                     if (fromDetails) from.finish();   // a film page is not kept under the tabs
                     return true;
                 }

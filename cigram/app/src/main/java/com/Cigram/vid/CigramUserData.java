@@ -498,6 +498,26 @@ public final class CigramUserData {
      * token, which changes on every login, so a returning user lost everything.
      * The first call with a given token moves data stored under the old token key to this key.
      */
+    /** The account's display name ("" when unknown). */
+    public static String displayName(Context context) {
+        try {
+            String n = context.getSharedPreferences("auth_session", Context.MODE_PRIVATE).getString("name", "");
+            return n == null ? "" : n.trim();
+        } catch (Throwable ignored) {
+            return "";
+        }
+    }
+
+    /**
+     * 19.2 Cigram Profiles: the key of the watching data of the PERSON watching now — the account itself for the main
+     * profile (unchanged, so nothing moves on update), the account key plus the profile id for the others.
+     */
+    public static String viewerHash(Context context) {
+        String acct = accountHash(context);
+        if (acct.length() == 0) return acct;
+        return acct + CigramProfiles.suffix(context);
+    }
+
     public static String accountHash(Context context) {
         if (context == null) return "";
         String e = email(context);
@@ -598,10 +618,11 @@ public final class CigramUserData {
         if (context == null || !isLoggedIn(context)) return out;
         try {
             Context app = context.getApplicationContext();
-            String acct = accountHash(context);
+            String acct = viewerHash(context);
             SharedPreferences cp = app.getSharedPreferences(CONTINUE_PREFS, Context.MODE_PRIVATE);
             JSONArray legacy = parseArray(cp.getString("items_" + acct, "[]"));
-            ArrayList<JSONObject> rows = historyGrouped(context);
+            // the account's server history belongs to the main profile only (19.2 Cigram Profiles)
+            ArrayList<JSONObject> rows = CigramProfiles.isMainActive(context) ? historyGrouped(context) : new ArrayList<JSONObject>();
             JSONArray fromHistory = new JSONArray();
             for (int i = 0; i < rows.size() && fromHistory.length() < 60; i++) {
                 JSONObject h = rows.get(i);

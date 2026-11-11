@@ -2333,7 +2333,7 @@ public class MainActivity extends AppCompatActivity {
 									&& !progressToken.trim()
 									.isEmpty()
 									? "account_"
-									+ CigramUserData.accountHash(
+									+ CigramUserData.viewerHash(
 									getApplicationContext()
 									)
 									: "guest";
@@ -2415,7 +2415,7 @@ public class MainActivity extends AppCompatActivity {
 											
 											String prefKey =
 											"items_"
-											+ CigramUserData.accountHash(getApplicationContext());
+											+ CigramUserData.viewerHash(getApplicationContext());
 											
 											android.content.SharedPreferences prefs =
 											getSharedPreferences(
@@ -2470,7 +2470,7 @@ public class MainActivity extends AppCompatActivity {
 											
 											String accountPrefix =
 											"account_"
-											+ CigramUserData.accountHash(getApplicationContext())
+											+ CigramUserData.viewerHash(getApplicationContext())
 											+ "|";
 											
 											for (int x = 0;
