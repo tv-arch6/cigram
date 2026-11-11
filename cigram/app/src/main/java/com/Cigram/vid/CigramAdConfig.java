@@ -82,13 +82,13 @@ public final class CigramAdConfig {
     // ---- player ad policy (local defaults) ----
     // v6.2 (owner's request): an ad on every press + up to 4 breaks inside each title.
     // The caps below are safety limits only, so a very long session cannot turn into an ad wall.
-    public static final int PLAYER_FIRST_AD_DELAY_MIN = 5;
-    public static final int PLAYER_MIDROLL_INTERVAL_MIN = 25;   // used only when the duration is unknown
-    public static final int PLAYER_MAX_ADS_PER_HOUR = 20;   // v10.34: room for 4 breaks + every press
-    public static final int PLAYER_AD_COOLDOWN_MIN = 3;
-    public static final int PLAYER_MAX_ADS_PER_SESSION = 60;
+    public static final int PLAYER_FIRST_AD_DELAY_MIN = 15;
+    public static final int PLAYER_MIDROLL_INTERVAL_MIN = 30;   // used only when the duration is unknown
+    public static final int PLAYER_MAX_ADS_PER_HOUR = 4;   // v10.34: room for 4 breaks + every press
+    public static final int PLAYER_AD_COOLDOWN_MIN = 10;
+    public static final int PLAYER_MAX_ADS_PER_SESSION = 12;
     /** Mid-rolls per film/episode (positions from CigramAdBreaks). */
-    public static final int PLAYER_MAX_ADS_PER_FILM = 4;
+    public static final int PLAYER_MAX_ADS_PER_FILM = 2;
 
     // legacy names kept for existing call sites (derived from the policy above)
     public static final long PLAYER_MIN_START_MS = PLAYER_FIRST_AD_DELAY_MIN * 60L * 1000L;
@@ -168,7 +168,7 @@ public final class CigramAdConfig {
      * before an episode / on «شاهد هسه», and as mid-rolls at the CigramAdBreaks positions.
      * They are used instead of AdMob when ADMOB_ENABLED is false. Remote key "inhouse_breaks_enabled" can switch them off.
      */
-    public static final boolean INHOUSE_BREAKS_ENABLED = true;
+    public static final boolean INHOUSE_BREAKS_ENABLED = false;
 
     public static boolean inHouseBreaksEnabled(Context c) {
         return flag(c, "inhouse_breaks_enabled", INHOUSE_BREAKS_ENABLED);
