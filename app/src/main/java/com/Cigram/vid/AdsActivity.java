@@ -502,7 +502,7 @@ public class AdsActivity extends AppCompatActivity {
 					android.view.View view
 					) {
 						
-						AdsActivity.this.finish();
+						CigramNav.back(AdsActivity.this);
 					}
 				}
 				);

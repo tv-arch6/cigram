@@ -220,7 +220,7 @@ public class ChannelsActivity extends AppCompatActivity {
 					channelsBack.setClickable(true);
 					channelsBack.setContentDescription("رجوع");
 					channelsBack.setOnClickListener(new android.view.View.OnClickListener() {
-						@Override public void onClick(android.view.View v) { finish(); }
+						@Override public void onClick(android.view.View v) { CigramNav.back(ChannelsActivity.this); }
 					});
 				}
 				

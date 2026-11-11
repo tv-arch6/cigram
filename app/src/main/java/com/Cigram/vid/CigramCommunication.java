@@ -80,11 +80,7 @@ public final class CigramCommunication {
                 t.setTypeface(CigramUI.font(a), android.graphics.Typeface.BOLD);
             }
             View back = byId(a, "imageview_communication_back");
-            if (back != null) {
-                back.setOnClickListener(new View.OnClickListener() {
-                    @Override public void onClick(View v) { a.finish(); }
-                });
-            }
+            if (back != null) CigramNav.bind(a, back);
 
             View bodyView = byId(a, "linear_communication_body");
             if (!(bodyView instanceof LinearLayout)) return;

@@ -261,7 +261,7 @@ public final class CigramOrder {
     /** Identity keys of every title the admin put in a CUSTOM home section. */
     public static HashSet<String> claims(String catalogJson) {
         HashSet<String> out = new HashSet<String>();
-        if (catalogJson == null || catalogJson.trim().length() == 0 || HomePrep.isSnapshot(catalogJson)) return out;
+        if (catalogJson == null || catalogJson.trim().length() == 0) return out;
         // the same catalog comes back on every refresh: parse it once
         int stamp = catalogJson.hashCode() * 31 + catalogJson.length();
         synchronized (LOCK) {
@@ -311,6 +311,15 @@ public final class CigramOrder {
     static void addClaimKeys(Set<String> out, JSONObject item) {
         if (out == null || item == null) return;
         for (String k : keysOf(item)) out.add(k);
+    }
+
+    /** Same rule for a catalogue record that is already JSON (the Home sections are built from JSON, not from maps). */
+    public static boolean claimed(Set<String> claims, JSONObject item) {
+        if (claims == null || claims.isEmpty() || item == null) return false;
+        try {
+            for (String k : keysOf(item)) if (claims.contains(k)) return true;
+        } catch (Throwable ignored) { }
+        return false;
     }
 
     /** True when the home item belongs to a custom section and must not repeat in a fixed row. */

@@ -235,13 +235,7 @@ public final class CigramSketchwareNotifications {
             back.setClickable(true);
             back.setFocusable(true);
             back.setContentDescription("رجوع");
-            back.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    activity.finish();
-                    activity.overridePendingTransition(0, 0);
-                }
-            });
+            CigramNav.bind(activity, back);
         }
 
         final SwipeRefreshLayout swipe = asSwipeRefresh(

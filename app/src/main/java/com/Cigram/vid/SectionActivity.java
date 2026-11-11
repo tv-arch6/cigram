@@ -1,2511 +1,585 @@
 package com.Cigram.vid;
 
-import android.animation.*;
-import android.app.*;
-import android.content.*;
-import android.content.res.*;
-import android.graphics.*;
-import android.graphics.drawable.*;
-import android.media.*;
-import android.net.*;
-import android.os.*;
-import android.text.*;
-import android.text.style.*;
-import android.util.*;
-import android.view.*;
-import android.view.View.*;
-import android.view.animation.*;
-import android.webkit.*;
-import android.widget.*;
-import androidx.activity.*;
-import androidx.annotation.*;
-import androidx.annotation.experimental.*;
-import androidx.appcompat.*;
+import android.content.Intent;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.TextUtils;
+import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.resources.*;
-import androidx.arch.core.*;
-import androidx.coordinatorlayout.*;
-import androidx.core.*;
-import androidx.core.ktx.*;
-import androidx.cursoradapter.*;
-import androidx.customview.*;
-import androidx.customview.poolingcontainer.*;
-import androidx.drawerlayout.*;
-import androidx.fragment.*;
-import androidx.fragment.app.DialogFragment;
-import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentManager;
-import androidx.interpolator.*;
-import androidx.lifecycle.*;
-import androidx.lifecycle.livedata.*;
-import androidx.lifecycle.livedata.core.*;
-import androidx.lifecycle.runtime.*;
-import androidx.lifecycle.viewmodel.*;
-import androidx.loader.*;
-import androidx.media.*;
-import androidx.mediarouter.*;
-import androidx.palette.*;
-import androidx.print.*;
-import androidx.recyclerview.*;
-import androidx.savedstate.*;
-import androidx.swiperefreshlayout.*;
-import androidx.vectordrawable.*;
-import androidx.vectordrawable.animated.*;
-import androidx.versionedparcelable.*;
-import androidx.viewpager.*;
-import com.Cigram.vid.databinding.*;
-import com.google.android.datatransport.*;
-import com.google.android.datatransport.backend.cct.*;
-import com.google.android.datatransport.runtime.*;
-import com.google.android.exoplayer2.common.*;
-import com.google.android.exoplayer2.container.*;
-import com.google.android.exoplayer2.core.*;
-import com.google.android.exoplayer2.database.*;
-import com.google.android.exoplayer2.decoder.*;
-import com.google.android.exoplayer2.extractor.*;
-import com.google.android.exoplayer2.source.dash.*;
-import com.google.android.exoplayer2.source.hls.*;
-import com.google.android.exoplayer2.source.rtsp.*;
-import com.google.android.exoplayer2.ui.*;
-import com.google.android.exoplayer2.upstream.*;
-import com.google.android.gms.ads.MobileAds;
-import com.google.android.gms.cast.*;
-import com.google.android.gms.cast.framework.*;
-import com.google.android.gms.flags.*;
-import com.google.firebase.encoders.json.*;
-import java.io.*;
-import java.text.*;
-import java.util.*;
-import java.util.regex.*;
-import org.json.*;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
+import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * «المزيد»: every title of one section, as a ranked list of landscape cards (1, 2, 3 ...).
+ *
+ * INSTANT: the page is built from {@link CigramSectionStore}, which Home filled with the very items it shows. The first frame already
+ * has the whole list: no network request, no spinner, no skeleton, no catalogue parse. The only thing that can happen afterwards is a
+ * SILENT top-up for a very long section (Home keeps a trimmed copy of those): the missing titles are appended at the END of the list,
+ * the visible cards are never replaced, reordered or blinked.
+ *
+ * Layout (physical order, the app ignores android:supportsRtl): [ info ][ poster ][ rank ], i.e. Arabic reading order from the right:
+ * rank, poster, text. The #1 numeral is a large translucent watermark that spills over the poster's inner edge; 2+ are outlined numerals
+ * in a fixed-width column (see {@link CigramRankView}).
+ *
+ * Performance: a RecyclerView (virtualised, view recycling, stable ids), one view hierarchy per card built once, no per-bind inflation,
+ * posters through the shared single-flight poster loader (memory + disk cache, skeleton placeholder), entrance animation only for
+ * the first screenful and only through property animators (never blocks a scroll).
+ */
 public class SectionActivity extends AppCompatActivity {
-	
-	private SectionBinding binding;
-	
-	@Override
-	protected void onCreate(Bundle _savedInstanceState) {
-		super.onCreate(_savedInstanceState);
-		binding = SectionBinding.inflate(getLayoutInflater());
-		setContentView(binding.getRoot());
-		initialize(_savedInstanceState);
-		
-		CigramAdManager.initialize(getApplicationContext()); // self-throttled, background thread, consent-gated
-		
-		initializeLogic();
-	}
-	
-	private void initialize(Bundle _savedInstanceState) {
-	}
-	
-	private void initializeLogic() {
-		class CigramGlass {
-			final android.content.Context context;
-			final float density;
-			final android.graphics.Typeface font;
-			
-			CigramGlass(android.content.Context value) {
-				context = value;
-				density = value.getResources().getDisplayMetrics().density;
-				
-				android.graphics.Typeface loaded =
-				android.graphics.Typeface.DEFAULT;
-				try {
-					loaded = CigramTypefaces.get(
-					value.getAssets(), CigramTypefaces.APP_FONT
-					);
-				} catch (Exception ignored) {}
-				font = loaded;
-			}
-			
-			int px(float value) {
-				return Math.round(value * density);
-			}
-			
-			class Skin extends android.graphics.drawable.Drawable {
-				final float radius;
-				final boolean outlined;
-				final android.graphics.Paint paint =
-				new android.graphics.Paint(3);
-				int alpha = 255;
-				
-				Skin(float radiusDp, boolean showOutline) {
-					radius = px(radiusDp);
-					outlined = showOutline;
-				}
-				
-				@Override public void draw(
-				android.graphics.Canvas canvas
-				) {
-					android.graphics.RectF rect =
-					new android.graphics.RectF(getBounds());
-					rect.inset(density / 2f, density / 2f);
-					
-					int layer = canvas.saveLayerAlpha(rect, alpha);
-					paint.setStyle(android.graphics.Paint.Style.FILL);
-					paint.setShader(null);
-					paint.setColor(0xB0111113);
-					canvas.drawRoundRect(rect, radius, radius, paint);
-					
-					paint.setShader(new android.graphics.LinearGradient(
-					rect.left, rect.top,
-					rect.right, rect.bottom,
-					new int[] {
-						0x34FFFFFF, 0x09FFFFFF,
-						0x00111113, 0x16FFFFFF
-					},
-					new float[] {0f, .28f, .65f, 1f},
-					android.graphics.Shader.TileMode.CLAMP
-					));
-					canvas.drawRoundRect(rect, radius, radius, paint);
-					paint.setShader(null);
-					
-					if (outlined) {
-						paint.setStyle(android.graphics.Paint.Style.STROKE);
-						paint.setStrokeWidth(density);
-						paint.setColor(0x60FFFFFF);
-						canvas.drawRoundRect(rect, radius, radius, paint);
-						paint.setStyle(android.graphics.Paint.Style.FILL);
-					}
-					canvas.restoreToCount(layer);
-				}
-				
-				@Override public void setAlpha(int value) {
-					alpha = value;
-					invalidateSelf();
-				}
-				
-				@Override public void setColorFilter(
-				android.graphics.ColorFilter filter
-				) {}
-				
-				@Override public int getOpacity() {
-					return android.graphics.PixelFormat.TRANSLUCENT;
-				}
-				
-				@Override public void getOutline(
-				android.graphics.Outline outline
-				) {
-					outline.setRoundRect(getBounds(), radius);
-				}
-			}
-			
-			void bind(
-			android.view.View view,
-			float radius,
-			boolean outlined
-			) {
-				if (view == null) return;
-				view.setBackground(new Skin(radius, outlined));
-				view.setElevation(0f);
-				view.setClipToOutline(true);
-			}
-			
-			void press(final android.view.View view) {
-				if (view == null) return;
-				
-				view.setOnTouchListener(
-				new android.view.View.OnTouchListener() {
-					@Override public boolean onTouch(
-					android.view.View v,
-					android.view.MotionEvent event
-					) {
-						int action = event.getActionMasked();
-						
-						if (
-						action
-						== android.view.MotionEvent.ACTION_DOWN
-						) {
-							v.animate()
-							.scaleX(1f)
-							.scaleY(1f)
-							.setDuration(100L)
-							.start();
-						} else if (
-						action
-						== android.view.MotionEvent.ACTION_UP
-						|| action
-						== android.view.MotionEvent.ACTION_CANCEL
-						) {
-							v.animate()
-							.scaleX(1f)
-							.scaleY(1f)
-							.setDuration(190L)
-							.start();
-						}
-						return false;
-					}
-				}
-				);
-			}
-			
-			android.widget.TextView label(
-			String value,
-			float size
-			) {
-				android.widget.TextView label =
-				new android.widget.TextView(context);
-				
-				label.setText(value);
-				label.setTextSize(size);
-				label.setTextColor(0xFFFFFFFF);
-				label.setTypeface(font);
-				label.setGravity(
-				android.view.Gravity.RIGHT
-				| android.view.Gravity.CENTER_VERTICAL
-				);
-				label.setTextDirection(
-				android.view.View.TEXT_DIRECTION_FIRST_STRONG
-				);
-				return label;
-			}
-		}
-		
-		final CigramGlass cgGlass =
-		new CigramGlass(SectionActivity.this);
-		
-		class CigramCatalog {
-			String text(
-			org.json.JSONObject object,
-			String... keys
-			) {
-				if (object == null) return "";
-				
-				for (String key : keys) {
-					Object value = object.opt(key);
-					if (
-					value != null
-					&& value != org.json.JSONObject.NULL
-					&& !String.valueOf(value).trim().isEmpty()
-					) {
-						return String.valueOf(value).trim();
-					}
-				}
-				return "";
-			}
-			
-			String normalize(String value) {
-				if (value == null) return "";
-				
-				return java.text.Normalizer.normalize(
-				value,
-				java.text.Normalizer.Form.NFKD
-				)
-				.replaceAll("\\p{M}+", "")
-				.replace("ـ", "")
-				.toLowerCase(java.util.Locale.ROOT)
-				.replace('أ', 'ا')
-				.replace('إ', 'ا')
-				.replace('آ', 'ا')
-				.replace('ٱ', 'ا')
-				.replace('ى', 'ي')
-				.replace('ة', 'ه')
-				.replace('ؤ', 'و')
-				.replace('ئ', 'ي')
-				.replaceAll("[^\\p{L}\\p{N}]+", " ")
-				.trim()
-				.replaceAll("\\s+", " ");
-			}
-			
-			String type(
-			org.json.JSONObject object,
-			String inherited
-			) {
-				String value = normalize(
-				text(
-				object,
-				"type",
-				"content_type",
-				"media_type"
-				)
-				);
-				
-				if (
-				value.equals("series")
-				|| value.equals("tv")
-				|| value.equals("show")
-				|| value.contains("مسلسل")
-				) {
-					return "series";
-				}
-				
-				if (
-				value.equals("movie")
-				|| value.equals("film")
-				|| value.equals("فيلم")
-				) {
-					return "movie";
-				}
-				
-				if (
-				!text(
-				object,
-				"season",
-				"episode",
-				"series_title",
-				"series_id"
-				).isEmpty()
-				|| object.has("seasons")
-				|| object.has("episodes")
-				|| object.has("series_episodes_json")
-				) {
-					return "series";
-				}
-				
-				return "series".equals(inherited)
-				? "series" : "movie";
-			}
-			
-			void episodes(
-			Object node,
-			org.json.JSONObject parent,
-			String season,
-			org.json.JSONArray output,
-			int depth
-			) throws org.json.JSONException {
-				if (
-				node == null
-				|| node == org.json.JSONObject.NULL
-				|| depth > 12
-				) {
-					return;
-				}
-				
-				if (node instanceof String) {
-					String encoded = ((String) node).trim();
-					if (
-					encoded.startsWith("[")
-					|| encoded.startsWith("{")
-					) {
-						episodes(
-						new org.json.JSONTokener(
-						encoded
-						).nextValue(),
-						parent,
-						season,
-						output,
-						depth + 1
-						);
-					}
-					return;
-				}
-				
-				if (node instanceof org.json.JSONArray) {
-					org.json.JSONArray array =
-					(org.json.JSONArray) node;
-					
-					for (int i = 0; i < array.length(); i++) {
-						episodes(
-						array.opt(i),
-						parent,
-						season,
-						output,
-						depth + 1
-						);
-					}
-					return;
-				}
-				
-				if (!(node instanceof org.json.JSONObject)) {
-					return;
-				}
-				
-				org.json.JSONObject object =
-				(org.json.JSONObject) node;
-				
-				String currentSeason = text(
-				object,
-				"season",
-				"season_number"
-				);
-				if (currentSeason.isEmpty()) {
-					currentSeason = season;
-				}
-				
-				if (object.has("seasons")) {
-					episodes(
-					object.opt("seasons"),
-					parent,
-					currentSeason,
-					output,
-					depth + 1
-					);
-					return;
-				}
-				
-				if (object.has("episodes")) {
-					if (currentSeason.isEmpty()) {
-						currentSeason = text(object, "number");
-					}
-					episodes(
-					object.opt("episodes"),
-					parent,
-					currentSeason,
-					output,
-					depth + 1
-					);
-					return;
-				}
-				
-				org.json.JSONObject episode =
-				new org.json.JSONObject(
-				object.toString()
-				);
-				
-				for (String key : new String[] {
-					"poster",
-					"series_poster",
-					"backdrop",
-					"category",
-					"year",
-					"imdb",
-					"description"
-				}) {
-					if (
-					text(episode, key).isEmpty()
-					&& !text(parent, key).isEmpty()
-					) {
-						episode.put(
-						key,
-						parent.opt(key)
-						);
-					}
-				}
-				
-				episode.put("type", "series");
-				episode.put(
-				"series_title",
-				text(
-				parent,
-				"series_title",
-				"title",
-				"name"
-				)
-				);
-				episode.put(
-				"series_id",
-				text(
-				parent,
-				"series_id",
-				"id"
-				)
-				);
-				
-				if (text(episode, "season").isEmpty()) {
-					episode.put(
-					"season",
-					currentSeason.isEmpty()
-					? "1" : currentSeason
-					);
-				}
-				
-				if (text(episode, "episode").isEmpty()) {
-					episode.put(
-					"episode",
-					text(
-					episode,
-					"episode_number",
-					"number"
-					)
-					);
-				}
-				
-				if (text(episode, "video").isEmpty()) {
-					episode.put(
-					"video",
-					text(
-					episode,
-					"link",
-					"url",
-					"movie_url",
-					"video_url"
-					)
-					);
-				}
-				
-				output.put(episode);
-			}
-			
-			void collect(
-			Object node,
-			String inherited,
-			org.json.JSONArray output,
-			int depth
-			) throws org.json.JSONException {
-				if (
-				node == null
-				|| node == org.json.JSONObject.NULL
-				|| depth > 12
-				) {
-					return;
-				}
-				
-				if (node instanceof org.json.JSONArray) {
-					org.json.JSONArray array =
-					(org.json.JSONArray) node;
-					
-					for (int i = 0; i < array.length(); i++) {
-						collect(
-						array.opt(i),
-						inherited,
-						output,
-						depth + 1
-						);
-					}
-					return;
-				}
-				
-				if (!(node instanceof org.json.JSONObject)) {
-					return;
-				}
-				
-				org.json.JSONObject object =
-				(org.json.JSONObject) node;
-				
-				String[] containers = {
-					"movies",
-					"series",
-					"items",
-					"data",
-					"results",
-					"content",
-					"sections",
-					"catalog"
-				};
-				
-				boolean collection = false;
-				for (String key : containers) {
-					Object child = object.opt(key);
-					
-					if (
-					child instanceof org.json.JSONArray
-					|| child instanceof org.json.JSONObject
-					) {
-						collection = true;
-					} else if (child instanceof String) {
-						String encoded =
-						((String) child).trim();
-						
-						if (
-						encoded.startsWith("[")
-						|| encoded.startsWith("{")
-						) {
-							collection = true;
-						}
-					}
-				}
-				
-				boolean record =
-				!collection
-				&& !text(
-				object,
-				"title",
-				"name",
-				"series_title"
-				).isEmpty()
-				&& (
-				object.has("id")
-				|| object.has("poster")
-				|| object.has("video")
-				|| object.has("link")
-				|| object.has("type")
-				|| object.has("episodes")
-				|| object.has("seasons")
-				);
-				
-				if (record) {
-					org.json.JSONObject item =
-					new org.json.JSONObject(
-					object.toString()
-					);
-					
-					String kind = type(
-					item,
-					inherited
-					);
-					item.put("type", kind);
-					
-					item.put(
-					"title",
-					kind.equals("series")
-					? text(
-					item,
-					"series_title",
-					"title",
-					"name"
-					)
-					: text(
-					item,
-					"title",
-					"name"
-					)
-					);
-					
-					if (text(item, "poster").isEmpty()) {
-						item.put(
-						"poster",
-						text(
-						item,
-						"series_poster",
-						"season_poster",
-						"image",
-						"backdrop"
-						)
-						);
-					}
-					
-					if (text(item, "video").isEmpty()) {
-						item.put(
-						"video",
-						text(
-						item,
-						"link",
-						"url",
-						"video_url",
-						"movie_url"
-						)
-						);
-					}
-					
-					if (text(item, "category").isEmpty()) {
-						item.put(
-						"category",
-						text(
-						item,
-						"genre",
-						"genres"
-						)
-						);
-					}
-					
-					if (text(item, "imdb").isEmpty()) {
-						item.put(
-						"imdb",
-						text(item, "rating")
-						);
-					}
-					
-					if (kind.equals("series")) {
-						org.json.JSONArray list =
-						new org.json.JSONArray();
-						
-						for (String key : new String[] {
-							"series_episodes_json",
-							"episodes",
-							"seasons"
-						}) {
-							if (item.has(key)) {
-								episodes(
-								item.opt(key),
-								item,
-								"",
-								list,
-								0
-								);
-							}
-						}
-						
-						if (list.length() > 0) {
-							item.put(
-							"series_episodes_json",
-							list.toString()
-							);
-						}
-					}
-					
-					output.put(item);
-					return;
-				}
-				
-				for (String key : containers) {
-					Object child = object.opt(key);
-					
-					if (child instanceof String) {
-						String encoded =
-						((String) child).trim();
-						
-						if (
-						encoded.startsWith("[")
-						|| encoded.startsWith("{")
-						) {
-							child = new org.json.JSONTokener(
-							encoded
-							).nextValue();
-						}
-					}
-					
-					if (child != null) {
-						collect(
-						child,
-						key.equals("series")
-						? "series"
-						: inherited,
-						output,
-						depth + 1
-						);
-					}
-				}
-			}
-			
-			String key(org.json.JSONObject item) {
-				if (
-				text(item, "type").equals("series")
-				) {
-					String id =
-					text(item, "series_id");
-					
-					return "series|" + (
-					id.isEmpty()
-					? normalize(
-					text(
-					item,
-					"series_title",
-					"title"
-					)
-					)
-					: id
-					);
-				}
-				
-				String id = text(item, "id");
-				
-				return "movie|" + (
-				id.isEmpty()
-				? normalize(
-				text(item, "title")
-				)
-				+ "|"
-				+ text(item, "year")
-				: id
-				);
-			}
-			
-			org.json.JSONArray parse(String json)
-			throws org.json.JSONException {
-				org.json.JSONArray flat =
-				new org.json.JSONArray();
-				
-				Object root =
-				new org.json.JSONTokener(
-				json
-				).nextValue();
-				
-				if (root instanceof org.json.JSONObject) {
-					org.json.JSONObject object =
-					(org.json.JSONObject) root;
-					
-					if (
-					!object.optBoolean("ok", true)
-					) {
-						throw new org.json.JSONException(
-						"Catalog request failed"
-						);
-					}
-					
-					boolean known =
-					!text(
-					object,
-					"title",
-					"name",
-					"series_title"
-					).isEmpty();
-					
-					for (String container : new String[] {
-						"movies",
-						"series",
-						"items",
-						"data",
-						"results",
-						"content",
-						"sections",
-						"catalog"
-					}) {
-						known =
-						known
-						|| object.has(container);
-					}
-					
-					if (!known) {
-						throw new org.json.JSONException(
-						"Unrecognized catalog"
-						);
-					}
-				} else if (
-				!(root instanceof org.json.JSONArray)
-				) {
-					throw new org.json.JSONException(
-					"Invalid catalog"
-					);
-				}
-				
-				collect(root, "", flat, 0);
-				
-				java.util.LinkedHashMap<
-				String,
-				org.json.JSONObject
-				> unique = new java.util.LinkedHashMap<
-				String,
-				org.json.JSONObject
-				>();
-				
-				java.util.LinkedHashMap<
-				String,
-				java.util.LinkedHashMap<
-				String,
-				org.json.JSONObject
-				>
-				> episodeGroups =
-				new java.util.LinkedHashMap<
-				String,
-				java.util.LinkedHashMap<
-				String,
-				org.json.JSONObject
-				>
-				>();
-				
-				for (
-				int i = 0;
-				i < flat.length();
-				i++
-				) {
-					org.json.JSONObject item =
-					flat.getJSONObject(i);
-					
-					String itemKey = key(item);
-					org.json.JSONObject existing =
-					unique.get(itemKey);
-					
-					if (existing == null) {
-						org.json.JSONObject copy = new org.json.JSONObject();
-						java.util.Iterator<String> copyKeys = item.keys();
-						while (copyKeys.hasNext()) {
-							String copyKey = copyKeys.next();
-							copy.put(copyKey, item.opt(copyKey));
-						}
-						unique.put(itemKey, copy);
-					} else {
-						java.util.Iterator<String> names =
-						item.keys();
-						
-						while (names.hasNext()) {
-							String name =
-							names.next();
-							
-							if (
-							text(existing, name)
-							.isEmpty()
-							) {
-								existing.put(
-								name,
-								item.opt(name)
-								);
-							}
-						}
-					}
-					
-					if (
-					!text(item, "type")
-					.equals("series")
-					) {
-						continue;
-					}
-					
-					if (
-					!episodeGroups
-					.containsKey(itemKey)
-					) {
-						episodeGroups.put(
-						itemKey,
-						new java.util.LinkedHashMap<
-						String,
-						org.json.JSONObject
-						>()
-						);
-					}
-					
-					org.json.JSONArray list =
-					new org.json.JSONArray();
-					
-					String nested = text(
-					item,
-					"series_episodes_json"
-					);
-					
-					if (!nested.isEmpty()) {
-						list =
-						new org.json.JSONArray(
-						nested
-						);
-					}
-					
-					if (
-					!text(item, "episode")
-					.isEmpty()
-					|| (
-					!text(item, "video")
-					.isEmpty()
-					&& list.length() == 0
-					)
-					) {
-						list.put(item);
-					}
-					
-					for (
-					int n = 0;
-					n < list.length();
-					n++
-					) {
-						org.json.JSONObject episode =
-						list.optJSONObject(n);
-						
-						if (episode == null) {
-							continue;
-						}
-						
-						String episodeKey =
-						text(
-						episode,
-						"season"
-						)
-						+ "|"
-						+ text(
-						episode,
-						"episode"
-						)
-						+ "|"
-						+ text(
-						episode,
-						"video",
-						"link"
-						);
-						
-						episodeGroups
-						.get(itemKey)
-						.put(
-						episodeKey,
-						episode
-						);
-					}
-				}
-				
-				org.json.JSONArray result =
-				new org.json.JSONArray();
-				
-				for (
-				java.util.Map.Entry<
-				String,
-				org.json.JSONObject
-				> entry
-				: unique.entrySet()
-				) {
-					java.util.LinkedHashMap<
-					String,
-					org.json.JSONObject
-					> group = episodeGroups.get(
-					entry.getKey()
-					);
-					
-					if (
-					group != null
-					&& !group.isEmpty()
-					) {
-						org.json.JSONArray list =
-						new org.json.JSONArray();
-						
-						for (
-						org.json.JSONObject episode
-						: group.values()
-						) {
-							list.put(episode);
-						}
-						
-						entry.getValue().put(
-						"series_episodes_json",
-						list.toString()
-						);
-					}
-					
-					result.put(
-					entry.getValue()
-					);
-				}
-				
-				return result;
-			}
-		}
-		
-		final CigramCatalog cgCatalog =
-		new CigramCatalog();
-		
-		class CigramImage {
-			final android.content.Context app;
-			
-			final android.os.Handler main =
-			new android.os.Handler(
-			android.os.Looper.getMainLooper()
-			);
-			
-			final java.util.concurrent.Executor workers =
-			android.os.AsyncTask.THREAD_POOL_EXECUTOR;
-			
-			final java.util.LinkedHashMap<
-			String,
-			android.graphics.Bitmap
-			> memory = new java.util.LinkedHashMap<
-			String,
-			android.graphics.Bitmap
-			>(18, .75f, true) {
-				@Override
-				protected boolean removeEldestEntry(
-				java.util.Map.Entry<
-				String,
-				android.graphics.Bitmap
-				> entry
-				) {
-					return size() > 16;
-				}
-			};
-			
-			CigramImage(
-			android.content.Context value
-			) {
-				app = value.getApplicationContext();
-			}
-			
-			String clean(String value) {
-				return value == null
-				? ""
-				: value.trim();
-			}
-			
-			String cacheName(String url) {
-				try {
-					byte[] bytes =
-					java.security.MessageDigest
-					.getInstance("SHA-256")
-					.digest(
-					url.getBytes("UTF-8")
-					);
-					
-					StringBuilder name =
-					new StringBuilder();
-					
-					for (byte value : bytes) {
-						name.append(
-						String.format(
-						java.util.Locale.US,
-						"%02x",
-						value & 0xff
-						)
-						);
-					}
-					
-					return name.toString()
-					+ ".img";
-				} catch (Exception ignored) {
-					return Integer.toHexString(
-					url.hashCode()
-					) + ".img";
-				}
-			}
-			
-			java.io.File file(String url) {
-				java.io.File folder =
-				new java.io.File(
-				app.getCacheDir(),
-				"cigram_image_cache"
-				);
-				
-				if (!folder.exists()) {
-					folder.mkdirs();
-				}
-				
-				return new java.io.File(
-				folder,
-				cacheName(url)
-				);
-			}
-			
-			android.graphics.Bitmap decode(
-			java.io.File source
-			) {
-				try {
-					android.graphics.BitmapFactory.Options bounds =
-					new android.graphics.BitmapFactory.Options();
-					
-					bounds.inJustDecodeBounds =
-					true;
-					
-					android.graphics.BitmapFactory.decodeFile(
-					source.getAbsolutePath(),
-					bounds
-					);
-					
-					if (
-					bounds.outWidth <= 0
-					|| bounds.outHeight <= 0
-					) {
-						return null;
-					}
-					
-					int largest = Math.max(
-					bounds.outWidth,
-					bounds.outHeight
-					);
-					
-					int sample = 1;
-					
-					while (
-					largest / sample > 960
-					) {
-						sample *= 2;
-					}
-					
-					android.graphics.BitmapFactory.Options options =
-					new android.graphics.BitmapFactory.Options();
-					
-					options.inSampleSize =
-					sample;
-					
-					options.inPreferredConfig =
-					android.graphics.Bitmap.Config.RGB_565;
-					
-					return android.graphics.BitmapFactory.decodeFile(
-					source.getAbsolutePath(),
-					options
-					);
-				} catch (Exception ignored) {
-					return null;
-				}
-			}
-			
-			android.graphics.Bitmap obtain(
-			String url
-			) {
-				synchronized (memory) {
-					android.graphics.Bitmap cached =
-					memory.get(url);
-					
-					if (
-					cached != null
-					&& !cached.isRecycled()
-					) {
-						return cached;
-					}
-				}
-				
-				java.io.File target =
-				file(url);
-				
-				android.graphics.Bitmap bitmap =
-				null;
-				
-				if (
-				target.isFile()
-				&& target.length() > 0
-				) {
-					bitmap = decode(target);
-				}
-				
-				if (
-				bitmap == null
-				&& (
-				url.startsWith("http://")
-				|| url.startsWith("https://")
-				)
-				) {
-					java.net.HttpURLConnection connection =
-					null;
-					java.io.InputStream input =
-					null;
-					java.io.FileOutputStream output =
-					null;
-					
-					java.io.File temporary =
-					new java.io.File(
-					target.getParentFile(),
-					target.getName()
-					+ ".part"
-					);
-					
-					try {
-						connection =
-						(java.net.HttpURLConnection)
-						new java.net.URL(
-						url
-						).openConnection();
-						
-						connection.setConnectTimeout(
-						10000
-						);
-						connection.setReadTimeout(
-						15000
-						);
-						connection.setInstanceFollowRedirects(
-						true
-						);
-						
-						int status =
-						connection.getResponseCode();
-						
-						if (
-						status < 200
-						|| status >= 300
-						) {
-							throw new java.io.IOException(
-							"HTTP " + status
-							);
-						}
-						
-						input =
-						connection.getInputStream();
-						
-						output =
-						new java.io.FileOutputStream(
-						temporary,
-						false
-						);
-						
-						byte[] buffer =
-						new byte[16384];
-						
-						int read;
-						long total = 0L;
-						
-						while (
-						(read = input.read(buffer))
-						!= -1
-						) {
-							total += read;
-							
-							if (
-							total > 12582912L
-							) {
-								throw new java.io.IOException(
-								"Image too large"
-								);
-							}
-							
-							output.write(
-							buffer,
-							0,
-							read
-							);
-						}
-						
-						output.flush();
-						output.close();
-						output = null;
-						
-						if (target.exists()) {
-							target.delete();
-						}
-						
-						if (
-						temporary.renameTo(
-						target
-						)
-						) {
-							bitmap =
-							decode(target);
-						} else {
-							bitmap =
-							decode(temporary);
-						}
-					} catch (Exception error) {
-						android.util.Log.w(
-						"CigramImage",
-						"Image loading failed",
-						error
-						);
-					} finally {
-						try {
-							if (input != null) {
-								input.close();
-							}
-						} catch (Exception ignored) {}
-						
-						try {
-							if (output != null) {
-								output.close();
-							}
-						} catch (Exception ignored) {}
-						
-						if (connection != null) {
-							connection.disconnect();
-						}
-						
-						if (temporary.exists()) {
-							temporary.delete();
-						}
-					}
-				}
-				
-				if (
-				bitmap == null
-				&& url.startsWith("file://")
-				) {
-					bitmap = decode(
-					new java.io.File(
-					android.net.Uri
-					.parse(url)
-					.getPath()
-					)
-					);
-				}
-				
-				if (bitmap != null) {
-					synchronized (memory) {
-						memory.put(
-						url,
-						bitmap
-						);
-					}
-				}
-				
-				return bitmap;
-			}
-			
-			void load(
-			final String raw,
-			final android.widget.ImageView view
-			) {
-				if (view == null) {
-					return;
-				}
-				
-				final String url =
-				clean(raw);
-				
-				final String token =
-				"cigram-image:" + url;
-				
-				view.setTag(token);
-				view.setScaleType(
-				android.widget.ImageView.ScaleType.CENTER_CROP
-				);
-				android.graphics.drawable.GradientDrawable cgPlaceholder =
-				new android.graphics.drawable.GradientDrawable();
-				cgPlaceholder.setColor(0xFF161619);
-				cgPlaceholder.setCornerRadius(14f * app.getResources().getDisplayMetrics().density);
-				view.setImageDrawable(null);
-				view.setBackground(cgPlaceholder);
-				
-				if (url.isEmpty()) {
-					return;
-				}
-				
-				android.graphics.Bitmap cached;
-				
-				synchronized (memory) {
-					cached = memory.get(url);
-				}
-				
-				if (
-				cached != null
-				&& !cached.isRecycled()
-				) {
-					view.setImageBitmap(
-					cached
-					);
-					return;
-				}
-				
-				workers.execute(
-				new Runnable() {
-					@Override public void run() {
-						final android.graphics.Bitmap bitmap =
-						obtain(url);
-						
-						if (bitmap == null) {
-							return;
-						}
-						
-						main.post(
-						new Runnable() {
-							@Override
-							public void run() {
-								if (
-								token.equals(
-								String.valueOf(
-								view.getTag()
-								)
-								)
-								) {
-									view.setImageBitmap(
-									bitmap
-									);
-								}
-							}
-						}
-						);
-					}
-				}
-				);
-			}
-		}
-		
-		final CigramImage cgImage =
-		new CigramImage(
-		SectionActivity.this
-		);
-		
-		final android.widget.LinearLayout cgSectionRoot =
-		(android.widget.LinearLayout)
-		findViewById(
-		R.id.linear_section_root
-		);
-		
-		final android.widget.LinearLayout cgSectionItems =
-		(android.widget.LinearLayout)
-		findViewById(
-		R.id.linear_section_items
-		);
-		
-		final android.widget.TextView cgSectionTitle =
-		(android.widget.TextView)
-		findViewById(
-		R.id.textview_section_title
-		);
-		
-		final String cgSectionId =
-		getIntent()
-		.getStringExtra("section_id")
-		== null
-		? ""
-		: getIntent()
-		.getStringExtra(
-		"section_id"
-		);
-		
-		final String cgSectionName =
-		getIntent()
-		.getStringExtra("section_title")
-		== null
-		? "القسم"
-		: getIntent()
-		.getStringExtra(
-		"section_title"
-		);
-		
-		final String cgSectionType =
-		getIntent()
-		.getStringExtra("section_type")
-		== null
-		? ""
-		: getIntent()
-		.getStringExtra(
-		"section_type"
-		);
-		
-		final String cgSectionCategory =
-		getIntent()
-		.getStringExtra("section_category")
-		== null
-		? ""
-		: getIntent()
-		.getStringExtra("section_category")
-		.trim();
-		
-		final String cgSectionExcludeId =
-		getIntent()
-		.getStringExtra("section_exclude_id")
-		== null
-		? ""
-		: getIntent()
-		.getStringExtra("section_exclude_id")
-		.trim();
-		
-		cgSectionRoot.setBackgroundColor(
-		0xFF0E0E10
-		);
-		cgSectionRoot.setLayoutDirection(
-		android.view.View.LAYOUT_DIRECTION_RTL
-		);
-		cgSectionItems.setOrientation(
-		android.widget.LinearLayout.VERTICAL
-		);
-		cgSectionItems.setPadding(
-		cgGlass.px(8),
-		cgGlass.px(10),
-		cgGlass.px(8),
-		cgGlass.px(20)
-		);
-		
-		cgSectionTitle.setText(
-		cgSectionName
-		);
-		cgSectionTitle.setTypeface(
-		cgGlass.font
-		);
-		cgSectionTitle.setTextColor(
-		0xFFFFFFFF
-		);
-		
-		cgGlass.bind(
-		findViewById(
-		R.id.linear_section_header
-		),
-		22,
-		false
-		);
-		
-		findViewById(
-		R.id.imageview_section_back
-		).setOnClickListener(
-		new android.view.View.OnClickListener() {
-			@Override public void onClick(
-			android.view.View view
-			) {
-				finish();
-				overridePendingTransition(
-				android.R.anim.fade_in,
-				android.R.anim.fade_out
-				);
-			}
-		}
-		);
-		
-		
-		class CigramPosterView extends android.widget.ImageView {
-			CigramPosterView(android.content.Context context) {
-				super(context);
-			}
-			
-			@Override protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-				int width = android.view.View.MeasureSpec.getSize(widthMeasureSpec);
-				if (width <= 0) {
-					super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-					width = getMeasuredWidth();
-				}
-				int height = Math.max(1, Math.round(width * 1.5f));
-				setMeasuredDimension(width, height);
-			}
-		}
-		
-		class CigramSection {
-			String shown = "";
-			final java.util.ArrayList<org.json.JSONObject> visible =
-			new java.util.ArrayList<org.json.JSONObject>();
-			int rendered = 0;
-			boolean scrollHooked = false;
-			
-			String extra(String key) {
-				String value = getIntent().getStringExtra(key);
-				return value == null ? "" : value.trim();
-			}
-			
-			boolean relatedMode() {
-				String mode = extra("section_mode");
-				return "__related__".equalsIgnoreCase(cgSectionId)
-				|| "recommendations".equalsIgnoreCase(cgSectionId)
-				|| "related".equalsIgnoreCase(mode);
-			}
-			
-			String kind(org.json.JSONObject item) {
-				String value = cgCatalog.text(item, "type").trim().toLowerCase(java.util.Locale.ROOT);
-				return value.isEmpty() ? "movie" : value;
-			}
-			
-			String identity(org.json.JSONObject item) {
-				return cgCatalog.key(item);
-			}
-			
-			boolean belongsToSection(org.json.JSONObject item) {
-				if (item == null) return false;
-				
-				String itemType = kind(item);
-				
-				if (relatedMode()) {
-					if (!cgSectionType.isEmpty() && !cgSectionType.equalsIgnoreCase(itemType)) {
-						return false;
-					}
-					
-					String excluded = extra("related_exclude_key");
-					if (excluded.isEmpty()) excluded = cgSectionExcludeId;
-					
-					if (!excluded.isEmpty()) {
-						String itemKey = identity(item);
-						String itemId = cgCatalog.text(item, "series_id", "id");
-						
-						if (excluded.equalsIgnoreCase(itemKey)
-						|| excluded.equalsIgnoreCase(itemId)) {
-							return false;
-						}
-					}
-					
-					String wantedCategory = extra("related_category");
-					if (wantedCategory.isEmpty()) wantedCategory = cgSectionCategory;
-					if (wantedCategory.isEmpty()) return true;
-					
-					String wanted = cgCatalog.normalize(wantedCategory);
-					String candidate = cgCatalog.normalize(
-					cgCatalog.text(item, "category", "genre", "genres")
-					);
-					
-					if (wanted.isEmpty()) return true;
-					if (candidate.contains(wanted) || wanted.contains(candidate)) return true;
-					
-					String[] parts = wanted.split("[,،/| ]+");
-					for (String part : parts) {
-						if (part != null && part.length() > 1 && candidate.contains(part)) {
-							return true;
-						}
-					}
-					return false;
-				}
-				
-				if ("latest_movies".equalsIgnoreCase(cgSectionId)) {
-					return "movie".equals(itemType);
-				}
-				
-				if ("featured_series".equalsIgnoreCase(cgSectionId)
-				|| "latest_series".equalsIgnoreCase(cgSectionId)) {
-					return "series".equals(itemType);
-				}
-				
-				if (!cgSectionType.isEmpty()
-				&& !cgSectionType.equalsIgnoreCase(itemType)) {
-					return false;
-				}
-				
-				String itemSectionId = cgCatalog.text(item, "section_id", "sectionId");
-				String itemSectionName = cgCatalog.text(item, "section_name", "section");
-				
-				if (!itemSectionId.isEmpty() || !itemSectionName.isEmpty()) {
-					boolean sameId = !cgSectionId.isEmpty()
-					&& cgSectionId.equalsIgnoreCase(itemSectionId);
-					
-					boolean sameName = !cgSectionName.isEmpty()
-					&& cgSectionName.equalsIgnoreCase(itemSectionName);
-					
-					return sameId || sameName;
-				}
-				
-				return cgSectionId.isEmpty();
-			}
-			
-			boolean hasRating(String value) {
-				if (value == null) return false;
-				String text = value.trim();
-				if (text.isEmpty()) return false;
-				
-				try {
-					return Double.parseDouble(text.replace(',', '.')) > 0.0001d;
-				} catch (Exception ignored) {
-					return !text.equals("0") && !text.equals("0.0");
-				}
-			}
-			
-			String firstCategory(String value) {
-				if (value == null) return "";
-				String text = value.trim();
-				if (text.isEmpty()) return "";
-				
-				String[] parts = text.split("[,،|/]");
-				return parts.length == 0 ? text : parts[0].trim();
-			}
-			
-			android.graphics.drawable.GradientDrawable rounded(int color, float radiusDp) {
-				android.graphics.drawable.GradientDrawable drawable =
-				new android.graphics.drawable.GradientDrawable();
-				drawable.setColor(color);
-				drawable.setCornerRadius(cgGlass.px(radiusDp));
-				return drawable;
-			}
-			
-			android.widget.TextView text(
-			String value,
-			float size,
-			int color,
-			boolean bold
-			) {
-				android.widget.TextView view = new android.widget.TextView(SectionActivity.this);
-				view.setText(value == null ? "" : value);
-				view.setTextSize(size);
-				view.setTextColor(color);
-				view.setTypeface(
-				cgGlass.font,
-				bold ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL
-				);
-				view.setGravity(android.view.Gravity.RIGHT | android.view.Gravity.CENTER_VERTICAL);
-				view.setTextDirection(android.view.View.TEXT_DIRECTION_FIRST_STRONG);
-				view.setLayoutDirection(android.view.View.LAYOUT_DIRECTION_RTL);
-				return view;
-			}
-			
-			android.view.View makeCard(final org.json.JSONObject item) {
-				final android.widget.LinearLayout card =
-				new android.widget.LinearLayout(SectionActivity.this);
-				
-				card.setOrientation(android.widget.LinearLayout.VERTICAL);
-				card.setGravity(android.view.Gravity.RIGHT);
-				card.setLayoutDirection(android.view.View.LAYOUT_DIRECTION_RTL);
-				card.setBackgroundColor(android.graphics.Color.TRANSPARENT);
-				card.setClickable(true);
-				card.setFocusable(true);
-				
-				final CigramPosterView poster =
-				new CigramPosterView(SectionActivity.this);
-				
-				poster.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
-				poster.setBackground(rounded(0xFF1B1B1F, 14));
-				
-				if (android.os.Build.VERSION.SDK_INT >= 21) {
-					final float radius = cgGlass.px(14);
-					poster.setOutlineProvider(
-					new android.view.ViewOutlineProvider() {
-						@Override public void getOutline(
-						android.view.View view,
-						android.graphics.Outline outline
-						) {
-							outline.setRoundRect(
-							0,
-							0,
-							view.getWidth(),
-							view.getHeight(),
-							radius
-							);
-						}
-					}
-					);
-					poster.setClipToOutline(true);
-				}
-				
-				card.addView(
-				poster,
-				new android.widget.LinearLayout.LayoutParams(
-				-1,
-				-2
-				)
-				);
-				
-				final String posterUrl =
-				cgCatalog.text(item, "poster", "series_poster", "season_poster", "image", "backdrop");
-				
-				final String backdropUrl =
-				cgCatalog.text(item, "backdrop", "landscape_poster", "source_backdrop");
-				
-				cgImage.load(posterUrl, poster);
-				
-				String ratingValue =
-				cgCatalog.text(item, "imdb", "rating", "imdb_rating", "vote_average", "score");
-				
-				android.widget.LinearLayout ratingRow =
-				new android.widget.LinearLayout(SectionActivity.this);
-				
-				ratingRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-				ratingRow.setLayoutDirection(android.view.View.LAYOUT_DIRECTION_LTR);
-				ratingRow.setGravity(android.view.Gravity.RIGHT | android.view.Gravity.CENTER_VERTICAL);
-				
-				android.widget.LinearLayout.LayoutParams ratingRowParams =
-				new android.widget.LinearLayout.LayoutParams(
-				-1,
-				cgGlass.px(24)
-				);
-				ratingRowParams.topMargin = cgGlass.px(6);
-				
-				card.addView(ratingRow, ratingRowParams);
-				
-				android.widget.ImageView imdb =
-				new android.widget.ImageView(SectionActivity.this);
-				
-				imdb.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
-				
-				int imdbId = getResources().getIdentifier(
-				"ic_imdb",
-				"drawable",
-				getPackageName()
-				);
-				
-				if (imdbId == 0) {
-					imdbId = getResources().getIdentifier(
-					"imdb",
-					"drawable",
-					getPackageName()
-					);
-				}
-				
-				if (imdbId != 0) {
-					imdb.setImageResource(imdbId);
-				}
-				
-				ratingRow.addView(
-				imdb,
-				new android.widget.LinearLayout.LayoutParams(
-				cgGlass.px(36),
-				cgGlass.px(18)
-				)
-				);
-				
-				android.widget.TextView rating =
-				text(
-				ratingValue,
-				12,
-				0xFFFFFFFF,
-				true
-				);
-				
-				android.widget.LinearLayout.LayoutParams ratingParams =
-				new android.widget.LinearLayout.LayoutParams(
-				-2,
-				cgGlass.px(24)
-				);
-				ratingParams.leftMargin = cgGlass.px(5);
-				
-				ratingRow.addView(rating, ratingParams);
-				ratingRow.setVisibility(
-				hasRating(ratingValue)
-				? android.view.View.VISIBLE
-				: android.view.View.GONE
-				);
-				
-				android.widget.TextView title =
-				text(
-				cgCatalog.text(item, "series_title", "title", "name"),
-				14,
-				0xFFFFFFFF,
-				true
-				);
-				
-				title.setSingleLine(true);
-				title.setEllipsize(android.text.TextUtils.TruncateAt.END);
-				title.setTextDirection(android.view.View.TEXT_DIRECTION_FIRST_STRONG);
-				
-				android.widget.LinearLayout.LayoutParams titleParams =
-				new android.widget.LinearLayout.LayoutParams(
-				-1,
-				-2
-				);
-				titleParams.topMargin = cgGlass.px(4);
-				
-				card.addView(title, titleParams);
-				
-				String category = firstCategory(
-				cgCatalog.text(item, "category", "genre", "genres")
-				);
-				
-				String year = cgCatalog.text(item, "year", "release_year");
-				
-				String metaText = "";
-				if (!category.isEmpty() && !year.isEmpty()) {
-					metaText = category + "," + year;
-				} else if (!category.isEmpty()) {
-					metaText = category;
-				} else if (!year.isEmpty()) {
-					metaText = year;
-				}
-				
-				android.widget.TextView meta =
-				text(
-				metaText,
-				12,
-				0xFF8FA0A8,
-				false
-				);
-				
-				meta.setSingleLine(true);
-				meta.setEllipsize(android.text.TextUtils.TruncateAt.END);
-				meta.setVisibility(
-				metaText.isEmpty()
-				? android.view.View.GONE
-				: android.view.View.VISIBLE
-				);
-				
-				android.widget.LinearLayout.LayoutParams metaParams =
-				new android.widget.LinearLayout.LayoutParams(
-				-1,
-				-2
-				);
-				metaParams.topMargin = cgGlass.px(2);
-				
-				card.addView(meta, metaParams);
-				
-				card.setOnTouchListener(
-				new android.view.View.OnTouchListener() {
-					@Override public boolean onTouch(
-					android.view.View view,
-					android.view.MotionEvent event
-					) {
-						int action = event.getActionMasked();
-						
-						if (action == android.view.MotionEvent.ACTION_DOWN) {
-							CigramStage1InitProvider.preloadDetailsImages(
-							SectionActivity.this,
-							posterUrl,
-							backdropUrl
-							);
-							
-							view.animate()
-							.scaleX(1f)
-							.scaleY(1f)
-							.setDuration(90L)
-							.start();
-						} else if (
-						action == android.view.MotionEvent.ACTION_UP
-						|| action == android.view.MotionEvent.ACTION_CANCEL
-						) {
-							view.animate()
-							.scaleX(1f)
-							.scaleY(1f)
-							.setDuration(150L)
-							.start();
-						}
-						
-						return false;
-					}
-				}
-				);
-				
-				card.setOnClickListener(
-				new android.view.View.OnClickListener() {
-					@Override public void onClick(android.view.View view) {
-						CigramStage1InitProvider.openTitleDetails(
-						SectionActivity.this,
-						item,
-						poster
-						);
-					}
-				}
-				);
-				
-				return card;
-			}
-			
-			void renderNextBatch() {
-				if (rendered >= visible.size()) return;
-				
-				int end = Math.min(
-				visible.size(),
-				rendered + 12   // 4 rows per step: 30 cards in one frame made every batch a visible hitch
-				);
-				
-				while (rendered < end) {
-					android.widget.LinearLayout row =
-					new android.widget.LinearLayout(SectionActivity.this);
-					
-					row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-					// v10.36: the app has no supportsRtl, so an RTL row was drawn left-to-right and the
-					// newest item landed at the far LEFT. Explicit LTR row, filled from the right:
-					// column 0 (the newest / first item) is the right-most cell.
-					row.setLayoutDirection(android.view.View.LAYOUT_DIRECTION_LTR);
-					row.setGravity(android.view.Gravity.TOP);
-					
-					android.view.View[] cells = new android.view.View[3];
-					for (int column = 0; column < 3; column++) {
-						if (rendered < end && rendered < visible.size()) {
-							org.json.JSONObject item = visible.get(rendered);
-							cells[column] = makeCard(item);
-							rendered++;
-						} else {
-							android.widget.Space filler =
-							new android.widget.Space(SectionActivity.this);
-							
-							filler.setVisibility(android.view.View.INVISIBLE);
-							cells[column] = filler;
-						}
-					}
-					
-					for (int column = 2; column >= 0; column--) {
-						android.widget.LinearLayout.LayoutParams cellParams =
-						new android.widget.LinearLayout.LayoutParams(
-						0,
-						-2,
-						1f
-						);
-						
-						cellParams.leftMargin = cgGlass.px(4);
-						cellParams.rightMargin = cgGlass.px(4);
-						
-						row.addView(
-						cells[column],
-						cellParams
-						);
-					}
-					
-					android.widget.LinearLayout.LayoutParams rowParams =
-					new android.widget.LinearLayout.LayoutParams(
-					-1,
-					-2
-					);
-					
-					rowParams.bottomMargin = cgGlass.px(16);
-					
-					cgSectionItems.addView(
-					row,
-					rowParams
-					);
-				}
-			}
-			
-			void ensureScrollHook() {
-				if (scrollHooked) return;
-				
-				final android.widget.ScrollView scroll =
-				(android.widget.ScrollView)
-				findViewById(R.id.vscroll_section);
-				
-				if (scroll == null) return;
-				
-				scrollHooked = true;
-				
-				scroll.getViewTreeObserver().addOnScrollChangedListener(
-				new android.view.ViewTreeObserver.OnScrollChangedListener() {
-					@Override public void onScrollChanged() {
-						if (scroll.getChildCount() == 0) return;
-						
-						android.view.View child =
-						scroll.getChildAt(0);
-						
-						int trigger =
-						scroll.getScrollY()
-						+ scroll.getHeight()
-						+ cgGlass.px(900);   // start the next small batch earlier so the user never reaches the end
-						
-						if (trigger >= child.getBottom()) {
-							renderNextBatch();
-						}
-					}
-				}
-				);
-			}
-			
-			void showEmpty(String message) {
-				cgSectionItems.removeAllViews();
-				
-				android.widget.TextView empty =
-				text(
-				message,
-				15,
-				0xFFB5C0C6,
-				false
-				);
-				
-				empty.setGravity(android.view.Gravity.CENTER);
-				empty.setPadding(
-				cgGlass.px(12),
-				cgGlass.px(28),
-				cgGlass.px(12),
-				cgGlass.px(20)
-				);
-				
-				cgSectionItems.addView(
-				empty,
-				new android.widget.LinearLayout.LayoutParams(
-				-1,
-				-2
-				)
-				);
-			}
-			
-			java.util.ArrayList<org.json.JSONObject> select(String raw)
-			throws org.json.JSONException {
-				org.json.JSONArray items =
-				cgCatalog.parse(raw);
-					
-					java.util.LinkedHashMap<
-					String,
-					org.json.JSONObject
-					> unique =
-					new java.util.LinkedHashMap<
-					String,
-					org.json.JSONObject
-					>();
-					
-					final java.util.HashMap<String, Long> newest =
-					new java.util.HashMap<String, Long>();
-					
-					for (int i = 0; i < items.length(); i++) {
-						org.json.JSONObject item =
-						items.optJSONObject(i);
-						
-						if (item == null || !belongsToSection(item)) {
-							continue;
-						}
-						
-						String itemKey = identity(item);
-						
-						if (itemKey.isEmpty()) {
-							itemKey =
-							kind(item)
-							+ "|"
-							+ cgCatalog.normalize(
-							cgCatalog.text(
-							item,
-							"series_title",
-							"title",
-							"name"
-							)
-							)
-							+ "|"
-							+ cgCatalog.text(item, "year");
-						}
-						
-						long itemRank = CigramStage1InitProvider.itemRecency(item);
-						Long bestRank = newest.get(itemKey);
-						if (bestRank == null || itemRank > bestRank.longValue()) {
-							newest.put(itemKey, Long.valueOf(itemRank));
-						}
-						
-						if (!unique.containsKey(itemKey)) {
-							unique.put(itemKey, item);
-						}
-					}
-					
-					// v10.36: newest first, like the home rows (the server order is not guaranteed);
-					// an item added later shows at the start (far right). Equal ranks keep server order.
-					java.util.ArrayList<String> orderedKeys =
-					new java.util.ArrayList<String>(unique.keySet());
-					java.util.Collections.sort(
-					orderedKeys,
-					new java.util.Comparator<String>() {
-						@Override public int compare(String a, String b) {
-							long ra = newest.get(a).longValue();
-							long rb = newest.get(b).longValue();
-							return ra == rb ? 0 : (ra < rb ? 1 : -1);
-						}
-					}
-					);
-					
-					java.util.ArrayList<org.json.JSONObject> ordered =
-				new java.util.ArrayList<org.json.JSONObject>();
-				for (String orderedKey : orderedKeys) {
-					ordered.add(unique.get(orderedKey));
-				}
-				return ordered;
-			}
 
-			/** v11: builds the grid on the UI thread from an already-parsed list (parsing stays off the main thread). */
-			void bind(String raw, java.util.ArrayList<org.json.JSONObject> ordered) {
-				if (raw == null || ordered == null) return;
-				if (
-				raw.equals(shown)
-				&& !visible.isEmpty()
-				&& cgSectionItems.getChildCount() > 0
-				) {
-					return;
-				}
-				visible.clear();
-				visible.addAll(ordered);
-				shown = raw;
-				rendered = 0;
-				cgSectionItems.removeAllViews();
-				if (visible.isEmpty()) {
-					showEmpty("لا يوجد محتوى في هذا القسم حاليًا");
-					return;
-				}
-				renderNextBatch();
-				ensureScrollHook();
-			}
+    static final String EXTRA_KEY = "section_key";
+    /** A section Home trimmed to this many titles may have more in the catalogue: the page tops it up silently. */
+    private static final int TRIMMED_AT = 80;
+    private static final int POSTER_W_DP = 92;
+    private static final int POSTER_H_DP = 138;
+    private static final int CARD_MIN_H_DP = 150;
 
-			/** Convenience: parse + bind on the current thread. Call off the main thread for large catalogues. */
-			void render(String raw) {
-				if (raw == null || raw.trim().isEmpty()) return;
-				if (raw.equals(shown) && !visible.isEmpty() && cgSectionItems.getChildCount() > 0) return;
-				try {
-					bind(raw, select(raw));
-				} catch (Exception error) {
-					android.util.Log.e("CigramSection", "Failed to render section", error);
-					showEmpty("تعذر عرض محتوى القسم");
-				}
-			}
-		}
-		
-		final CigramSection cgSection =
-		new CigramSection();
-		
-		// v11: no synchronous catalogue read/parse on the UI thread here — it froze «المزيد» on open.
-		// cgRequest.load() shows the loading label and renders cache-first off the main thread.
-		
-		class CigramRequest {
-			boolean loading = false;
+    private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
-			String sectionCacheFirst() {
-				try {
-					String cached =
-					CigramStage1InitProvider.cachedCatalogJson(SectionActivity.this);
-					if (cached == null || cached.trim().isEmpty()) return null;
-					final String cachedRaw = CigramTitles.normalizeCatalog(cached);
-					if (cachedRaw.equals(cgSection.shown)) return cachedRaw;
-					final java.util.ArrayList<org.json.JSONObject> ordered =
-					cgSection.select(cachedRaw);
-					runOnUiThread(new Runnable() {
-						@Override public void run() {
-							if (!isFinishing() && !isDestroyed()) {
-								cgSection.bind(cachedRaw, ordered);
-							}
-						}
-					});
-					return cachedRaw;
-				} catch (Throwable ignored) {
-					return null;
-				}
-			}
-			
-			void load() {
-				if (loading) {
-					return;
-				}
-				
-				loading = true;
-				
-				if (
-				cgSection.shown.isEmpty()
-				) {
-					cgSectionItems.removeAllViews();
-					
-					android.widget.TextView message =
-					cgGlass.label(
-					"جارٍ تحميل محتوى القسم…",
-					15
-					);
-					
-					message.setPadding(
-					cgGlass.px(12),
-					cgGlass.px(28),
-					cgGlass.px(12),
-					cgGlass.px(12)
-					);
-					
-					cgSectionItems.addView(
-					message
-					);
-				}
-				
-				new Thread(
-				new Runnable() {
-					@Override public void run() {
-						java.net.HttpURLConnection connection =
-						null;
+    private RecyclerView list;
+    private RowAdapter adapter;
+    private TextView emptyView;
+    private boolean closed;
 
-						// v11: cache-first — paint the locally cached catalogue immediately (parsed on this
-						// background thread) so «المزيد» opens instantly; the network refresh below only
-						// reparses + rebinds when the content actually changed.
-						final String cachedRaw = sectionCacheFirst();
+    private String sectionId = "";
+    private String sectionTitle = "";
+    private String sectionType = "";
 
-						try {
-							// Sections reuse Home's hardened catalogue load: a network fetch that retries on
-							// transient failures, then the cached copy as a safety net, so a momentary blip
-							// never leaves the section blank. (connection stays null; the finally below no-ops.)
-							final String source =
-							CigramStage1InitProvider.loadCatalogJsonBlocking(
-							SectionActivity.this
-							);
-							
-							if (source == null || source.trim().isEmpty()) {
-								throw new java.io.IOException(
-								"no catalog"
-								);
-							}
-							
-							final String raw =
-							CigramTitles.normalizeCatalog(source);
-							
-							CigramStage1InitProvider.prepareAndStoreCatalogAsync(
-							SectionActivity.this,
-							raw
-							);
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        readTarget();
 
-							// Only reparse + rebind when the server content differs from the cache we already
-							// painted. Unchanged content avoids a full grid rebuild.
-							if (cachedRaw != null && raw.equals(cachedRaw)) {
-								runOnUiThread(new Runnable() {
-									@Override public void run() { loading = false; }
-								});
-							} else {
-								final java.util.ArrayList<org.json.JSONObject> ordered =
-								cgSection.select(raw);
-								runOnUiThread(new Runnable() {
-									@Override public void run() {
-										loading = false;
-										if (!isFinishing() && !isDestroyed()) {
-											cgSection.bind(raw, ordered);
-										}
-									}
-								});
-							}
-						} catch (
-						final Exception error
-						) {
-							android.util.Log.e(
-							"CigramSection",
-							"Catalog request failed",
-							error
-							);
-							
-							runOnUiThread(
-							new Runnable() {
-								@Override
-								public void run() {
-									loading =
-									false;
-									
-									if (
-									isFinishing()
-									|| isDestroyed()
-									) {
-										return;
-									}
-									
-									// إذا يوجد محتوى محفوظ، أبقه ظاهرًا.
-									if (
-									!cgSection.shown
-									.isEmpty()
-									) {
-										return;
-									}
-									
-									cgSectionItems.removeAllViews();
-									
-									android.widget.LinearLayout errorBox =
-									new android.widget.LinearLayout(
-									SectionActivity.this
-									);
-									
-									errorBox.setOrientation(
-									android.widget.LinearLayout.VERTICAL
-									);
-									
-									errorBox.setGravity(
-									android.view.Gravity.CENTER
-									);
-									
-									errorBox.setPadding(
-									cgGlass.px(12),
-									cgGlass.px(28),
-									cgGlass.px(12),
-									cgGlass.px(12)
-									);
-									
-									android.widget.TextView message =
-									cgGlass.label(
-									"تعذر تحميل القسم. تحقق من الاتصال",
-									15
-									);
-									
-									message.setGravity(
-									android.view.Gravity.CENTER
-									);
-									
-									errorBox.addView(
-									message,
-									new android.widget.LinearLayout.LayoutParams(
-									-1,
-									-2
-									)
-									);
-									
-									android.widget.TextView retry =
-									cgGlass.label(
-									"إعادة المحاولة",
-									16
-									);
-									
-									retry.setGravity(
-									android.view.Gravity.CENTER
-									);
-									
-									cgGlass.bind(
-									retry,
-									16,
-									true
-									);
-									
-									cgGlass.press(
-									retry
-									);
-									
-									android.widget.LinearLayout.LayoutParams retryParams =
-									new android.widget.LinearLayout.LayoutParams(
-									cgGlass.px(170),
-									cgGlass.px(48)
-									);
-									
-									retryParams.topMargin =
-									cgGlass.px(16);
-									
-									errorBox.addView(
-									retry,
-									retryParams
-									);
-									
-									retry.setOnClickListener(
-									new android.view.View.OnClickListener() {
-										@Override
-										public void onClick(
-										android.view.View view
-										) {
-											load();
-										}
-									}
-									);
-									
-									cgSectionItems.addView(
-									errorBox
-									);
-								}
-							}
-							);
-						} finally {
-							if (
-							connection != null
-							) {
-								connection.disconnect();
-							}
-						}
-					}
-				},
-				"cigram-section"
-				).start();
-			}
-		}
-		
-		final CigramRequest cgRequest =
-		new CigramRequest();
-		
-		cgRequest.load();
-		
-		// CIGRAM: no side drawer / no visible edge scrollbars anywhere on this screen.
-		try {
-			final android.view.View cigramNoSideRoot =
-			findViewById(android.R.id.content);
-			class CigramNoSideUi {
-				void apply(android.view.View view) {
-					if (view == null) return;
-					try {
-						view.setVerticalScrollBarEnabled(false);
-						view.setHorizontalScrollBarEnabled(false);
-					} catch (Exception ignored) {}
-					
-					String className = view.getClass().getName();
-					if (className != null && className.contains("DrawerLayout")) {
-						try {
-							java.lang.reflect.Method lockMethod =
-							view.getClass().getMethod(
-							"setDrawerLockMode",
-							int.class
-							);
-							lockMethod.invoke(view, 1); // LOCK_MODE_LOCKED_CLOSED
-						} catch (Exception ignored) {}
-					}
-					if (
-					className != null
-					&&
-					className.contains("NavigationView")
-					) {
-						view.setVisibility(android.view.View.GONE);
-					}
-					if (view instanceof android.view.ViewGroup) {
-						android.view.ViewGroup group = (android.view.ViewGroup) view;
-						for (int i = 0; i < group.getChildCount(); i++) {
-							apply(group.getChildAt(i));
-						}
-					}
-				}
-			}
-			new CigramNoSideUi().apply(cigramNoSideRoot);
-		} catch (Exception ignored) {}
-		
-	}
-	
+        boolean light = CigramTheme.isLight(this);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(CigramTheme.page(this));
+        root.addView(CigramTopBar.create(this, sectionTitle.length() == 0 ? "القسم" : sectionTitle),
+                new LinearLayout.LayoutParams(-1, CigramUI.dp(this, CigramTopBar.HEIGHT_DP)));
+
+        FrameLayout body = new FrameLayout(this);
+        list = new RecyclerView(this);
+        list.setId(View.generateViewId());                      // an id lets the layout manager save / restore the scroll position
+        list.setLayoutManager(new LinearLayoutManager(this));
+        list.setHasFixedSize(true);
+        list.setItemViewCacheSize(8);
+        list.setClipToPadding(false);
+        list.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        list.setVerticalScrollBarEnabled(false);
+        list.setItemAnimator(null);                             // appended rows must not animate over the visible ones
+        list.setPadding(0, CigramUI.dp(this, 6), 0, CigramUI.dp(this, 24));
+        adapter = new RowAdapter(this, light);
+        list.setAdapter(adapter);
+        body.addView(list, new FrameLayout.LayoutParams(-1, -1));
+
+        emptyView = new TextView(this);
+        emptyView.setText("لا توجد عناصر في هذا القسم حالياً");
+        emptyView.setTextColor(light ? 0xFF5F6B73 : 0xFF8E8E94);
+        emptyView.setTextSize(15f);
+        emptyView.setGravity(Gravity.CENTER);
+        emptyView.setTypeface(CigramUI.font(this));
+        emptyView.setVisibility(View.GONE);
+        body.addView(emptyView, new FrameLayout.LayoutParams(-1, -1));
+        root.addView(body, new LinearLayout.LayoutParams(-1, 0, 1f));
+        setContentView(root);
+
+        // the whole list, synchronously, before the first frame
+        CigramSectionStore.Page page = resolvePage();
+        if (page != null) adapter.submit(page.items);
+        emptyView.setVisibility(adapter.getItemCount() == 0 ? View.VISIBLE : View.GONE);
+
+        if (page == null || (!page.complete && page.items.size() >= TRIMMED_AT) || page.items.isEmpty()) {
+            topUpSilently(page);
+        }
+    }
+
+    // ------------------------------------------------------------------ what to show
+
+    private void readTarget() {
+        Intent intent = getIntent();
+        sectionId = clean(intent == null ? null : intent.getStringExtra("section_id"));
+        sectionTitle = clean(intent == null ? null : intent.getStringExtra("section_title"));
+        if (sectionTitle.length() == 0) sectionTitle = clean(intent == null ? null : intent.getStringExtra("section_name"));
+        sectionType = clean(intent == null ? null : intent.getStringExtra("section_type")).toLowerCase(Locale.ROOT);
+
+        if (sectionId.length() == 0) {
+            String n = CigramStage1InitProvider.cigramNormalize(sectionTitle);
+            if (n.equals(CigramStage1InitProvider.cigramNormalize(CigramStage1InitProvider.LATEST_MOVIES_NAME))) {
+                sectionId = CigramStage1InitProvider.LATEST_MOVIES_ID;
+            } else if (n.equals(CigramStage1InitProvider.cigramNormalize(CigramStage1InitProvider.FEATURED_SERIES_NAME))) {
+                sectionId = CigramStage1InitProvider.FEATURED_SERIES_ID;
+            } else if (sectionTitle.length() == 0 && "movie".equals(sectionType)) {
+                sectionId = CigramStage1InitProvider.LATEST_MOVIES_ID;
+            } else if (sectionTitle.length() == 0 && "series".equals(sectionType)) {
+                sectionId = CigramStage1InitProvider.FEATURED_SERIES_ID;
+            }
+        }
+        if ("latest_series".equalsIgnoreCase(sectionId)) sectionId = CigramStage1InitProvider.FEATURED_SERIES_ID;
+        if (sectionTitle.length() == 0) {
+            if (CigramStage1InitProvider.LATEST_MOVIES_ID.equalsIgnoreCase(sectionId)) sectionTitle = CigramStage1InitProvider.LATEST_MOVIES_NAME;
+            else if (CigramStage1InitProvider.FEATURED_SERIES_ID.equalsIgnoreCase(sectionId)) sectionTitle = CigramStage1InitProvider.FEATURED_SERIES_NAME;
+            else if ("__related__".equals(sectionId)) sectionTitle = "ذات صلة";
+        }
+    }
+
+    /** Memory first (what Home drew); the saved sections of the last session when this process has not drawn Home yet. Never the network. */
+    private CigramSectionStore.Page resolvePage() {
+        String key = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_KEY);
+        CigramSectionStore.Page page = CigramSectionStore.getByKey(key);
+        if (page == null) page = CigramSectionStore.get(sectionId, sectionTitle);
+        if (page == null && !"__related__".equals(sectionId)) {
+            List<JSONObject> saved = CigramStage1InitProvider.snapshotSectionItems(this, sectionId, sectionTitle);
+            if (saved != null && !saved.isEmpty()) page = new CigramSectionStore.Page(sectionId, sectionTitle, sectionType, saved, false);
+        }
+        return page;
+    }
+
+    /**
+     * Long sections: Home keeps a trimmed copy, the catalogue has more. Read the rest in the background and APPEND what is new; the cards
+     * on screen stay exactly as they are. Also the way back to a list for a restored process that had nothing saved.
+     */
+    private void topUpSilently(final CigramSectionStore.Page shown) {
+        if ("__related__".equals(sectionId)) return;
+        final android.content.Context app = getApplicationContext();
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final List<JSONObject> all = CigramStage1InitProvider.fullSectionItems(app, sectionId, sectionTitle);
+                if (all.isEmpty()) return;
+                final List<JSONObject> added = shown == null ? all : CigramSectionStore.topUp(shown, all);
+                if (added.isEmpty()) return;
+                MAIN.post(new Runnable() {
+                    @Override public void run() {
+                        if (closed || isFinishing() || isDestroyed()) return;
+                        adapter.append(added);
+                        emptyView.setVisibility(View.GONE);
+                    }
+                });
+            }
+        }, "cigram-section-topup").start();
+    }
+
+    @Override
+    protected void onDestroy() {
+        closed = true;
+        super.onDestroy();
+    }
+
+    private static String clean(String s) { return s == null ? "" : s.trim(); }
+
+    // ------------------------------------------------------------------ list
+
+    private static final class Row {
+        final JSONObject item;
+        final long stableId;
+        final String title;
+        final String meta;
+        final String genres;
+        final String synopsis;
+        final List<Badge> badges;
+        Row(JSONObject item, long stableId, String title, String meta, String genres, String synopsis, List<Badge> badges) {
+            this.item = item; this.stableId = stableId; this.title = title; this.meta = meta;
+            this.genres = genres; this.synopsis = synopsis; this.badges = badges;
+        }
+    }
+
+    private static final class Badge {
+        final int color;
+        final String label;
+        Badge(int color, String label) { this.color = color; this.label = label; }
+    }
+
+    private static final class Holder extends RecyclerView.ViewHolder {
+        final FrameLayout card;
+        final ImageView poster;
+        final CigramRankView rank;
+        final TextView title;
+        final TextView meta;
+        final TextView genres;
+        final TextView synopsis;
+        final LinearLayout badges;
+        Holder(FrameLayout card, ImageView poster, CigramRankView rank, TextView title, TextView meta, TextView genres,
+               TextView synopsis, LinearLayout badges) {
+            super(card);
+            this.card = card; this.poster = poster; this.rank = rank; this.title = title; this.meta = meta;
+            this.genres = genres; this.synopsis = synopsis; this.badges = badges;
+        }
+    }
+
+    private static final class RowAdapter extends RecyclerView.Adapter<Holder> {
+        private final SectionActivity host;
+        private final boolean light;
+        private final float d;
+        private final ArrayList<Row> rows = new ArrayList<Row>();
+        private final java.util.HashSet<String> identities = new java.util.HashSet<String>();
+        /** Cards bound before the first scroll animate in; after the user scrolls, rows just appear (no animation to wait for). */
+        private boolean entrance = true;
+        private int animated;
+        private final HashMap<String, int[]> episodeStats = new HashMap<String, int[]>();
+
+        RowAdapter(SectionActivity host, boolean light) {
+            this.host = host;
+            this.light = light;
+            this.d = host.getResources().getDisplayMetrics().density;
+            setHasStableIds(true);
+        }
+
+        void submit(List<JSONObject> items) {
+            rows.clear();
+            identities.clear();
+            append(items, false);
+            notifyDataSetChanged();
+        }
+
+        /** Adds titles at the END only. The rows already shown keep their place, their rank and their views. */
+        void append(List<JSONObject> items) {
+            int from = rows.size();
+            append(items, true);
+            if (rows.size() > from) notifyItemRangeInserted(from, rows.size() - from);
+        }
+
+        private void append(List<JSONObject> items, boolean silent) {
+            if (items == null) return;
+            for (JSONObject item : items) {
+                if (item == null) continue;
+                String identity = CigramSectionStore.identity(item);
+                if (identity.length() > 2 && !identities.add(identity)) continue;     // one card per title
+                try {
+                    rows.add(prepare(item, identity));
+                } catch (Throwable error) {
+                    android.util.Log.w("CigramSection", "row skipped", error);        // one bad record never costs the page
+                }
+            }
+        }
+
+        @Override public long getItemId(int position) { return rows.get(position).stableId; }
+        @Override public int getItemCount() { return rows.size(); }
+
+        @Override
+        public void onViewRecycled(Holder h) {
+            h.card.animate().cancel();
+            h.card.setAlpha(1f);
+            h.card.setTranslationY(0f);
+            h.card.setScaleX(1f);
+            h.card.setScaleY(1f);
+        }
+
+        // ---- row data (strings only; no views, cheap)
+
+        private Row prepare(JSONObject item, String identity) {
+            String title = CigramStage1InitProvider.itemText(item, "series_title", "title", "title_ar", "title_en", "original_title", "name");
+            if (title.length() == 0) title = "بدون عنوان";
+
+            ArrayList<String> meta = new ArrayList<String>();
+            int year = CigramContent.year(item);
+            if (year > 0) meta.add(String.valueOf(year));
+            double rating = CigramContent.rating(item);
+            if (rating > 0d) meta.add("★ " + String.format(Locale.US, "%.1f", rating));
+            String length = lengthText(item);
+            if (length.length() > 0) meta.add(length);
+
+            List<String> genreList = CigramContent.genreLabels(item);
+            StringBuilder genres = new StringBuilder();
+            for (int i = 0; i < genreList.size() && i < 3; i++) {
+                if (i > 0) genres.append(" • ");
+                genres.append(genreList.get(i));
+            }
+
+            ArrayList<Badge> badges = new ArrayList<Badge>();
+            boolean series = CigramContent.isSeries(item);
+            badges.add(new Badge(series ? 0xFF26A5B5 : 0xFF6C63FF, series ? "مسلسل" : "فيلم"));
+            String quality = CigramStage1InitProvider.itemText(item, "quality", "resolution", "video_quality");
+            if (quality.length() > 0 && quality.length() <= 8) badges.add(new Badge(0xFF3A3A42, quality));
+            try {
+                for (String entry : CigramHome.cardBadges(item, 2)) {                      // admin badges, «جديد», «حلقة جديدة»
+                    String[] parts = entry.split("\\|", 2);
+                    if (parts.length == 2) badges.add(new Badge(Integer.parseInt(parts[0]), parts[1]));
+                }
+            } catch (Throwable ignored) { }
+
+            String synopsis = CigramStage1InitProvider.itemText(item, "description", "overview", "plot", "synopsis").replaceAll("\\s+", " ").trim();
+            if (synopsis.length() > 240) synopsis = cut(synopsis, 240);
+
+            long id = identity.hashCode() * 31L + title.hashCode();
+            return new Row(item, id, title, join(meta, "  •  "), genres.toString(), synopsis, badges);
+        }
+
+        /** "1 س 52 د" style text is kept as the admin wrote it; a bare number is minutes; a series shows its seasons and episodes. */
+        private String lengthText(JSONObject item) {
+            if (CigramContent.isSeries(item)) {
+                int[] st = stats(item);
+                if (st[1] == 0) return "";
+                String eps = st[1] + " حلقة";
+                return st[0] > 1 ? st[0] + " مواسم  •  " + eps : eps;
+            }
+            String raw = CigramStage1InitProvider.itemText(item, "duration", "runtime");
+            if (raw.length() == 0) return "";
+            boolean digits = true;
+            for (int i = 0; i < raw.length(); i++) if (!Character.isDigit(raw.charAt(i))) { digits = false; break; }
+            return digits ? raw + " د" : raw;
+        }
+
+        private final Pattern SEASON = Pattern.compile("\"season(?:_number)?\"\\s*:\\s*\"?(\\d+)");
+        private final Pattern EPISODE = Pattern.compile("\"(?:episode|episode_number|ep)\"\\s*:");
+
+        /** {seasons, episodes} of a series, from its episode list, without parsing the (possibly large) JSON. Cached per title. */
+        private int[] stats(JSONObject item) {
+            String key = CigramSectionStore.identity(item);
+            int[] hit = episodeStats.get(key);
+            if (hit != null) return hit;
+            int[] out = new int[2];
+            Object raw = item.opt("series_episodes_json");
+            if (raw instanceof org.json.JSONArray) {
+                out[1] = ((org.json.JSONArray) raw).length();
+                java.util.HashSet<String> seasons = new java.util.HashSet<String>();
+                for (int i = 0; i < out[1]; i++) {
+                    JSONObject e = ((org.json.JSONArray) raw).optJSONObject(i);
+                    if (e != null) seasons.add(CigramContent.text(e, "season", "season_number"));
+                }
+                out[0] = Math.max(1, seasons.size());
+            } else if (raw instanceof String && ((String) raw).length() > 2) {
+                String text = (String) raw;
+                Matcher m = SEASON.matcher(text);
+                java.util.HashSet<String> seasons = new java.util.HashSet<String>();
+                while (m.find()) seasons.add(m.group(1));
+                Matcher e = EPISODE.matcher(text);
+                int n = 0;
+                while (e.find()) n++;
+                out[1] = n;
+                out[0] = Math.max(1, seasons.size());
+            }
+            episodeStats.put(key, out);
+            return out;
+        }
+
+        private static String cut(String text, int max) {
+            if (text.length() <= max) return text;
+            int at = text.lastIndexOf(' ', max);
+            return text.substring(0, at > max / 2 ? at : max).trim() + "…";
+        }
+
+        private static String join(List<String> parts, String glue) {
+            StringBuilder b = new StringBuilder();
+            for (int i = 0; i < parts.size(); i++) {
+                if (i > 0) b.append(glue);
+                b.append(parts.get(i));
+            }
+            return b.toString();
+        }
+
+        // ---- views
+
+        @Override
+        public Holder onCreateViewHolder(ViewGroup parent, int viewType) {
+            final SectionActivity a = host;
+            int ink = light ? 0xFF111418 : 0xFFFFFFFF;
+            int soft = light ? 0xFF5F6B73 : 0xFF8E8E94;
+            int mid = light ? 0xFF3C474E : 0xFFAAB4B9;
+
+            final FrameLayout card = new FrameLayout(a);
+            RecyclerView.LayoutParams clp = new RecyclerView.LayoutParams(-1, -2);
+            clp.setMargins(dp(12), dp(6), dp(12), dp(6));
+            card.setLayoutParams(clp);
+            card.setClipChildren(false);                              // the #1 watermark paints beyond its own box
+            card.setClipToPadding(false);
+            GradientDrawable bg = new GradientDrawable();
+            bg.setColor(light ? 0xFFFFFFFF : 0xFF151518);
+            bg.setCornerRadius(dp(18));
+            bg.setStroke(dp(1), light ? 0xFFDADFE3 : 0xFF26262B);
+            card.setBackground(bg);
+            card.setMinimumHeight(dp(CARD_MIN_H_DP));
+            card.setClickable(true);
+            card.setFocusable(true);
+            card.setForeground(new android.graphics.drawable.RippleDrawable(
+                    android.content.res.ColorStateList.valueOf(light ? 0x22000000 : 0x33FFFFFF), null, roundMask()));
+
+            // physical, left → right: [ info ][ poster ][ rank column ]
+            LinearLayout content = new LinearLayout(a);
+            content.setOrientation(LinearLayout.HORIZONTAL);
+            content.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+            content.setGravity(Gravity.CENTER_VERTICAL);
+            content.setPadding(dp(12), dp(8), 0, dp(8));
+            card.addView(content, new FrameLayout.LayoutParams(-1, -2));
+
+            LinearLayout info = new LinearLayout(a);
+            info.setOrientation(LinearLayout.VERTICAL);
+            info.setGravity(Gravity.RIGHT);
+            LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(0, -2, 1f);
+            ilp.rightMargin = dp(12);
+            content.addView(info, ilp);
+
+            TextView title = text(a, 16.5f, ink, true);
+            title.setMaxLines(2);
+            info.addView(title, new LinearLayout.LayoutParams(-1, -2));
+
+            TextView meta = text(a, 12.5f, mid, false);
+            meta.setSingleLine(true);
+            LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(-1, -2);
+            mlp.topMargin = dp(5);
+            info.addView(meta, mlp);
+
+            TextView genres = text(a, 12f, soft, false);
+            genres.setSingleLine(true);
+            LinearLayout.LayoutParams glp = new LinearLayout.LayoutParams(-1, -2);
+            glp.topMargin = dp(3);
+            info.addView(genres, glp);
+
+            TextView synopsis = text(a, 12f, soft, false);
+            synopsis.setMaxLines(3);
+            synopsis.setLineSpacing(dp(2), 1f);
+            LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-1, -2);
+            slp.topMargin = dp(6);
+            info.addView(synopsis, slp);
+
+            LinearLayout badges = new LinearLayout(a);
+            badges.setOrientation(LinearLayout.HORIZONTAL);
+            badges.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+            badges.setGravity(Gravity.RIGHT);
+            LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-1, -2);
+            blp.topMargin = dp(8);
+            info.addView(badges, blp);
+
+            ImageView poster = new ImageView(a);
+            poster.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            GradientDrawable pbg = new GradientDrawable();
+            pbg.setColor(light ? 0xFFE3E7EA : 0xFF1B1B1F);
+            pbg.setCornerRadius(dp(12));
+            poster.setBackground(pbg);
+            poster.setClipToOutline(true);
+            LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(dp(POSTER_W_DP), dp(POSTER_H_DP));
+            content.addView(poster, plp);
+
+            View column = new View(a);                                 // the fixed rank column: every card reserves the same width
+            content.addView(column, new LinearLayout.LayoutParams(dp(CigramRankView.COLUMN_DP), 1));
+
+            // the numeral is drawn ABOVE the poster, in a box that reaches over the poster's inner edge (the #1 watermark)
+            CigramRankView rank = new CigramRankView(a);
+            FrameLayout.LayoutParams rlp = new FrameLayout.LayoutParams(
+                    dp(CigramRankView.COLUMN_DP + CigramRankView.WATERMARK_OVERLAP_DP), -1, Gravity.RIGHT);
+            card.addView(rank, rlp);
+
+            attachPressFeedback(card);
+            return new Holder(card, poster, rank, title, meta, genres, synopsis, badges);
+        }
+
+        @Override
+        public void onBindViewHolder(final Holder h, int position) {
+            final Row row = rows.get(position);
+            final int rankNumber = position + 1;
+            h.title.setText(CigramPageKit.rtl(row.title));
+            setOrGone(h.meta, row.meta);
+            setOrGone(h.genres, row.genres);
+            setOrGone(h.synopsis, row.synopsis);
+            h.rank.setRank(rankNumber);
+            h.card.setContentDescription("المركز " + CigramRankView.format(rankNumber) + "، " + row.title);
+
+            h.badges.removeAllViews();
+            h.badges.setVisibility(row.badges.isEmpty() ? View.GONE : View.VISIBLE);
+            for (Badge b : row.badges) {
+                TextView pill = CigramHome.badgeView(host, b.label, b.color, 10f);
+                LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) pill.getLayoutParams();
+                lp.bottomMargin = 0;
+                lp.leftMargin = dp(5);
+                pill.setLayoutParams(lp);
+                h.badges.addView(pill);
+            }
+
+            CigramStage1InitProvider.loadPosterInto(host, row.item, h.poster);
+
+            h.card.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    CigramStage1InitProvider.openTitleDetails(host, row.item, h.poster);
+                }
+            });
+
+            animateIn(h.card, position);
+        }
+
+        /** The first screenful fades and slides in, one card after another. Property animators: nothing here waits for, or delays, a scroll. */
+        private void animateIn(View card, int position) {
+            if (!entrance || position > 9) { card.setAlpha(1f); card.setTranslationY(0f); return; }
+            if (animated >= 10) { entrance = false; return; }
+            animated++;
+            card.setAlpha(0f);
+            card.setTranslationY(dp(18));
+            card.animate().alpha(1f).translationY(0f).setStartDelay(Math.min(position, 8) * 40L).setDuration(260L)
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+        }
+
+        @Override
+        public void onAttachedToRecyclerView(RecyclerView recyclerView) {
+            recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+                @Override public void onScrollStateChanged(RecyclerView rv, int newState) {
+                    if (newState != RecyclerView.SCROLL_STATE_IDLE) entrance = false;   // the user is scrolling: no entrance from now on
+                }
+            });
+        }
+
+        // ---- small helpers
+
+        private int dp(float v) { return Math.round(v * d); }
+
+        private TextView text(SectionActivity a, float sp, int color, boolean bold) {
+            TextView t = new TextView(a);
+            t.setTextColor(color);
+            t.setTextSize(sp);
+            t.setTypeface(CigramUI.font(a), bold ? Typeface.BOLD : Typeface.NORMAL);
+            t.setGravity(Gravity.RIGHT);
+            t.setTextDirection(View.TEXT_DIRECTION_RTL);
+            t.setEllipsize(TextUtils.TruncateAt.END);
+            return t;
+        }
+
+        private void setOrGone(TextView t, String value) {
+            boolean has = value != null && value.length() > 0;
+            t.setVisibility(has ? View.VISIBLE : View.GONE);
+            if (has) t.setText(CigramPageKit.rtl(value));
+        }
+
+        private android.graphics.drawable.Drawable roundMask() {
+            GradientDrawable m = new GradientDrawable();
+            m.setColor(0xFFFFFFFF);
+            m.setCornerRadius(dp(18));
+            return m;
+        }
+
+        /** A light squeeze while a card is pressed; it never consumes the touch, so scrolling and the click behave as normal. */
+        private void attachPressFeedback(final View card) {
+            card.setOnTouchListener(new View.OnTouchListener() {
+                @Override public boolean onTouch(View v, MotionEvent e) {
+                    switch (e.getActionMasked()) {
+                        case MotionEvent.ACTION_DOWN:
+                            v.animate().scaleX(0.975f).scaleY(0.975f).setDuration(90L).start();
+                            break;
+                        case MotionEvent.ACTION_UP:
+                        case MotionEvent.ACTION_CANCEL:
+                            v.animate().scaleX(1f).scaleY(1f).setDuration(140L).start();
+                            break;
+                        default:
+                            break;
+                    }
+                    return false;
+                }
+            });
+        }
+    }
 }

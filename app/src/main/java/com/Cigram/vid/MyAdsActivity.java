@@ -43,7 +43,7 @@ public class MyAdsActivity extends Activity {
         shell.addView(col, new FrameLayout.LayoutParams(-1, -1));
         LinearLayout top = AdsUi.hbox(this);
         top.setPadding(AdsUi.dp(this, 8), AdsUi.dp(this, 6), AdsUi.dp(this, 8), AdsUi.dp(this, 6));
-        top.addView(icon(AdsIcons.BACK, "رجوع", new View.OnClickListener() { @Override public void onClick(View v) { finish(); } }), new LinearLayout.LayoutParams(AdsUi.dp(this, 48), AdsUi.dp(this, 48)));
+        top.addView(icon(AdsIcons.BACK, "رجوع", new View.OnClickListener() { @Override public void onClick(View v) { CigramNav.back(MyAdsActivity.this); } }), new LinearLayout.LayoutParams(AdsUi.dp(this, 48), AdsUi.dp(this, 48)));
         TextView title = AdsUi.text(this, "إعلاناتي", 20f, CigramGlass.text(this), true);
         LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(0, -2);
         tl.weight = 1f;

@@ -268,7 +268,7 @@ public class AdsChatActivity extends Activity {
         setDevAvatar(dev);
         top.addView(devAvatar, new LinearLayout.LayoutParams(AdsUi.dp(this, 42), AdsUi.dp(this, 42)));
         top.addView(iconBtn(AdsIcons.BACK, "رجوع", new View.OnClickListener() {
-            @Override public void onClick(View v) { finish(); }
+            @Override public void onClick(View v) { CigramNav.back(AdsChatActivity.this); }
         }), new LinearLayout.LayoutParams(AdsUi.dp(this, 48), AdsUi.dp(this, 48)));
         col.addView(top, new LinearLayout.LayoutParams(-1, -2));
         View topLine = new View(this);

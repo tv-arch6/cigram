@@ -87,20 +87,16 @@ public class SearchXmlActivity extends AppCompatActivity {
 	/** One background thread for parsing the search index (never the main thread). */
 	private static final java.util.concurrent.ExecutorService CG_SEARCH_PARSE = CigramPool.fixed(1, "search-parse");
 	
-	private SearchXmlBinding binding;
-	private HashMap<String, Object> search_source = new HashMap<>();
-	private HashMap<String, Object> search_results = new HashMap<>();
-	private String search_json = "";
+	/** One thread for the matching of a query (filters, scoring, sorting, spelling help): never the main thread. */
+	private static final java.util.concurrent.ExecutorService CG_SEARCH_MATCH = CigramPool.fixed(1, "search-match");
 	
-	private RequestNetwork request_search;
-	private RequestNetwork.RequestListener _request_search_request_listener;
+	private SearchXmlBinding binding;
 	
 	@Override
 	protected void onCreate(Bundle _savedInstanceState) {
 		super.onCreate(_savedInstanceState);
 		binding = SearchXmlBinding.inflate(getLayoutInflater());
 		setContentView(binding.getRoot());
-		initialize(_savedInstanceState);
 		
 		CigramAdManager.initialize(getApplicationContext()); // self-throttled, background thread, consent-gated
 		
@@ -154,241 +150,6 @@ public class SearchXmlActivity extends AppCompatActivity {
 			View focused = getCurrentFocus();
 			if (focused instanceof EditText) cgReleaseSearchFocus(focused);
 		} catch (Throwable ignored) { }
-	}
-	
-	private void initialize(Bundle _savedInstanceState) {
-		request_search = new RequestNetwork(this);
-		
-		binding.edittextSearch.addTextChangedListener(new TextWatcher() {
-			@Override
-			public void onTextChanged(CharSequence _param1, int _param2, int _param3, int _param4) {
-				final String _charSeq = _param1.toString();
-				// A single TextWatcher is installed by CigramSearch in initializeLogic.
-				
-			}
-			
-			@Override
-			public void beforeTextChanged(CharSequence _param1, int _param2, int _param3, int _param4) {
-				
-			}
-			
-			@Override
-			public void afterTextChanged(Editable _param1) {
-				
-			}
-		});
-		
-		_request_search_request_listener = new RequestNetwork.RequestListener() {
-			@Override
-			public void onResponse(String _param1, String _param2, HashMap<String, Object> _param3) {
-				final String _tag = _param1;
-				final String _response = _param2;
-				final HashMap<String, Object> _responseHeaders = _param3;
-				// CIGRAM: network callback completed; search data is now ready or cache fallback will be rendered.
-				{android.view.ViewGroup root=(android.view.ViewGroup)findViewById(R.id.linear_root_search);if(root!=null){android.view.View loading=root.findViewWithTag("cigram_search_loading_state");if(loading!=null)root.removeView(loading);}}
-				class CigramCatalog {
-					String text(org.json.JSONObject o,String... keys) {
-						if(o==null)return "";
-						for(String key:keys) {
-							Object v=o.opt(key);
-							if(v!=null && v!=org.json.JSONObject.NULL && !String.valueOf(v).trim().isEmpty())return String.valueOf(v).trim();
-						}
-						return "";
-					}
-					String normalize(String s) { return CigramSmartSearch.normalize(s); }
-					String type(org.json.JSONObject o,String inherited) {
-						String t=normalize(text(o,"type","content_type","media_type"));
-						if(t.equals("series")||t.equals("tv")||t.equals("show")||t.contains("مسلسل"))return "series";
-						if(t.equals("movie")||t.equals("film")||t.equals("فيلم"))return "movie";
-						if(!text(o,"season","episode","series_title","series_id").isEmpty()
-						||o.has("seasons")||o.has("episodes")||o.has("series_episodes_json"))return "series";
-						return inherited.equals("series")?"series":"movie";
-					}
-					void episodes(Object node,org.json.JSONObject parent,String season,org.json.JSONArray out,int depth) throws org.json.JSONException {
-						if(node==null||node==org.json.JSONObject.NULL||depth>12)return;
-						if(node instanceof String) {
-							String s=((String)node).trim();
-							if(s.startsWith("[")||s.startsWith("{"))episodes(new org.json.JSONTokener(s).nextValue(),parent,season,out,depth+1);
-						} else if(node instanceof org.json.JSONArray) {
-							org.json.JSONArray a=(org.json.JSONArray)node;
-							for(int i=0;i<a.length();i++)episodes(a.opt(i),parent,season,out,depth+1);
-						} else if(node instanceof org.json.JSONObject) {
-							org.json.JSONObject o=(org.json.JSONObject)node;
-							String sn=text(o,"season","season_number"); if(sn.isEmpty())sn=season;
-							if(o.has("seasons"))episodes(o.opt("seasons"),parent,sn,out,depth+1);
-							else if(o.has("episodes")) {
-								if(sn.isEmpty())sn=text(o,"number");
-								episodes(o.opt("episodes"),parent,sn,out,depth+1);
-							} else {
-								org.json.JSONObject e=new org.json.JSONObject(o.toString());
-								for(String key:new String[]{"poster","series_poster","backdrop","category","year","imdb","description"})
-								if(text(e,key).isEmpty()&&!text(parent,key).isEmpty())e.put(key,parent.opt(key));
-								e.put("type","series"); e.put("series_title",text(parent,"series_title","title","name"));
-								e.put("series_id",text(parent,"series_id","id"));
-								if(text(e,"season").isEmpty())e.put("season",sn.isEmpty()?"1":sn);
-								if(text(e,"episode").isEmpty())e.put("episode",text(e,"episode_number","number"));
-								if(text(e,"video").isEmpty())e.put("video",text(e,"link","url","movie_url","video_url"));
-								out.put(e);
-							}
-						}
-					}
-					void collect(Object node,String inherited,org.json.JSONArray out,int depth) throws org.json.JSONException {
-						if(node==null||node==org.json.JSONObject.NULL||depth>12)return;
-						if(node instanceof org.json.JSONArray) {
-							org.json.JSONArray a=(org.json.JSONArray)node;
-							for(int i=0;i<a.length();i++)collect(a.opt(i),inherited,out,depth+1);
-							return;
-						}
-						if(!(node instanceof org.json.JSONObject))return;
-						org.json.JSONObject o=(org.json.JSONObject)node;
-						boolean collection=false;
-						for(String key:new String[]{"movies","series","items","data","results","content","sections","catalog"}) {
-							Object value=o.opt(key);
-							collection=collection||value instanceof org.json.JSONArray||value instanceof org.json.JSONObject;
-							if(value instanceof String) {
-								String encoded=((String)value).trim();
-								collection=collection||encoded.startsWith("[")||encoded.startsWith("{");
-							}
-						}
-						boolean record=!collection&&!text(o,"title","name","series_title").isEmpty()
-						&& (o.has("id")||o.has("poster")||o.has("video")||o.has("link")||o.has("type")||o.has("episodes")||o.has("seasons"));
-						if(record) {
-							org.json.JSONObject item=new org.json.JSONObject(o.toString());
-							String kind=type(item,inherited); item.put("type",kind);
-							String title=kind.equals("series")?text(item,"series_title","title","name"):text(item,"title","name");
-							item.put("title",title);
-							if(text(item,"poster").isEmpty())item.put("poster",text(item,"series_poster","season_poster","image","backdrop"));
-							if(text(item,"video").isEmpty())item.put("video",text(item,"link","url","video_url","movie_url"));
-							if(text(item,"category").isEmpty())item.put("category",text(item,"genre","genres"));
-							if(text(item,"imdb").isEmpty())item.put("imdb",text(item,"rating"));
-							org.json.JSONArray eps=new org.json.JSONArray();
-							if(kind.equals("series")) {
-								for(String key:new String[]{"series_episodes_json","episodes","seasons"})
-								if(item.has(key))episodes(item.opt(key),item,"",eps,0);
-								if(eps.length()>0)item.put("series_episodes_json",eps.toString());
-							}
-							out.put(item); return;
-						}
-						for(String key:new String[]{"movies","series","items","data","results","content","sections","catalog"}) {
-							Object child=o.opt(key);
-							if(child instanceof String) {
-								String s=((String)child).trim();
-								if(s.startsWith("[")||s.startsWith("{"))child=new org.json.JSONTokener(s).nextValue();
-							}
-							if(child!=null)collect(child,key.equals("series")?"series":inherited,out,depth+1);
-						}
-					}
-					String key(org.json.JSONObject item) {
-						String type=text(item,"type");
-						if(type.equals("series")) {
-							String id=text(item,"series_id");
-							return "series|"+(id.isEmpty()?normalize(text(item,"series_title","title")):id);
-						}
-						String id=text(item,"id");
-						return "movie|"+(id.isEmpty()?normalize(text(item,"title"))+"|"+text(item,"year"):id);
-					}
-					org.json.JSONArray parse(String json) throws org.json.JSONException {
-						org.json.JSONArray flat=new org.json.JSONArray();
-						Object root=new org.json.JSONTokener(json).nextValue();
-						if(root instanceof org.json.JSONObject) {
-							org.json.JSONObject object=(org.json.JSONObject)root;
-							if(!object.optBoolean("ok",true))throw new org.json.JSONException("Catalog request failed");
-							boolean known=!text(object,"title","name","series_title").isEmpty();
-							for(String key:new String[]{"movies","series","items","data","results","content","sections","catalog"})known=known||object.has(key);
-							if(!known)throw new org.json.JSONException("Unrecognized catalog");
-						} else if(!(root instanceof org.json.JSONArray))throw new org.json.JSONException("Invalid catalog");
-						collect(root,"",flat,0);
-						java.util.LinkedHashMap<String,org.json.JSONObject> unique=new java.util.LinkedHashMap<String,org.json.JSONObject>();
-						java.util.LinkedHashMap<String,java.util.LinkedHashMap<String,org.json.JSONObject>> eps=
-						new java.util.LinkedHashMap<String,java.util.LinkedHashMap<String,org.json.JSONObject>>();
-						for(int i=0;i<flat.length();i++) {
-							org.json.JSONObject item=flat.getJSONObject(i); String k=key(item);
-							org.json.JSONObject existing=unique.get(k);
-							if(existing==null)unique.put(k,new org.json.JSONObject(item.toString()));
-							else {
-								java.util.Iterator<String> keys=item.keys();
-								while(keys.hasNext()){String name=keys.next();if(text(existing,name).isEmpty())existing.put(name,item.opt(name));}
-							}
-							if(text(item,"type").equals("series")) {
-								if(!eps.containsKey(k))eps.put(k,new java.util.LinkedHashMap<String,org.json.JSONObject>());
-								org.json.JSONArray list=new org.json.JSONArray();
-								String nested=text(item,"series_episodes_json");
-								if(!nested.isEmpty())list=new org.json.JSONArray(nested);
-								if(!text(item,"episode").isEmpty()||(!text(item,"video").isEmpty()&&list.length()==0))list.put(item);
-								for(int n=0;n<list.length();n++) {
-									org.json.JSONObject e=list.optJSONObject(n);if(e==null)continue;
-									String ek=text(e,"season")+"|"+text(e,"episode")+"|"+text(e,"video","link");
-									eps.get(k).put(ek,e);
-								}
-							}
-						}
-						org.json.JSONArray result=new org.json.JSONArray();
-						for(java.util.Map.Entry<String,org.json.JSONObject> entry:unique.entrySet()) {
-							if(eps.containsKey(entry.getKey())&&!eps.get(entry.getKey()).isEmpty()) {
-								org.json.JSONArray list=new org.json.JSONArray();
-								for(org.json.JSONObject e:eps.get(entry.getKey()).values())list.put(e);
-								entry.getValue().put("series_episodes_json",list.toString());
-							}
-							result.put(entry.getValue());
-						}
-						return result;
-					}
-					boolean matches(org.json.JSONObject item,String query) {
-						String q=normalize(query);if(q.isEmpty())return true;
-						StringBuilder searchable=new StringBuilder();
-						for(String key:new String[]{"title","series_title","original_title","original_name","title_ar","title_en","name","aliases","alternative_titles","alt_titles","category","genre","genres","year","description","overview","actors","cast","stars","director"})
-						searchable.append(' ').append(text(item,key));
-						searchable.append(type(item,"").equals("series")?" مسلسل مسلسلات series":" فيلم افلام movie");
-						String haystack=normalize(searchable.toString());
-						for(String token:q.split(" "))if(!haystack.contains(token))return false;
-						return true;
-					}
-					int score(org.json.JSONObject item,String query) {
-						String nq=normalize(query);if(nq.isEmpty())return 0;
-						String title=normalize(text(item,"series_title","title","name","title_ar","title_en"));
-						String alt=normalize(text(item,"original_title","original_name","aliases","alternative_titles","alt_titles"));
-						int s=0;
-						if(title.equals(nq))s=1000;
-						else if(title.startsWith(nq))s=800;
-						else if(title.contains(nq))s=600;
-						else {
-							boolean all=true;
-							for(String tk:nq.split(" "))if(!title.contains(tk)){all=false;break;}
-							if(all)s=450;
-						}
-						if(s==0)s=alt.contains(nq)?300:100;
-						try{s+=(int)Math.min(9f,Float.parseFloat(text(item,"imdb").replace(',','.')));}catch(Exception ignored){}
-						return s;
-					}
-				}
-				final CigramCatalog cgCatalog=new CigramCatalog();
-				
-				try {
-					String incoming=CigramTitles.normalizeCatalog(_response==null?"":_response.trim());
-					cgCatalog.parse(incoming);
-					search_json=incoming;
-					CigramStage1InitProvider.prepareAndStoreCatalogAsync(SearchXmlActivity.this,incoming);
-				} catch(Exception error) {
-					android.widget.Toast.makeText(getApplicationContext(),"تعذر قراءة بيانات البحث الجديدة",0).show();
-				}
-				android.view.View input=findViewById(R.id.edittext_search);
-				if(input!=null && input.getTag() instanceof Runnable)((Runnable)input.getTag()).run();
-				
-			}
-			
-			@Override
-			public void onErrorResponse(String _param1, String _param2) {
-				final String _tag = _param1;
-				final String _message = _param2;
-				// CIGRAM: network callback completed; search data is now ready or cache fallback will be rendered.
-				{android.view.ViewGroup root=(android.view.ViewGroup)findViewById(R.id.linear_root_search);if(root!=null){android.view.View loading=root.findViewWithTag("cigram_search_loading_state");if(loading!=null)root.removeView(loading);}}
-				
-				android.view.View input=findViewById(R.id.edittext_search);
-				if(input!=null && input.getTag() instanceof Runnable)((Runnable)input.getTag()).run();
-				android.widget.Toast.makeText(getApplicationContext(),search_json==null||search_json.trim().isEmpty()?"تعذر تحميل البحث. تحقق من الاتصال":"تعذر التحديث؛ البحث يستخدم آخر بيانات محفوظة",0).show();
-				
-			}
-		};
 	}
 	
 	private void initializeLogic() {
@@ -870,7 +631,6 @@ public class SearchXmlActivity extends AppCompatActivity {
 		final android.widget.TextView cgEmpty=(android.widget.TextView)findViewById(R.id.textview_empty_search);
 		final android.widget.ImageView cgEmptyIcon=(android.widget.ImageView)findViewById(R.id.imageview_empty_search);
 		final android.content.SharedPreferences cgFilters=getSharedPreferences("cigram_search_filters",MODE_PRIVATE);
-		final android.content.SharedPreferences cgRecent=getSharedPreferences("cigram_search_recent",MODE_PRIVATE);
 		final android.os.Handler cgSearchHandler=new android.os.Handler(android.os.Looper.getMainLooper());
 		final String[] cgType={"all"};
 		final android.widget.TextView[] cgTabViews={
@@ -897,32 +657,37 @@ public class SearchXmlActivity extends AppCompatActivity {
 		((android.widget.ImageView)findViewById(R.id.imageview_filter)).setColorFilter(0xFFFFFFFF);
 		
 		class CigramSearch implements java.lang.Runnable {
-			String source="";
 			org.json.JSONArray items=new org.json.JSONArray();
 			int generation;
 			boolean failed;
-			/** 2026: a large index is parsed on a background thread (it froze the page on entry and after every
-			 *  catalogue refresh); the previous results stay on screen and the search re-runs when it is ready. */
-			String pending=null;
-			void reload() {
-				String value=search_json==null?"":search_json.trim();
-				if(value.equals(source)||value.equals(pending))return;
-				if(value.length()<24000){
-					try { items=cgCatalog.parse(value); source=value; failed=false; }
-					catch(Exception error){failed=true;}
-					return;
-				}
-				pending=value;
-				final String job=value;
+			/** The index (the whole catalogue as flat records) is NOT read when the page opens: the page is drawn from the saved state
+			 *  (CigramSearchCache). It is read, off the main thread, the first time a query or the filter panel needs it. */
+			boolean loaded=false, loading=false;
+			final java.util.ArrayList<java.lang.Runnable> waiters=new java.util.ArrayList<java.lang.Runnable>();
+			/** Bumped by every new query and by clearing the box: an answer that arrives for an older one is dropped (cancellation). */
+			volatile int searchToken;
+			final class Outcome {
+				java.util.ArrayList<org.json.JSONObject> hits=new java.util.ArrayList<org.json.JSONObject>();
+				java.util.ArrayList<org.json.JSONObject> smart=new java.util.ArrayList<org.json.JSONObject>();
+				boolean anyQueryMatch;
+			}
+			void ensureIndex(java.lang.Runnable whenReady) {
+				if(loaded){if(whenReady!=null)whenReady.run();return;}
+				if(whenReady!=null)waiters.add(whenReady);
+				if(loading)return;
+				loading=true;
+				final android.content.Context app=getApplicationContext();
 				CG_SEARCH_PARSE.execute(new java.lang.Runnable(){@Override public void run(){
 					org.json.JSONArray parsed=null;
-					try{parsed=cgCatalog.parse(job);}catch(Throwable error){parsed=null;}
+					try{String raw=CigramStage1InitProvider.searchIndexJson(app);if(raw.length()>2)parsed=cgCatalog.parse(raw);}catch(Throwable error){parsed=null;}
 					final org.json.JSONArray result=parsed;
 					cgSearchHandler.post(new java.lang.Runnable(){@Override public void run(){
-						if(isFinishing()||isDestroyed()||!job.equals(pending))return;
-						pending=null;
-						if(result!=null){items=result;source=job;failed=false;}else failed=true;
-						queue();
+						loading=false;
+						if(isFinishing()||isDestroyed())return;
+						if(result!=null&&result.length()>0){items=result;loaded=true;failed=false;}else failed=true;
+						java.util.ArrayList<java.lang.Runnable> ready=new java.util.ArrayList<java.lang.Runnable>(waiters);
+						waiters.clear();
+						for(java.lang.Runnable r:ready){try{r.run();}catch(Throwable ignored){}}
 					}});
 				}});
 			}
@@ -931,7 +696,6 @@ public class SearchXmlActivity extends AppCompatActivity {
 			}
 			// v10.68: number of titles a filter choice would show (live count on «عرض النتائج»)
 			int countWith(String type,String year,String category,String ratingText) {
-				reload();
 				String query=cgInput.getText().toString().trim();
 				float rating=number(ratingText);
 				int n=0;
@@ -977,14 +741,9 @@ public class SearchXmlActivity extends AppCompatActivity {
 			String sourceImageUrl
 			) {
 				try {
-					org.json.JSONArray recent=new org.json.JSONArray(cgRecent.getString("items","[]"));
-					org.json.JSONArray next=new org.json.JSONArray(); next.put(item);
-					for(int i=0;i<recent.length()&&next.length()<12;i++) {
-						org.json.JSONObject old=recent.optJSONObject(i);
-						if(old!=null&&!cgCatalog.key(old).equals(cgCatalog.key(item)))next.put(old);
-					}
-					cgRecent.edit().putString("items",next.toString()).apply();
-				}catch(Exception ignored){}
+					CigramSearchCache.rememberOpened(getApplicationContext(),item);
+					CigramSearchCache.rememberQuery(getApplicationContext(),cgInput.getText().toString());
+				}catch(Throwable ignored){}
 				CigramStage1InitProvider.openTitleDetails(
 				SearchXmlActivity.this, item, sharedPoster
 				);
@@ -1223,76 +982,193 @@ public class SearchXmlActivity extends AppCompatActivity {
 				return hits.size();
 			}
 			@Override public void run() {
-				final long cgT0=android.os.SystemClock.elapsedRealtime();
-				reload(); tabs(); cgEmptyIcon.setVisibility(android.view.View.GONE);
+				tabs(); cgEmptyIcon.setVisibility(android.view.View.GONE);
 				cgEmpty.animate().cancel();cgEmpty.setVisibility(android.view.View.GONE);
-				cgResults.removeAllViews();cgResults.setAlpha(1f);cgResults.setTranslationY(0f);
-				if(pending!=null&&items.length()==0){   // the index is still being parsed in the background
-					android.widget.TextView cgWait=new android.widget.TextView(SearchXmlActivity.this);
-					cgWait.setText("\u200Fجارٍ تجهيز البحث…");cgWait.setTextColor(0xAAFFFFFF);cgWait.setTypeface(cgGlass.font);
-					cgWait.setGravity(android.view.Gravity.CENTER);cgWait.setPadding(0,cgGlass.px(40),0,0);
-					cgResults.addView(cgWait,new android.widget.LinearLayout.LayoutParams(-1,-2));
-					return;
-				}
 				try{CigramRequestPrompt.hide(findViewById(R.id.linear_search_empty));}catch(Throwable cgReqIgnored){}
-				String query=cgInput.getText().toString().trim();
+				final String query=cgInput.getText().toString().trim();
 				boolean browse=query.isEmpty()&&(!cgType[0].equals("all")||advanced());
 				if(query.isEmpty()&&!browse) {
-					cgTabs.setVisibility(android.view.View.GONE);
-					try {
-						org.json.JSONArray recent=new org.json.JSONArray(cgRecent.getString("items","[]"));
-						if(recent.length()>0) {
-							// v4.4: same section header as the home page (title + red accent bar)
-							cgResults.addView(CigramDesign.sectionHeader(SearchXmlActivity.this,"آخر ما شاهدته في البحث",null),
-							new android.widget.LinearLayout.LayoutParams(-1,cgGlass.px(48)));
-							for(int i=0;i<recent.length();i++) {
-								org.json.JSONObject old=recent.optJSONObject(i); if(old==null)continue;
-								// Resolve history against the fresh catalog to avoid opening stale records.
-								for(int j=0;j<items.length();j++) {
-									org.json.JSONObject current=items.optJSONObject(j);
-									if(current!=null&&cgCatalog.key(current).equals(cgCatalog.key(old))){card(current);break;}
-								}
-							}
-						}
-					}catch(Exception ignored){}
-					cgResults.setVisibility(android.view.View.VISIBLE);
+					searchToken++;   // an answer still on its way for an earlier query is dropped
+					cgResults.removeAllViews();cgResults.setAlpha(1f);cgResults.setTranslationY(0f);
+					renderDefault();
 					return;
 				}
-				String year=cgFilters.getString("year","all"), category=cgFilters.getString("category","all");
-				float rating=number(cgFilters.getString("imdb_min","0"));
-				int found=0;
-				boolean anyQueryMatch=false;
-				final java.util.ArrayList<org.json.JSONObject> cgHits=new java.util.ArrayList<org.json.JSONObject>();
-				final java.util.HashSet<String> cgDedupe=new java.util.HashSet<String>();
-				for(int i=0;i<items.length();i++) {
-					org.json.JSONObject item=items.optJSONObject(i); if(item==null)continue;
+				match(query);
+			}
+			/** What the page shows before the user types, drawn from the saved state only: no index, no parse, no request, no loading state. */
+			void renderDefault() {
+				cgTabs.setVisibility(android.view.View.GONE);
+				final CigramSearchCache.State saved=CigramSearchCache.load(SearchXmlActivity.this);
+				int shown=0;
+				if(!saved.queries.isEmpty()) {
+					android.widget.TextView clear=new android.widget.TextView(SearchXmlActivity.this);
+					clear.setText("مسح");
+					clear.setClickable(true);
+					clear.setOnClickListener(new android.view.View.OnClickListener() {
+						@Override public void onClick(android.view.View v) {
+							CigramSearchCache.clearQueries(SearchXmlActivity.this);
+							cgResults.removeAllViews();
+							renderDefault();
+						}
+					});
+					cgResults.addView(CigramDesign.sectionHeader(SearchXmlActivity.this,"عمليات البحث الأخيرة",clear),
+					new android.widget.LinearLayout.LayoutParams(-1,cgGlass.px(48)));
+					chips(saved.queries);
+					shown++;
+				}
+				if(saved.lastQuery.length()>0&&!saved.lastResults.isEmpty()) {
+					final String lastQuery=saved.lastQuery;
+					final String lastType=saved.lastType;
+					android.widget.TextView all=new android.widget.TextView(SearchXmlActivity.this);
+					all.setText("عرض الكل");
+					all.setClickable(true);
+					all.setOnClickListener(new android.view.View.OnClickListener() {
+						@Override public void onClick(android.view.View v) {
+							cgType[0]=lastType;
+							cgInput.setText(lastQuery);
+							cgInput.setSelection(lastQuery.length());
+						}
+					});
+					cgResults.addView(CigramDesign.sectionHeader(SearchXmlActivity.this,"آخر نتائج بحثك «"+lastQuery+"»",all),
+					new android.widget.LinearLayout.LayoutParams(-1,cgGlass.px(48)));
+					for(int i=0;i<saved.lastResults.size()&&i<6;i++)card(saved.lastResults.get(i));
+					shown++;
+				}
+				if(!saved.recent.isEmpty()) {
+					// v4.4: same section header as the home page (title + red accent bar)
+					cgResults.addView(CigramDesign.sectionHeader(SearchXmlActivity.this,"آخر ما شاهدته في البحث",null),
+					new android.widget.LinearLayout.LayoutParams(-1,cgGlass.px(48)));
+					for(int i=0;i<saved.recent.size()&&i<6;i++)card(saved.recent.get(i));
+					shown++;
+				}
+				if(!saved.suggestMovies.isEmpty()||!saved.suggestSeries.isEmpty()) {
+					rail("اقتراحات: أفلام","movie",saved.suggestMovies);
+					rail("اقتراحات: مسلسلات","series",saved.suggestSeries);
+					shown++;
+				}
+				cgResults.setVisibility(shown>0?android.view.View.VISIBLE:android.view.View.GONE);
+				if(shown==0) {   // a fresh install, nothing saved yet: the page's own prompt (icon + text), not a loader
+					cgEmptyIcon.setVisibility(android.view.View.VISIBLE);
+					cgEmpty.setText("نتائج البحث ستظهر هنا");
+					cgEmpty.setVisibility(android.view.View.VISIBLE);
+				}
+			}
+			/** Recent queries: a row of chips, newest at the right; a tap puts the words back in the box (which searches). */
+			void chips(java.util.List<String> queries) {
+				final android.widget.HorizontalScrollView scroll=new android.widget.HorizontalScrollView(SearchXmlActivity.this);
+				scroll.setHorizontalScrollBarEnabled(false);
+				scroll.setOverScrollMode(android.view.View.OVER_SCROLL_NEVER);
+				scroll.setLayoutDirection(android.view.View.LAYOUT_DIRECTION_LTR);
+				final android.widget.LinearLayout strip=new android.widget.LinearLayout(SearchXmlActivity.this);
+				strip.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+				strip.setLayoutDirection(android.view.View.LAYOUT_DIRECTION_LTR);
+				strip.setGravity(android.view.Gravity.RIGHT);
+				strip.setPadding(cgGlass.px(10),cgGlass.px(2),cgGlass.px(10),cgGlass.px(8));
+				for(int i=queries.size()-1;i>=0;i--) {
+					final String q=queries.get(i);
+					android.widget.TextView chip=cgGlass.label("\u200F"+q,13.5f);
+					chip.setSingleLine(true);
+					chip.setMaxWidth(cgGlass.px(220));
+					chip.setEllipsize(android.text.TextUtils.TruncateAt.END);
+					chip.setGravity(android.view.Gravity.CENTER);
+					chip.setPadding(cgGlass.px(14),cgGlass.px(8),cgGlass.px(14),cgGlass.px(8));
+					chip.setBackground(cgGlass.surface(18,false));
+					cgGlass.press(chip);
+					chip.setClickable(true);
+					chip.setOnClickListener(new android.view.View.OnClickListener() {
+						@Override public void onClick(android.view.View v) { cgInput.setText(q); cgInput.setSelection(q.length()); }
+					});
+					android.widget.LinearLayout.LayoutParams lp=new android.widget.LinearLayout.LayoutParams(-2,-2);
+					lp.leftMargin=cgGlass.px(8);
+					strip.addView(chip,lp);
+				}
+				scroll.addView(strip,new android.widget.HorizontalScrollView.LayoutParams(-2,-2));
+				strip.setMinimumWidth(SearchXmlActivity.this.getResources().getDisplayMetrics().widthPixels-cgGlass.px(16));
+				scroll.post(new java.lang.Runnable(){@Override public void run(){scroll.scrollTo(Math.max(0,strip.getWidth()-scroll.getWidth()),0);}});
+				cgResults.addView(scroll,new android.widget.LinearLayout.LayoutParams(-1,-2));
+			}
+			/**
+			 * The search itself. Debounced by queue(), cancelled by the next keystroke (searchToken), and the matching (filters, scoring,
+			 * sorting, spelling help over the whole catalogue) runs on its own thread; the main thread only draws the answer.
+			 */
+			void match(final String query) {
+				final int token=++searchToken;
+				final String type=cgType[0];
+				final String year=cgFilters.getString("year","all"), category=cgFilters.getString("category","all");
+				final float rating=number(cgFilters.getString("imdb_min","0"));
+				ensureIndex(new java.lang.Runnable(){@Override public void run(){
+					if(token!=searchToken||isFinishing()||isDestroyed())return;
+					final org.json.JSONArray index=items;
+					CG_SEARCH_MATCH.execute(new java.lang.Runnable(){@Override public void run(){
+						Outcome computed=null;
+						try{ computed=compute(index,query,type,year,category,rating); }
+						catch(Throwable error){ android.util.Log.w("CigramSearch","match failed",error); }
+						final Outcome outcome=computed;
+						cgSearchHandler.post(new java.lang.Runnable(){@Override public void run(){
+							if(token!=searchToken||isFinishing()||isDestroyed())return;
+							try{ show(query,type,year,category,rating,outcome); }
+							catch(Throwable error){ android.util.Log.w("CigramSearch","show failed",error); showMessage("تعذر إتمام البحث، حاول مجددًا"); }
+						}});
+					}});
+				}});
+			}
+			/** Background thread: which titles match, best first. Pure: reads the index it was given and nothing on screen. */
+			Outcome compute(org.json.JSONArray index,String query,String type,String year,String category,float rating) {
+				Outcome out=new Outcome();
+				final java.util.HashSet<String> dedupe=new java.util.HashSet<String>();
+				for(int i=0;i<index.length();i++) {
+					org.json.JSONObject item=index.optJSONObject(i); if(item==null)continue;
 					final boolean cgMatch=cgCatalog.matches(item,query);   // true for an empty query
-					if(!query.isEmpty()&&cgMatch)anyQueryMatch=true;
-					if(!cgType[0].equals("all")&&!cgType[0].equals(cgCatalog.text(item,"type")))continue;
+					if(!query.isEmpty()&&cgMatch)out.anyQueryMatch=true;
+					if(!type.equals("all")&&!type.equals(cgCatalog.text(item,"type")))continue;
 					if(!CigramSearchFilter.yearMatches(year,cgCatalog.text(item,"year")))continue;
 					if(!category.equals("all")&&!cgCatalog.normalize(cgCatalog.text(item,"category")).contains(cgCatalog.normalize(category)))continue;
 					if(number(cgCatalog.text(item,"imdb"))<rating||!cgMatch)continue;
-					String cgDupKey=cgCatalog.text(item,"type")+"|"+cgCatalog.normalize(cgCatalog.text(item,"series_title","title"))+"|"+cgCatalog.text(item,"year");
-					if(!cgDedupe.add(cgDupKey))continue;
-					cgHits.add(item);
+					String dupKey=cgCatalog.text(item,"type")+"|"+cgCatalog.normalize(cgCatalog.text(item,"series_title","title"))+"|"+cgCatalog.text(item,"year");
+					if(!dedupe.add(dupKey))continue;
+					out.hits.add(item);
 				}
 				if(!query.isEmpty()) {
-					final java.util.IdentityHashMap<org.json.JSONObject,Integer> cgScores=new java.util.IdentityHashMap<org.json.JSONObject,Integer>();
-					for(org.json.JSONObject hit:cgHits)cgScores.put(hit,Integer.valueOf(cgCatalog.score(hit,query)));
-					java.util.Collections.sort(cgHits,new java.util.Comparator<org.json.JSONObject>(){
+					final java.util.IdentityHashMap<org.json.JSONObject,Integer> scores=new java.util.IdentityHashMap<org.json.JSONObject,Integer>();
+					for(org.json.JSONObject hit:out.hits)scores.put(hit,Integer.valueOf(cgCatalog.score(hit,query)));
+					java.util.Collections.sort(out.hits,new java.util.Comparator<org.json.JSONObject>(){
 						@Override public int compare(org.json.JSONObject a,org.json.JSONObject b){
-							return cgScores.get(b).intValue()-cgScores.get(a).intValue();
+							return scores.get(b).intValue()-scores.get(a).intValue();
 						}
 					});
 				}
-				try { CigramSearchFilter.sort(cgHits,cgFilters); } catch(Throwable cgSortIgnored) {}
+				try { CigramSearchFilter.sort(out.hits,cgFilters); } catch(Throwable sortIgnored) {}
+				// v10.62: البحث الذكي — أخطاء إملائية + عربي/إنجليزي، فقط عندما لا توجد نتيجة
+				if(out.hits.isEmpty()&&!query.isEmpty()&&index.length()>0) {
+					try { out.smart=CigramSmartSearch.fuzzy(index,query,type,year,category,rating); } catch(Throwable smartIgnored) {}
+				}
+				return out;
+			}
+			void showMessage(String message) {
+				cgResults.removeAllViews();
+				cgResults.setVisibility(android.view.View.GONE);
+				cgEmptyIcon.setVisibility(android.view.View.GONE);
+				cgEmpty.setText(message);
+				cgEmpty.setVisibility(android.view.View.VISIBLE);
+			}
+			/** Main thread: draws the answer of {@link #compute}. The previous results stay on screen until this replaces them. */
+			void show(String query,String type,String year,String category,float rating,Outcome outcome) {
+				final long cgT0=android.os.SystemClock.elapsedRealtime();
+				cgEmpty.animate().cancel();cgEmpty.setVisibility(android.view.View.GONE);cgEmptyIcon.setVisibility(android.view.View.GONE);
+				if(outcome==null) { showMessage("تعذر إتمام البحث، حاول مجددًا"); return; }
+				if(!loaded&&failed) { showMessage("لا توجد بيانات للبحث بعد. افتح الرئيسية مرة واحدة بوجود إنترنت ثم عد إلى البحث"); return; }
+				cgResults.removeAllViews();cgResults.setAlpha(1f);cgResults.setTranslationY(0f);
+				int found=0;
+				final java.util.ArrayList<org.json.JSONObject> cgHits=outcome.hits;
+				boolean anyQueryMatch=outcome.anyQueryMatch;
+				boolean browse=query.isEmpty()&&(!type.equals("all")||advanced());
 				try {
 					android.view.View cgSummary=CigramSearchFilter.summaryView(SearchXmlActivity.this,cgFilters,new java.lang.Runnable(){
 						@Override public void run(){CigramSearch.this.tabs();CigramSearch.this.queue();}
 					});
 					if(cgSummary!=null&&!cgHits.isEmpty())cgResults.addView(cgSummary);
 				} catch(Throwable cgSummaryIgnored) {}
-				if(cgType[0].equals("all")) { found=grouped(cgHits); }
+				if(type.equals("all")) { found=grouped(cgHits); }
 				else {
 					// Perf: browsing one type used to build a card for EVERY match on the main thread (hundreds).
 					// The first screenful is built now, the rest in small batches (and dropped if a new search starts).
@@ -1324,43 +1200,41 @@ public class SearchXmlActivity extends AppCompatActivity {
 				? android.view.View.VISIBLE
 				: android.view.View.GONE
 				);
-				// v10.62: البحث الذكي — أخطاء إملائية + عربي/إنجليزي، فقط عندما لا توجد نتيجة
-				if(found==0&&!query.isEmpty()&&!source.isEmpty()) {
-					try {
-						java.util.ArrayList<org.json.JSONObject> cgSmart=CigramSmartSearch.fuzzy(items,query,cgType[0],year,category,rating);
-						if(!cgSmart.isEmpty()) {
-							cgResults.addView(CigramDesign.sectionHeader(SearchXmlActivity.this,"ربما تقصد",null),
-							new android.widget.LinearLayout.LayoutParams(-1,cgGlass.px(48)));
-							for(org.json.JSONObject cgHit:cgSmart){card(cgHit);found++;}
-							cgResults.setVisibility(android.view.View.VISIBLE);
-							try{cgResults.addView(CigramRequestPrompt.row(SearchXmlActivity.this,query,cgType[0]));}catch(Throwable cgReqIgnored){}
-							try { CigramAnalytics.track(SearchXmlActivity.this,"search_smart_hit","results",String.valueOf(cgSmart.size())); } catch(Throwable cgIgnored) {}
-						}
-					} catch(Throwable cgSmartError) {}
+				if(found==0&&!outcome.smart.isEmpty()) {
+					cgResults.addView(CigramDesign.sectionHeader(SearchXmlActivity.this,"ربما تقصد",null),
+					new android.widget.LinearLayout.LayoutParams(-1,cgGlass.px(48)));
+					for(org.json.JSONObject cgHit:outcome.smart){card(cgHit);found++;}
+					cgResults.setVisibility(android.view.View.VISIBLE);
+					try{cgResults.addView(CigramRequestPrompt.row(SearchXmlActivity.this,query,type));}catch(Throwable cgReqIgnored){}
+					try { CigramAnalytics.track(SearchXmlActivity.this,"search_smart_hit","results",String.valueOf(outcome.smart.size())); } catch(Throwable cgIgnored) {}
 				}
 				if(found==0) {
-					cgEmpty.setText(source.isEmpty()?"جارٍ جلب بيانات البحث…":failed?"تعذر تحديث البيانات؛ جرّب فتح البحث مجددًا":(query.isEmpty()?"لا توجد نتائج مطابقة للفلاتر المحددة":"لا توجد نتائج لـ «"+query+"»\nجرّب كلمة أخرى أو غيّر الفلاتر"));
+					cgEmpty.setText(query.isEmpty()?"لا توجد نتائج مطابقة للفلاتر المحددة":"لا توجد نتائج لـ «"+query+"»\nجرّب كلمة أخرى أو غيّر الفلاتر");
 					cgEmpty.setVisibility(android.view.View.VISIBLE);cgEmpty.setAlpha(0f);cgEmpty.animate().alpha(1f).setDuration(180L).start();
-					if(!query.isEmpty()&&!source.isEmpty()&&!failed){try{CigramRequestPrompt.show(SearchXmlActivity.this,findViewById(R.id.linear_search_empty),cgEmpty,query,cgType[0]);}catch(Throwable cgReqIgnored){}}
-				} else {cgResults.setAlpha(0f);cgResults.animate().alpha(1f).setDuration(190L).start();}
+					if(!query.isEmpty()){try{CigramRequestPrompt.show(SearchXmlActivity.this,findViewById(R.id.linear_search_empty),cgEmpty,query,type);}catch(Throwable cgReqIgnored){}}
+				} else {
+					cgResults.setAlpha(0f);cgResults.animate().alpha(1f).setDuration(190L).start();
+					if(!query.isEmpty()) CigramSearchCache.rememberResults(getApplicationContext(),query,type,cgHits);   // shown again, at once, next time the page opens
+				}
 			}
 			void filter() {
 				// v10.68: لوحة فلترة واحدة واضحة (النوع، التصنيف، السنة، التقييم، الترتيب) مع عدد النتائج المباشر
-				reload();
-				CigramSearchFilter.show(SearchXmlActivity.this,items,cgFilters,cgType[0],new CigramSearchFilter.Host(){
-					@Override public int count(String type,String year,String category,String rating){
-						return countWith(type,year,category,rating);
-					}
-					@Override public void apply(String type){
-						cgType[0]=type;tabs();queue();
-					}
-				});
+				// the panel lists the catalogue's genres and years: the index is read now (the user asked for the panel), off the main thread
+				ensureIndex(new java.lang.Runnable(){@Override public void run(){
+					CigramSearchFilter.show(SearchXmlActivity.this,items,cgFilters,cgType[0],new CigramSearchFilter.Host(){
+						@Override public int count(String type,String year,String category,String rating){
+							return countWith(type,year,category,rating);
+						}
+						@Override public void apply(String type){
+							cgType[0]=type;tabs();queue();
+						}
+					});
+				}});
 			}
 		}
 		final CigramSearch cgSearch=new CigramSearch();
 		// One render callback shared by network response, typing, tabs and voice input.
 		cgInput.setTag(cgSearch);
-		search_json=CigramCatalogPrefs.of(this).getString("json",search_json==null?"":search_json);
 		cgFilter.setOnClickListener(new android.view.View.OnClickListener(){@Override public void onClick(android.view.View v){cgSearch.filter();}});
 		findViewById(R.id.imageview_filter).setOnClickListener(new android.view.View.OnClickListener(){@Override public void onClick(android.view.View v){cgSearch.filter();}});
 		for(int i=0;i<cgTabViews.length;i++) {
@@ -1382,11 +1256,9 @@ public class SearchXmlActivity extends AppCompatActivity {
 			@Override public void onViewAttachedToWindow(android.view.View v){}
 			@Override public void onViewDetachedFromWindow(android.view.View v){cgSearchHandler.removeCallbacksAndMessages(null);cgResults.animate().cancel();}
 		});
-		// The search page must appear instantly like the other tabs. The very first render calls
-		// reload(), which parses the whole (multi-MB) catalogue — doing that here, in onCreate, froze
-		// the first frame so the page showed up late. Defer it one frame: the field, keyboard and tabs
-		// draw immediately, then the default list fills in.
-		cgRoot.post(new java.lang.Runnable(){ @Override public void run(){ try { cgSearch.run(); } catch (Throwable ignored) {} }});
+		// The page is complete on its first frame: recent searches, last results and suggestions come from the saved state (a small file),
+		// so there is nothing to wait for. The catalogue index is only read when the user actually searches.
+		try { cgSearch.run(); } catch (Throwable error) { android.util.Log.w("CigramSearch", "first draw failed", error); }
 		
 		// =====================================================
 		// CIGRAM VOICE SEARCH - FULL CODE v2
@@ -2171,23 +2043,6 @@ public class SearchXmlActivity extends AppCompatActivity {
 			}
 			);
 		}
-		// CIGRAM SEARCH LOADING STATE
-		{
-			android.view.ViewGroup root=(android.view.ViewGroup)findViewById(R.id.linear_root_search);
-			if(root!=null&&root.findViewWithTag("cigram_search_loading_state")==null){
-				final float d=getResources().getDisplayMetrics().density;
-				android.widget.LinearLayout box=new android.widget.LinearLayout(SearchXmlActivity.this);
-				box.setTag("cigram_search_loading_state");box.setOrientation(android.widget.LinearLayout.VERTICAL);box.setGravity(android.view.Gravity.CENTER);
-				box.setPadding(0,(int)(24*d),0,(int)(24*d));
-				android.widget.ProgressBar bar=new android.widget.ProgressBar(SearchXmlActivity.this);
-				box.addView(bar,new android.widget.LinearLayout.LayoutParams((int)(38*d),(int)(38*d)));
-				android.widget.TextView label=new android.widget.TextView(SearchXmlActivity.this);label.setText("جارٍ تجهيز البحث…");label.setTextColor(0xCCFFFFFF);label.setTextSize(13);label.setGravity(android.view.Gravity.CENTER);
-				label.setPadding(0,(int)(10*d),0,0);box.addView(label,new android.widget.LinearLayout.LayoutParams(-1,-2));
-				root.addView(box,new android.view.ViewGroup.LayoutParams(-1,-2));
-			}
-		}
-		
-		
 		// CIGRAM: no side drawer / no visible edge scrollbars anywhere on this screen.
 		try {
 			final android.view.View cigramNoSideRoot =
@@ -2229,25 +2084,6 @@ public class SearchXmlActivity extends AppCompatActivity {
 			new CigramNoSideUi().apply(cigramNoSideRoot);
 		} catch (Exception ignored) {}
 		
-		// Search filters the catalogue ALREADY saved in memory/preferences. A new download is started only when
-		// nothing is saved yet or the saved copy is older than 10 minutes; opening the page, typing and tapping
-		// never trigger a request, and there is no loading / prep screen while a usable copy exists.
-		{
-			android.content.SharedPreferences cgCatalogPrefs = CigramCatalogPrefs.of(this);
-			long cgSavedAt = cgCatalogPrefs.getLong("updated_at", 0L);
-			boolean cgHasSaved = search_json != null && search_json.trim().length() > 2;
-			boolean cgFresh = cgHasSaved && cgSavedAt > 0L
-			&& System.currentTimeMillis() - cgSavedAt < 10L * 60L * 1000L;
-			if (cgFresh) {
-				android.view.ViewGroup cgLoadRoot = (android.view.ViewGroup) findViewById(R.id.linear_root_search);
-				if (cgLoadRoot != null) {
-					android.view.View cgLoad = cgLoadRoot.findViewWithTag("cigram_search_loading_state");
-					if (cgLoad != null) cgLoadRoot.removeView(cgLoad);
-				}
-			} else {
-				request_search.startRequestNetwork(RequestNetworkController.GET, "https://cigram-admin-api.wwq-mixtv.workers.dev/movies", "search_data", _request_search_request_listener);
-			}
-		}
 		{
 			final android.app.Activity tnActivity = this;
 			final float tnDensity = getResources().getDisplayMetrics().density;

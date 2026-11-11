@@ -92,13 +92,7 @@ public final class CigramSettings {
         int pad = CigramUI.dp(a, 8);
         back.setPadding(pad, pad, pad, pad);
         back.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                try {
-                    a.onBackPressed();
-                } catch (Throwable error) {
-                    a.finish();
-                }
-            }
+            @Override public void onClick(View v) { CigramNav.back(a); }
         });
     }
 

@@ -63,7 +63,7 @@ final class CigramPageKit {
         arrow.setScaleX(-1f);
         backBox.addView(arrow, new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER));
         backBox.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { CigramPageKit.this.a.finish(); }
+            @Override public void onClick(View v) { CigramNav.back(CigramPageKit.this.a); }
         });
         back = backBox;
         TextView t = CigramUI.label(a, rtl(title), 18f, pal.text, true);

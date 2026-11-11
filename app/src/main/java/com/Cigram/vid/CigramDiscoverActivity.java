@@ -112,15 +112,7 @@ public class CigramDiscoverActivity extends Activity {
         header.setPadding(p, dp(8), p, dp(8));
         TextView title = label("اكتشف", 24f, Color.WHITE, true);
         header.addView(title, new LinearLayout.LayoutParams(0, -2, 1f));
-        TextView back = label("رجوع", 14f, 0xFF8B9AA3, true);
-        back.setPadding(dp(10), dp(8), dp(10), dp(8));
-        back.setClickable(true);
-        back.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                finish();
-            }
-        });
-        header.addView(back, new LinearLayout.LayoutParams(-2, -2));
+        header.addView(CigramTopBar.backButton(this, 0xFFFFFFFF), new LinearLayout.LayoutParams(dp(48), dp(48)));
         root.addView(header, new LinearLayout.LayoutParams(-1, -2));
 
         ScrollView scroll = new ScrollView(this);

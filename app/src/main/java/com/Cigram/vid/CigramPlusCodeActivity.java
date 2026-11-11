@@ -171,9 +171,7 @@ public class CigramPlusCodeActivity extends Activity {
         back.setMinHeight(dp(48));
         back.setContentDescription("رجوع");
         back.setClickable(true);
-        back.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { finish(); }
-        });
+        CigramNav.bind(this, back);
         head.addView(back);
         TextView title = CigramUI.label(this, "Cigram Plus", 20f, CigramPlusUI.GOLD, true);
         title.setPadding(dp(6), 0, 0, 0);

@@ -52,21 +52,15 @@ final class CigramTabRefresh {
         }
         final Context app = activity.getApplicationContext();
         final boolean home = "MainActivity".equals(name);
-        final boolean search = "SearchXmlActivity".equals(name);
         final boolean channels = "ChannelsActivity".equals(name);
         final boolean account = "AccountActivity".equals(name);
 
         try {
             // New films / series / episodes / sections. The cold-start download already did this.
-            if (home || search) {
-                // 18.3: the shared CigramRefreshPolicy decides (TTL, single flight, back-off); this used to force a download
-                CigramStage1InitProvider.refreshCatalogNow(app, new Runnable() {
-                    @Override public void run() {
-                        if (search && !activity.isFinishing() && !activity.isDestroyed()) {
-                            CigramStage1InitProvider.reapplySearchIndex(activity);
-                        }
-                    }
-                });
+            if (home) {
+                // 18.3: the shared CigramRefreshPolicy decides (TTL, single flight, back-off); this used to force a download.
+                // Search never triggers it: opening the search page loads and fetches nothing.
+                CigramStage1InitProvider.refreshCatalogNow(app, null);
             }
         } catch (Throwable ignored) { }
 

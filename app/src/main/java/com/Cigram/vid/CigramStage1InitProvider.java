@@ -120,14 +120,10 @@ public final class CigramStage1InitProvider extends ContentProvider {
 
     private static final Map<Activity, Boolean> MAIN_SETUP =
             new WeakHashMap<Activity, Boolean>();
-    private static final Map<Activity, Boolean> SEARCH_SETUP =
-            new WeakHashMap<Activity, Boolean>();
     private static final Map<Activity, PlayerMonitor> PLAYER_MONITORS =
             new WeakHashMap<Activity, PlayerMonitor>();
     private static final Map<Activity, SupportAdController> SUPPORT_AD_CONTROLLERS =
             new WeakHashMap<Activity, SupportAdController>();
-    private static final Map<Activity, StrictSectionController> STRICT_SECTION_CONTROLLERS =
-            new WeakHashMap<Activity, StrictSectionController>();
     private static final Map<View, Boolean> PULL_FALLBACK_SETUP =
             new WeakHashMap<View, Boolean>();
 
@@ -463,9 +459,6 @@ public final class CigramStage1InitProvider extends ContentProvider {
                             synchronized (MAIN_SETUP) {
                                 MAIN_SETUP.remove(activity);
                             }
-                            synchronized (SEARCH_SETUP) {
-                                SEARCH_SETUP.remove(activity);
-                            }
                             synchronized (DETAILS_STAGE3_SETUP) {
                                 DETAILS_STAGE3_SETUP.remove(activity);
                             }
@@ -490,11 +483,6 @@ public final class CigramStage1InitProvider extends ContentProvider {
                             }
                             if (supportController != null) supportController.destroy();
 
-                            StrictSectionController strictSection;
-                            synchronized (STRICT_SECTION_CONTROLLERS) {
-                                strictSection = STRICT_SECTION_CONTROLLERS.remove(activity);
-                            }
-                            if (strictSection != null) strictSection.destroy();
                             CigramCastHome.unbind(activity);
                             // Maps whose values reference the page itself would keep every destroyed page alive:
                             synchronized (EPISODE_REFRESH) { EPISODE_REFRESH.remove(activity); }
@@ -686,9 +674,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
         } else if ("NotificationsActivity".equals(name)) {
             CigramSketchwareNotifications.bindNotificationsPage(activity);
         } else if ("SearchXmlActivity".equals(name)) {
-            setupSearch(activity);
-            refreshOfflineBanner(activity);
-            applySavedSearchIndex(activity);
+            // nothing is loaded, fetched or injected when Search opens: the page draws itself from its saved state (CigramSearchCache)
             CigramBottomNav.bind(activity);
         } else if ("DetailsActivity".equals(name)) {
             CigramBottomNav.installOnDetails(activity);   // v10.47: the bottom bar on the film page too
@@ -743,14 +729,13 @@ public final class CigramStage1InitProvider extends ContentProvider {
         } else if ("MyContentActivity".equals(name)) {
             hideStage3MyContentList(activity);
             CigramMyContent.bind(activity);
-        } else if ("SectionActivity".equals(name)) {
-            ensureStrictSectionController(activity).start();
         } else if ("PlayerActivity".equals(name)) {
             applyPlayerEdgeToEdge(activity);
             CigramCastHome.hidePlayerCast(activity);
             ensurePlayerMonitor(activity).start();
         }
 
+        CigramNav.install(activity);    // every screen has one visible back button (see CigramNav)
         setupStage5SupportAd(activity, 0);
         CigramTvMode.bound(activity);   // v10.66: TV only — remote focus, side rail, page layouts
     }
@@ -820,12 +805,6 @@ public final class CigramStage1InitProvider extends ContentProvider {
             boolean accepted = requestEarlyCatalogRefresh(context.getApplicationContext(), CigramRefreshPolicy.Reason.TAB_SHOWN);
             if (accepted && onDone != null) CATALOG_DONE_LISTENERS.add(onDone);
         }
-    }
-
-    /** Re-applies the saved search index to an open search page (after the catalogue changed). */
-    static void reapplySearchIndex(Activity activity) {
-        if (activity == null || !isAlive(activity)) return;
-        applySavedSearchIndex(activity);
     }
 
     /** The facts {@link CigramRefreshPolicy} needs about the catalogue. */
@@ -1289,7 +1268,6 @@ public final class CigramStage1InitProvider extends ContentProvider {
 
         ACTIVE_MAIN = new java.lang.ref.WeakReference<Activity>(activity);
         setupPullToRefresh(activity);
-        try { CigramDesign.styleHomeHeaders(activity); } catch (Throwable ignored) { }   // v4.4
 
         // Perf: loading the multi-MB catalogue preferences used to happen here, on the main thread,
         // right after the first frame. Read it on the IO pool, then deliver/render on the main thread.
@@ -1565,170 +1543,6 @@ public final class CigramStage1InitProvider extends ContentProvider {
         }
     }
 
-    private static void setupSearch(final Activity activity) {
-        if (!isAlive(activity)) return;
-
-        synchronized (SEARCH_SETUP) {
-            if (Boolean.TRUE.equals(SEARCH_SETUP.get(activity))) {
-                applySavedSearchIndex(activity);
-                return;
-            }
-            SEARCH_SETUP.put(activity, Boolean.TRUE);
-        }
-
-        IO.execute(new Runnable() {
-            @Override public void run() {
-                final SharedPreferences prefs = catalogPrefs(activity);
-                String index = prefs.getString(KEY_SEARCH_JSON, "");
-
-                if (!isValidCatalog(index)) {
-                    String cached = prefs.getString(KEY_JSON, "");
-                    if (isValidCatalog(cached)) {
-                        PreparedCatalog prepared = prepareCatalog(cached);
-                        index = prepared.searchIndexJson;
-                        prefs.edit()
-                                .putString(KEY_JSON, prepared.displayJson)
-                                .putString(KEY_SEARCH_JSON, index)
-                                .apply();
-                    }
-                }
-
-                if (isValidCatalog(index)) {
-                    final String finalIndex = index;
-                    MAIN.post(new Runnable() {
-                        @Override public void run() {
-                            if (!isAlive(activity)) return;
-                            removeTagged(activity, "cigram_stage1_search_error");
-                            applySearchIndexWithRetry(activity, finalIndex, 0);
-                            refreshOfflineBanner(activity);
-                        }
-                    });
-                    return;
-                }
-
-                MAIN.post(new Runnable() {
-                    @Override public void run() {
-                        if (!isAlive(activity)) return;
-                        showLoadingMessage(
-                                activity,
-                                "cigram_stage1_search_error",
-                                "جاري تحميل بيانات البحث..."
-                        );
-                    }
-                });
-
-                final FetchResult result = fetchCatalog(activity);
-                if (result.ok && isValidCatalog(result.body)) {
-                    final long now = System.currentTimeMillis();
-                    final PreparedCatalog prepared = prepareCatalog(result.body);
-                    prefs.edit()
-                            .putString(KEY_JSON, prepared.displayJson)
-                            .putLong(KEY_UPDATED, now)
-                            .putString(KEY_SEARCH_JSON, prepared.searchIndexJson)
-                            .putLong(KEY_SEARCH_UPDATED, now)
-                            .apply();
-
-                    MAIN.post(new Runnable() {
-                        @Override public void run() {
-                            if (!isAlive(activity)) return;
-                            removeTagged(activity, "cigram_stage1_search_error");
-                            applySearchIndexWithRetry(
-                                    activity, prepared.searchIndexJson, 0);
-                        }
-                    });
-                } else {
-                    MAIN.post(new Runnable() {
-                        @Override public void run() {
-                            if (!isAlive(activity)) return;
-                            showRetryError(
-                                    activity,
-                                    "cigram_stage1_search_error",
-                                    result.userMessage,
-                                    new Runnable() {
-                                        @Override public void run() {
-                                            synchronized (SEARCH_SETUP) {
-                                                SEARCH_SETUP.remove(activity);
-                                            }
-                                            setupSearch(activity);
-                                        }
-                                    }
-                            );
-                        }
-                    });
-                }
-            }
-        });
-    }
-
-    private static void applySavedSearchIndex(final Activity activity) {
-        if (!isAlive(activity)) return;
-        IO.execute(new Runnable() {
-            @Override public void run() {
-                SharedPreferences prefs = catalogPrefs(activity);
-                String index = prefs.getString(KEY_SEARCH_JSON, "");
-                if (!isValidCatalog(index)) {
-                    String cached = prefs.getString(KEY_JSON, "");
-                    if (isValidCatalog(cached)) {
-                        PreparedCatalog prepared = prepareCatalog(cached);
-                        index = prepared.searchIndexJson;
-                        prefs.edit()
-                                .putString(KEY_JSON, prepared.displayJson)
-                                .putString(KEY_SEARCH_JSON, index)
-                                .apply();
-                    }
-                }
-                final String finalIndex = index;
-                if (!isValidCatalog(finalIndex)) return;
-                MAIN.post(new Runnable() {
-                    @Override public void run() {
-                        if (isAlive(activity)) {
-                            applySearchIndexWithRetry(activity, finalIndex, 0);
-                        }
-                    }
-                });
-            }
-        });
-    }
-
-    private static void applySearchIndexWithRetry(
-            final Activity activity,
-            final String indexJson,
-            final int attempt
-    ) {
-        if (!isAlive(activity) || !isValidCatalog(indexJson)) return;
-
-        boolean applied = false;
-        try {
-            setFieldValue(activity, "search_json", indexJson);
-
-            View input = findByIdName(activity, "edittext_search");
-            Object engine = input == null ? null : input.getTag();
-            if (engine != null) {
-                Method reload = findMethod(engine.getClass(), "reload", 0);
-                Method queue = findMethod(engine.getClass(), "queue", 0);
-                if (reload != null) {
-                    reload.setAccessible(true);
-                    reload.invoke(engine);
-                }
-                if (queue != null) {
-                    queue.setAccessible(true);
-                    queue.invoke(engine);
-                }
-                applied = reload != null || queue != null;
-            }
-        } catch (Throwable error) {
-            android.util.Log.w("CigramStage2", "Search index apply failed", error);
-        }
-
-        if (!applied && attempt < 8) {
-            MAIN.postDelayed(new Runnable() {
-                @Override public void run() {
-                    applySearchIndexWithRetry(activity, indexJson, attempt + 1);
-                }
-            }, 180L);
-        }
-    }
-
     private static final String TAG_DYNAMIC_SECTIONS =
             "cigram_stage2_dynamic_sections";
 
@@ -1770,7 +1584,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
     // claims, several seconds), so they appeared ~10 s after the first rows and all at once. The result
     // is now kept in a small file keyed by the catalogue hash and drawn at once on the next start;
     // when the catalogue changes it is rebuilt and the file is refreshed.
-    private static final String SECTIONS_SNAP_FILE = "cigram_sections_snapshot_v1.json";
+    private static final String SECTIONS_SNAP_FILE = "cigram_sections_snapshot_v2.json";   // v2: carries the two classic rows as ordinary sections
     private static final int SECTIONS_SNAP_ITEMS = 80;
     private static final java.util.HashSet<String> SNAP_DROP = new java.util.HashSet<String>(
             java.util.Arrays.asList("series_episodes_json", "episodes", "seasons", "_search_normalized"));
@@ -1932,34 +1746,10 @@ public final class CigramStage1InitProvider extends ContentProvider {
         });
     }
 
-    private static final java.util.WeakHashMap<View, Boolean> HIDDEN_BY_ORDER =
-            new java.util.WeakHashMap<View, Boolean>();
-
-    /** Gives the two fixed home rows back to the home layout before the block is rebuilt. */
-    private static void restoreBuiltInHomeRows(Activity activity, LinearLayout home) {
-        try {
-            View block = home.findViewWithTag(TAG_DYNAMIC_SECTIONS);
-            if (!(block instanceof ViewGroup) || block.getParent() != home) return;
-            ViewGroup from = (ViewGroup) block;
-            int pos = home.indexOfChild(block);
-            String[] ids = {"linear_latest_movies_header", "hscroll1", "linear8", "hscroll_series"};
-            for (String id : ids) {
-                View v = findByIdName(activity, id);
-                if (v == null || v.getParent() != from) continue;
-                ViewGroup.LayoutParams lp = v.getLayoutParams();
-                from.removeView(v);
-                home.addView(v, pos++, lp);
-            }
-        } catch (Throwable error) {
-            android.util.Log.w("CigramStage2", "restore home rows failed", error);
-        }
-    }
-
     private static final class OrderedRow {
         final int rank;
         final int seq;
-        final java.util.ArrayList<View> views = new java.util.ArrayList<View>();
-        DynamicHomeSection section;                 // 19.1: the section a placeholder will be filled with (null for the fixed rows)
+        DynamicHomeSection section;                 // the section the placeholder will be filled with
         android.widget.FrameLayout holder;
         OrderedRow(int rank, int seq) { this.rank = rank; this.seq = seq; }
     }
@@ -1980,13 +1770,9 @@ public final class CigramStage1InitProvider extends ContentProvider {
                 if (homeBusyScrolling()) { MAIN.postDelayed(this, 90L); return; }
                 int end = Math.min(sections.size(), next[0] + 2);
                 for (; next[0] < end; next[0]++) {
-                    try {
-                        View v = makeDynamicSectionView(activity, sections.get(next[0]));
-                        if (holders != null) holders.get(next[0]).addView(v, new android.widget.FrameLayout.LayoutParams(-1, -2));
-                        else block.addView(v, new LinearLayout.LayoutParams(-1, -2));
-                    } catch (Throwable error) {
-                        android.util.Log.w("CigramStage2", "section skipped", error);
-                    }
+                    View v = sectionViewOrFallback(activity, sections.get(next[0]));
+                    if (holders != null) holders.get(next[0]).addView(v, new android.widget.FrameLayout.LayoutParams(-1, -2));
+                    else block.addView(v, new LinearLayout.LayoutParams(-1, -2));
                 }
                 if (next[0] < sections.size()) MAIN.postDelayed(this, 16L);
             }
@@ -1995,13 +1781,13 @@ public final class CigramStage1InitProvider extends ContentProvider {
     }
 
     /**
-     * Fills {@code block} with every home section in the order the Admin app set: the dynamic
-     * sections and the fixed «أحدث الأفلام» / «المسلسلات المميزة» rows. Rows the admin does not
-     * know keep the app's own order after the registered ones; hidden ones are not drawn.
+     * Fills {@code block} with every home section in the order the Admin app set. «أحدث الأفلام» and
+     * «المسلسلات المميزة» are ordinary entries of {@code sections} (see {@link #addBuiltInSections}), so they are ranked, hidden and
+     * built exactly like every other row. Sections the admin does not know keep the app's own order after the registered ones.
      */
-    private static void fillBlockInAdminOrder(Activity activity, LinearLayout home, LinearLayout block,
+    private static void fillBlockInAdminOrder(Activity activity, LinearLayout block,
                                               java.util.ArrayList<DynamicHomeSection> sections,
-                                              CigramHomeOrder.Plan plan) throws Exception {
+                                              CigramHomeOrder.Plan plan) {
         java.util.ArrayList<OrderedRow> rows = new java.util.ArrayList<OrderedRow>();
         int seq = 0;
         for (DynamicHomeSection section : sections) {
@@ -2009,30 +1795,6 @@ public final class CigramStage1InitProvider extends ContentProvider {
             OrderedRow row = new OrderedRow(plan.rank(section.id, section.name), seq++);
             row.section = section;
             row.holder = new android.widget.FrameLayout(activity);      // filled now (first screen) or one frame later
-            row.views.add(row.holder);
-            rows.add(row);
-        }
-        String[][] builtIns = {
-                {"latest_movies", "أحدث الأفلام", "linear_latest_movies_header", "hscroll1"},
-                {"featured_series", "المسلسلات المميزة", "linear8", "hscroll_series"},
-        };
-        for (String[] b : builtIns) {
-            View first = directChildUnder(home, findByIdName(activity, b[2]));
-            View second = directChildUnder(home, findByIdName(activity, b[3]));
-            if (first == null || second == null) continue;
-            boolean hide = plan.disabled(b[0], b[1]) || plan.hiddenOnHome(b[0], b[1]);
-            if (hide) {
-                first.setVisibility(View.GONE);
-                second.setVisibility(View.GONE);
-                HIDDEN_BY_ORDER.put(first, Boolean.TRUE);
-                HIDDEN_BY_ORDER.put(second, Boolean.TRUE);
-                continue;
-            }
-            if (HIDDEN_BY_ORDER.remove(first) != null) first.setVisibility(View.VISIBLE);
-            if (HIDDEN_BY_ORDER.remove(second) != null) second.setVisibility(View.VISIBLE);
-            OrderedRow row = new OrderedRow(plan.rank(b[0], b[1]), seq++);
-            row.views.add(first);
-            row.views.add(second);
             rows.add(row);
         }
         java.util.Collections.sort(rows, new java.util.Comparator<OrderedRow>() {
@@ -2045,26 +1807,60 @@ public final class CigramStage1InitProvider extends ContentProvider {
         java.util.ArrayList<android.widget.FrameLayout> deferredHolders = new java.util.ArrayList<android.widget.FrameLayout>();
         int built = 0;
         for (OrderedRow row : rows) {
-            if (row.section != null && row.holder != null) {
-                if (built < EAGER_SECTIONS) {
-                    try {
-                        row.holder.addView(makeDynamicSectionView(activity, row.section), new android.widget.FrameLayout.LayoutParams(-1, -2));
-                    } catch (Throwable error) {
-                        android.util.Log.w("CigramStage2", "section skipped", error);
-                    }
-                    built++;
-                } else {
-                    deferred.add(row.section);
-                    deferredHolders.add(row.holder);
-                }
+            if (built < EAGER_SECTIONS) {
+                row.holder.addView(sectionViewOrFallback(activity, row.section), new android.widget.FrameLayout.LayoutParams(-1, -2));
+                built++;
+            } else {
+                deferred.add(row.section);
+                deferredHolders.add(row.holder);
             }
-            for (View v : row.views) {
-                ViewGroup.LayoutParams lp = v.getLayoutParams();
-                if (v.getParent() instanceof ViewGroup) ((ViewGroup) v.getParent()).removeView(v);
-                block.addView(v, lp != null ? lp : new LinearLayout.LayoutParams(-1, -2));
-            }
+            block.addView(row.holder, new LinearLayout.LayoutParams(-1, -2));
         }
         if (!deferred.isEmpty()) buildSectionsLater(activity, deferred, deferredHolders, block);
+    }
+
+    /**
+     * The error boundary of one Home section: a section that cannot be built (bad data, a layout error) is replaced by a quiet
+     * one-line card with its title and a tap-to-retry, instead of leaving a hole or taking the rest of Home down with it.
+     */
+    private static View sectionViewOrFallback(final Activity activity, final DynamicHomeSection section) {
+        try {
+            return makeDynamicSectionView(activity, section);
+        } catch (Throwable error) {
+            android.util.Log.w("CigramStage2", "section failed: " + section.name, error);
+            final FrameLayout holder = new FrameLayout(activity);
+            try {
+                holder.addView(sectionErrorCard(activity, section, holder), new FrameLayout.LayoutParams(-1, -2));
+            } catch (Throwable ignored) { }
+            return holder;
+        }
+    }
+
+    private static View sectionErrorCard(final Activity activity, final DynamicHomeSection section, final FrameLayout holder) {
+        TextView card = new TextView(activity);
+        card.setText("تعذر عرض قسم «" + (section.name == null ? "" : section.name) + "». اضغط لإعادة المحاولة");
+        card.setTextColor(0xFFAAB4B9);
+        card.setTextSize(13f);
+        card.setGravity(Gravity.CENTER);
+        card.setTypeface(cigramTypeface(activity));
+        card.setPadding(dpInt(activity, 16), dpInt(activity, 18), dpInt(activity, 16), dpInt(activity, 18));
+        card.setBackground(roundedDrawable(0xFF16161A, dp(activity, 14f)));
+        card.setClickable(true);
+        card.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                try {
+                    View again = makeDynamicSectionView(activity, section);
+                    holder.removeAllViews();
+                    holder.addView(again, new FrameLayout.LayoutParams(-1, -2));
+                } catch (Throwable error) {
+                    android.util.Log.w("CigramStage2", "section retry failed: " + section.name, error);
+                }
+            }
+        });
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, -2);
+        lp.setMargins(dpInt(activity, 12), dpInt(activity, 8), dpInt(activity, 12), dpInt(activity, 8));
+        card.setLayoutParams(lp);
+        return card;
     }
 
     // Perf: parsing the whole catalogue (JSONTokener + section grouping) used to run right here on the
@@ -2074,6 +1870,8 @@ public final class CigramStage1InitProvider extends ContentProvider {
     private static String PRE_JSON;
     private static java.util.LinkedHashMap<String, DynamicHomeSection> PRE_GROUPED;
     private static boolean PRE_FAILED;
+    private static String PARSE_INFLIGHT = "";      // content key of the grouping job that is running (guarded by PRE_LOCK)
+    private static java.lang.ref.WeakReference<Activity> PARSE_FOR;   // the page that gets that job's result (guarded by PRE_LOCK)
 
     private static void renderDynamicSections(final Activity activity, final String catalogJson) {
         if (!isAlive(activity) || catalogJson == null || catalogJson.trim().length() == 0) {
@@ -2084,6 +1882,14 @@ public final class CigramStage1InitProvider extends ContentProvider {
             havePre = PRE_JSON == catalogJson && (PRE_GROUPED != null || PRE_FAILED);
         }
         if (!havePre && Looper.myLooper() == Looper.getMainLooper()) {
+            // One background grouping per catalogue CONTENT: Home is handed the same catalogue by several sources (saved copy, early
+            // download, own request, tab refresh); a second identical job used to start while the first was still running.
+            final String parseKey = catalogJson.length() + ":" + catalogJson.hashCode();
+            synchronized (PRE_LOCK) {
+                PARSE_FOR = new java.lang.ref.WeakReference<Activity>(activity);   // the newest page asking gets the result
+                if (parseKey.equals(PARSE_INFLIGHT)) return;     // its result is rendered when it lands
+                PARSE_INFLIGHT = parseKey;
+            }
             IO.execute(new Runnable() {
                 @Override public void run() {
                     java.util.LinkedHashMap<String, DynamicHomeSection> grouped = null;
@@ -2102,9 +1908,14 @@ public final class CigramStage1InitProvider extends ContentProvider {
                         PRE_JSON = catalogJson;
                         PRE_GROUPED = grouped;
                         PRE_FAILED = failed;
+                        PARSE_INFLIGHT = "";
                     }
                     MAIN.post(new Runnable() {
-                        @Override public void run() { renderDynamicSections(activity, catalogJson); }
+                        @Override public void run() {
+                            Activity target;
+                            synchronized (PRE_LOCK) { target = PARSE_FOR == null ? null : PARSE_FOR.get(); }
+                            renderDynamicSections(target != null && isAlive(target) ? target : activity, catalogJson);
+                        }
                     });
                 }
             });
@@ -2130,17 +1941,14 @@ public final class CigramStage1InitProvider extends ContentProvider {
             if (prepared != null) {
                 grouped = prepared;
             } else {
-                // fallback (background parse failed / called off the main thread): the original path
-                Object root = new JSONTokener(catalogJson).nextValue();
-                grouped = new java.util.LinkedHashMap<String, DynamicHomeSection>();
-                collectDynamicSectionContent(root, "", null, grouped, 0);
-                addDerivedSections(root, grouped);
+                // fallback (background parse failed / called off the main thread): the same grouping, run here
+                grouped = groupCatalog(catalogJson);
             }
 
-            if (grouped.isEmpty() && !CigramHomeOrder.plan(activity).any) {
-                restoreBuiltInHomeRows(activity, home);          // nothing to show: the previous block (if any) goes, as before
-                removeTagged(activity, TAG_DYNAMIC_SECTIONS);
+            if (grouped.isEmpty()) {
+                removeTagged(activity, TAG_DYNAMIC_SECTIONS);     // nothing to show: the previous block (if any) goes
                 RENDER_SIG = "";
+                clearHomeLoading(activity);
                 return;
             }
 
@@ -2165,6 +1973,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             else promoteSectionsForUser(activity, sections);
             DYNAMIC_LAST_JSON = catalogJson;
             DYNAMIC_LAST_ACTIVITY = new java.lang.ref.WeakReference<Activity>(activity);
+            publishSectionPages(activity, sections);   // the «المزيد» page opens from these, on its first frame
 
             // 19.0: an unchanged Home is NOT rebuilt. The same catalogue content + order + titles / styles + administrator plan, drawn
             // in THIS activity and still attached, means every card is already right: no teardown, no 220 ms fade-in, no scroll jump,
@@ -2175,9 +1984,9 @@ public final class CigramStage1InitProvider extends ContentProvider {
                     && RENDER_ACTIVITY != null && RENDER_ACTIVITY.get() == activity) {
                 CigramStage1InitProvider.trace("homeSame");
                 installNetflixTop(activity, home, sections);     // cheap and always rebuilt (admin layout changes show at once)
+                clearHomeLoading(activity);
                 return;
             }
-            restoreBuiltInHomeRows(activity, home);
             removeTagged(activity, TAG_DYNAMIC_SECTIONS);
 
             final Runnable rerender = new Runnable() {
@@ -2198,20 +2007,12 @@ public final class CigramStage1InitProvider extends ContentProvider {
             block.setGravity(Gravity.RIGHT);
             block.setPadding(0, 0, 0, dpInt(activity, 8));
 
-            // where the block goes: right above the fixed «أحدث الأفلام» row (found BEFORE any row moves)
-            int insertAt = home.getChildCount();
-            View latestHeader = findByIdName(activity, "linear_latest_movies_header");
-            if (latestHeader != null) {
-                View direct = directChildUnder(home, latestHeader);
-                if (direct != null) {
-                    int index = home.indexOfChild(direct);
-                    if (index >= 0) insertAt = index;
-                }
-            }
+            // the block goes at the end of Home: every section, «أحدث الأفلام» and «المسلسلات المميزة» included, lives inside it
+            final int insertAt = home.getChildCount();
 
             if (adminPlan.any) {
-                // v10.37: ONE ordered list for every section, the two fixed rows included
-                fillBlockInAdminOrder(activity, home, block, sections, adminPlan);
+                // v10.37: ONE ordered list for every section
+                fillBlockInAdminOrder(activity, block, sections, adminPlan);
             } else {
                 // v18.2: build EVERY section's header + first screenful in one pass, so the whole
                 // catalogue appears together instead of popping in section-by-section. Each row still
@@ -2223,20 +2024,13 @@ public final class CigramStage1InitProvider extends ContentProvider {
                 for (DynamicHomeSection section : sections) {
                     if (section.items.isEmpty()) continue;
                     if (built >= EAGER_SECTIONS) { deferred.add(section); continue; }   // 19.1: the rest follows, 1-2 per frame
-                    try {
-                        block.addView(
-                                makeDynamicSectionView(activity, section),
-                                new LinearLayout.LayoutParams(-1, -2)
-                        );
-                        built++;
-                    } catch (Throwable error) {
-                        android.util.Log.w("CigramStage2", "section skipped", error);
-                    }
+                    block.addView(sectionViewOrFallback(activity, section), new LinearLayout.LayoutParams(-1, -2));
+                    built++;
                 }
                 if (!deferred.isEmpty()) buildSectionsLater(activity, deferred, null, block);
             }
 
-            if (block.getChildCount() == 0) { RENDER_SIG = ""; return; }
+            if (block.getChildCount() == 0) { RENDER_SIG = ""; clearHomeLoading(activity); return; }
 
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
             home.addView(block, Math.max(0, Math.min(insertAt, home.getChildCount())), lp);
@@ -2249,10 +2043,121 @@ public final class CigramStage1InitProvider extends ContentProvider {
             }
 
             installNetflixTop(activity, home, sections);
+            clearHomeLoading(activity);
 
         } catch (Throwable error) {
             android.util.Log.w("CigramStage2", "Dynamic sections render failed", error);
+            clearHomeLoading(activity);
         }
+    }
+
+    /**
+     * Hands every section Home is about to draw to {@link CigramSectionStore}, before any row view is built: the «المزيد» page, a chip or a
+     * notification then finds its items in memory (references, no copy) whatever Home has drawn so far.
+     */
+    private static void publishSectionPages(Activity activity, java.util.List<DynamicHomeSection> sections) {
+        try {
+            for (DynamicHomeSection section : sections) {
+                if (section == null || section.items.isEmpty()) continue;
+                String type = dynamicSectionType(section);
+                CigramSectionStore.publish(section.id, section.name, type, section.items.values(), section.keepOrder);
+                String shown = CigramLayoutConfig.titleFor(activity, section.id, section.name);
+                if (shown != null && shown.length() > 0 && !shown.equals(section.name)) {
+                    CigramSectionStore.publish("", shown, type, section.items.values(), section.keepOrder);   // renamed by the Admin app
+                }
+            }
+        } catch (Throwable error) {
+            android.util.Log.w("CigramStage2", "section pages not published", error);
+        }
+    }
+
+    /** The poster loader of the Home rows (memory + disk cache, one download per URL, skeleton while it loads), for the «المزيد» page. */
+    static void loadPosterInto(Context context, JSONObject item, android.widget.ImageView view) {
+        if (context == null || item == null || view == null) return;
+        loadDynamicPoster(context, jsonText(item, "poster", "series_poster", "season_poster", "image", "backdrop"), view);
+    }
+
+    /** First non-empty text among the keys (catalogue records are loose about their field names). */
+    static String itemText(JSONObject item, String... keys) {
+        return jsonText(item, keys);
+    }
+
+    /** The titles related to {@code active} (same type, same genre first, newest first), everything in memory: the page opens at once. */
+    static java.util.ArrayList<JSONObject> relatedItems(Context context, JSONObject active) {
+        java.util.ArrayList<JSONObject> out = new java.util.ArrayList<JSONObject>();
+        try {
+            JSONArray found = extractRelatedCatalogItems(
+                    cachedCatalogJson(context), inferContentType(active, ""),
+                    jsonText(active, "category", "genre", "genres"), relatedIdentityKey(active), 0);
+            for (int i = 0; i < found.length(); i++) {
+                JSONObject item = found.optJSONObject(i);
+                if (item != null) out.add(item);
+            }
+        } catch (Throwable error) {
+            android.util.Log.w("CigramRelated", "related list failed", error);
+        }
+        return out;
+    }
+
+    /**
+     * A section as the last Home saved it (see the sections snapshot), for a «المزيد» page opened by a process that has not drawn Home yet
+     * (the app was restored after the system killed it). One small file read, no network, no catalogue parse; null when there is none.
+     */
+    static java.util.ArrayList<JSONObject> snapshotSectionItems(Context context, String sectionId, String sectionName) {
+        try {
+            SectionsSnap snap = loadSectionsSnapshot(context, "", true);
+            if (snap == null) return null;
+            String wantId = normalizeSearch(sectionId);
+            String wantName = normalizeSearch(sectionName);
+            for (DynamicHomeSection s : snap.grouped.values()) {
+                boolean same = (wantId.length() > 0 && wantId.equals(normalizeSearch(s.id)))
+                        || (wantName.length() > 0 && wantName.equals(normalizeSearch(s.name)));
+                if (!same || s.items.isEmpty()) continue;
+                java.util.ArrayList<JSONObject> list = new java.util.ArrayList<JSONObject>(s.items.values());
+                if (!s.keepOrder) CigramOrder.sortJson(list);
+                return list;
+            }
+        } catch (Throwable error) {
+            android.util.Log.w("CigramStage2", "section snapshot lookup failed", error);
+        }
+        return null;
+    }
+
+    /**
+     * The flat catalogue index the Search page matches a query against. Blocking (a multi-MB read): background threads only, and only when
+     * the user actually searches. Never a network call: it is whatever the last catalogue refresh saved.
+     */
+    static String searchIndexJson(Context context) {
+        try {
+            String memory = CATALOG_MEMORY_JSON;
+            SharedPreferences prefs = catalogPrefs(context);
+            String index = prefs.getString(KEY_SEARCH_JSON, "");
+            if (isValidCatalog(index)) return index;
+            if (looksLikeCatalogText(memory)) return memory;
+            String cached = prefs.getString(KEY_JSON, "");
+            return cached == null ? "" : cached;
+        } catch (Throwable error) {
+            android.util.Log.w("CigramStage2", "search index unavailable", error);
+            return "";
+        }
+    }
+
+    /** The skeleton MainActivity shows until the first sections are drawn. Gone on every way out of a render, so it can never stay on top. */
+    private static void clearHomeLoading(Activity activity) {
+        try {
+            removeTagged(activity, "cigram_home_loading_state");
+            removeTagged(activity, "cigram_home_retry_box");
+        } catch (Throwable ignored) { }
+    }
+
+    /** Everything the catalogue says, as sections: the administrator's, the two classic rows, the discovery rows. */
+    private static java.util.LinkedHashMap<String, DynamicHomeSection> groupCatalog(String catalogJson) throws Exception {
+        Object root = new JSONTokener(catalogJson).nextValue();
+        java.util.LinkedHashMap<String, DynamicHomeSection> grouped = new java.util.LinkedHashMap<String, DynamicHomeSection>();
+        collectDynamicSectionContent(root, "", null, grouped, 0);
+        addBuiltInSections(catalogJson, grouped);   // «أحدث الأفلام» / «المسلسلات المميزة»: ordinary sections
+        addDerivedSections(root, grouped);          // PrimeTV-style discovery rows (never over an administrator's section)
+        return grouped;
     }
 
     /**
@@ -2356,13 +2261,27 @@ public final class CigramStage1InitProvider extends ContentProvider {
     private static java.util.LinkedHashMap<String, DynamicHomeSection> groupedFor(Context context, String catalogJson) throws Exception {
         java.util.LinkedHashMap<String, DynamicHomeSection> hit = groupedCacheCopy(catalogJson);
         if (hit != null) return hit;
-        Object root = new JSONTokener(catalogJson).nextValue();
-        java.util.LinkedHashMap<String, DynamicHomeSection> grouped = new java.util.LinkedHashMap<String, DynamicHomeSection>();
-        collectDynamicSectionContent(root, "", null, grouped, 0);
-        addDerivedSections(root, grouped);   // PrimeTV-style discovery rows (never over an administrator's section)
+        java.util.LinkedHashMap<String, DynamicHomeSection> grouped = groupCatalog(catalogJson);
+        saveSearchSuggestions(context, grouped);
         saveSectionsSnapshot(context, catalogJson, grouped);
         groupedCachePut(catalogJson, grouped);
         return grouped;
+    }
+
+    /** The newest films and series are the Search page's default content: saved with the sections so Search opens complete, offline too. */
+    private static void saveSearchSuggestions(Context context, java.util.LinkedHashMap<String, DynamicHomeSection> grouped) {
+        try {
+            java.util.ArrayList<JSONObject> movies = new java.util.ArrayList<JSONObject>();
+            java.util.ArrayList<JSONObject> series = new java.util.ArrayList<JSONObject>();
+            for (DynamicHomeSection s : grouped.values()) {
+                if (s == null) continue;
+                if (LATEST_MOVIES_ID.equals(s.id)) movies.addAll(s.items.values());
+                else if (FEATURED_SERIES_ID.equals(s.id)) series.addAll(s.items.values());
+            }
+            CigramSearchCache.putSuggestions(context, movies, series);
+        } catch (Throwable error) {
+            android.util.Log.w("CigramStage2", "search suggestions not saved", error);
+        }
     }
 
     private static java.util.LinkedHashMap<String, DynamicHomeSection> groupedCacheCopy(String catalogJson) {
@@ -2458,9 +2377,6 @@ public final class CigramStage1InitProvider extends ContentProvider {
         try {
             java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-1");
             StringBuilder head = new StringBuilder("v1|").append(plan.any).append('|');
-            for (String[] b : new String[][]{{"latest_movies", "أحدث الأفلام"}, {"featured_series", "المسلسلات المميزة"}}) {
-                head.append(plan.rank(b[0], b[1])).append(',').append(plan.disabled(b[0], b[1])).append(',').append(plan.hiddenOnHome(b[0], b[1])).append(';');
-            }
             md.update(head.toString().getBytes("UTF-8"));
             for (DynamicHomeSection s : sections) {
                 if (s == null || s.items.isEmpty()) continue;
@@ -2574,6 +2490,88 @@ public final class CigramStage1InitProvider extends ContentProvider {
         } catch (Throwable error) {
             android.util.Log.w("CigramStage2", "derived rows skipped", error);
         }
+    }
+
+    /** Ids / names of the two classic Home rows. They are ordinary sections: same builder, same «المزيد» page, same admin plan. */
+    static final String LATEST_MOVIES_ID = "latest_movies";
+    static final String LATEST_MOVIES_NAME = "أحدث الأفلام";
+    static final String FEATURED_SERIES_ID = "featured_series";
+    static final String FEATURED_SERIES_NAME = "المسلسلات المميزة";
+
+    /**
+     * «أحدث الأفلام» and «المسلسلات المميزة» used to be two hand-built rows of main.xml: MainActivity filled them card by card from its own
+     * parse of the catalogue (five triggers re-entered the same builder, each starting a never-cancelled build loop) and this class moved
+     * them in and out of the section block. They are now two ordinary {@link DynamicHomeSection}s computed from the same catalogue read
+     * (on the background thread, cached with everything else in the sections snapshot): newest first, a title that sits in an administrator's
+     * section is shown there only, one card per title.
+     */
+    private static void addBuiltInSections(String catalogJson,
+                                           java.util.LinkedHashMap<String, DynamicHomeSection> grouped) {
+        if (grouped == null || catalogJson == null || catalogJson.trim().length() == 0) return;
+        try {
+            java.util.HashSet<String> claims = new java.util.HashSet<String>();
+            for (DynamicHomeSection custom : grouped.values()) {
+                if (custom == null) continue;
+                for (JSONObject item : custom.items.values()) CigramOrder.addClaimKeys(claims, item);
+            }
+            HomeCatalog catalog = new HomeCatalog();
+            JSONArray flat = catalog.parse(CigramTitles.normalizeCatalog(catalogJson));
+            java.util.ArrayList<JSONObject> records = new java.util.ArrayList<JSONObject>();
+            for (int i = 0; i < flat.length(); i++) {
+                JSONObject record = flat.optJSONObject(i);
+                if (record != null) records.add(record);
+            }
+            CigramOrder.sortJson(records);   // newest first (date, numeric id, first seen)
+
+            java.util.LinkedHashMap<String, JSONObject> movies = new java.util.LinkedHashMap<String, JSONObject>();
+            java.util.LinkedHashMap<String, JSONObject> series = new java.util.LinkedHashMap<String, JSONObject>();
+            for (int i = 0; i < records.size(); i++) {
+                JSONObject record = records.get(i);
+                if (CigramOrder.claimed(claims, record)) continue;
+                boolean isSeries = "series".equalsIgnoreCase(jsonText(record, "type"));
+                String title = jsonText(record, "title");
+                String id = jsonText(record, "id");
+                String seriesId = jsonText(record, "series_id");
+                String unique = isSeries && seriesId.length() > 0 ? seriesId
+                        : title.length() > 0 ? catalog.normal(title)
+                        : id.length() > 0 ? "id:" + id : "index:" + i;
+                java.util.LinkedHashMap<String, JSONObject> target = isSeries ? series : movies;
+                JSONObject kept = target.get(unique);
+                if (kept == null) {
+                    target.put(unique, shallowCopy(record));
+                } else {
+                    // a later duplicate only fills what the newest copy is missing (poster, rating, ...)
+                    java.util.Iterator<String> keys = record.keys();
+                    while (keys.hasNext()) {
+                        String key = keys.next();
+                        if (jsonText(kept, key).length() == 0 && jsonText(record, key).length() > 0) kept.put(key, record.opt(key));
+                    }
+                }
+            }
+            putBuiltInSection(grouped, LATEST_MOVIES_ID, LATEST_MOVIES_NAME, movies.values());
+            putBuiltInSection(grouped, FEATURED_SERIES_ID, FEATURED_SERIES_NAME, series.values());
+        } catch (Throwable error) {
+            android.util.Log.w("CigramStage2", "built-in sections skipped", error);   // the rest of Home is unaffected
+        }
+    }
+
+    private static void putBuiltInSection(java.util.LinkedHashMap<String, DynamicHomeSection> grouped, String id, String name,
+                                          java.util.Collection<JSONObject> items) {
+        if (items.isEmpty()) return;
+        String key = "id:" + normalizeSearch(id);
+        if (grouped.containsKey(key)) return;
+        DynamicHomeSection section = new DynamicHomeSection(key);
+        section.id = id;
+        section.name = name;
+        section.rank = 0L;           // after every administrator section and discovery row in the default order, as the old fixed rows were
+        section.keepOrder = true;    // already newest first
+        int n = 0;
+        for (JSONObject item : items) {
+            String itemKey = dynamicDisplayItemKey(item);
+            section.items.put(itemKey.length() == 0 ? "item:" + n : itemKey, item);
+            n++;
+        }
+        grouped.put(key, section);
     }
 
     private static JSONObject derivedCopy(JSONObject record, CigramHomeGroups.Group g) throws Exception {
@@ -2857,6 +2855,37 @@ public final class CigramStage1InitProvider extends ContentProvider {
         return out;
     }
 
+    /** The one entry point of MainActivity's catalogue listener: keep the catalogue and draw every Home section (the two classic rows too) from it. */
+    static void homeCatalogReceived(Activity activity, String catalogJson) {
+        if (!isAlive(activity) || !looksLikeCatalogText(catalogJson)) return;
+        prepareAndStoreCatalogAsync(activity, catalogJson);
+        renderDynamicSections(activity, catalogJson);
+    }
+
+    /** True once Home shows its sections (what MainActivity's error handling used to ask of the two fixed rows). */
+    static boolean homeHasSections(Activity activity) {
+        View root = findByIdName(activity, "linear1");
+        return root != null && root.findViewWithTag(TAG_DYNAMIC_SECTIONS) != null;
+    }
+
+    /**
+     * The COMPLETE item list of a section, newest first, read from the saved catalogue. Blocking (a multi-MB parse): background threads only.
+     * The «المزيد» page opens from what Home already holds and tops up with this silently.
+     */
+    static java.util.ArrayList<JSONObject> fullSectionItems(Context context, String sectionId, String sectionName) {
+        java.util.ArrayList<JSONObject> out = new java.util.ArrayList<JSONObject>();
+        try {
+            JSONArray array = new JSONArray(getSectionItemsJson(cachedCatalogJson(context), sectionId, sectionName));
+            for (int i = 0; i < array.length(); i++) {
+                JSONObject item = array.optJSONObject(i);
+                if (item != null) out.add(item);
+            }
+        } catch (Throwable error) {
+            android.util.Log.w("CigramStage2", "full section read failed", error);
+        }
+        return out;
+    }
+
     public static String getSectionItemsJson(
             String catalogJson,
             String targetSectionId,
@@ -2865,10 +2894,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
         if (catalogJson == null || catalogJson.trim().length() == 0) return "[]";
 
         try {
-            Object root = new JSONTokener(catalogJson).nextValue();
-            java.util.LinkedHashMap<String, DynamicHomeSection> grouped =
-                    new java.util.LinkedHashMap<String, DynamicHomeSection>();
-            collectDynamicSectionContent(root, "", null, grouped, 0);
+            java.util.LinkedHashMap<String, DynamicHomeSection> grouped = groupCatalog(catalogJson);
 
             String idKey = targetSectionId == null
                     ? ""
@@ -3632,558 +3658,6 @@ public final class CigramStage1InitProvider extends ContentProvider {
         }
     }
 
-    private static StrictSectionController ensureStrictSectionController(Activity activity) {
-        synchronized (STRICT_SECTION_CONTROLLERS) {
-            StrictSectionController controller = STRICT_SECTION_CONTROLLERS.get(activity);
-            if (controller == null) {
-                controller = new StrictSectionController(activity);
-                STRICT_SECTION_CONTROLLERS.put(activity, controller);
-            }
-            return controller;
-        }
-    }
-
-    private static final class StrictSectionController {
-        private final Activity activity;
-        private final Handler handler = new Handler(Looper.getMainLooper());
-        private ViewGroup itemsRoot;
-        private TextView titleView;
-        private android.widget.ScrollView scrollView;
-        private android.view.ViewTreeObserver.OnScrollChangedListener scrollListener;
-        private JSONArray exactItems;
-        private int renderedCount;
-        private boolean appending;
-        private String sectionId = "";
-        private String sectionTitle = "";
-        private String sectionType = "";
-        private String sectionMode = "";
-        private String relatedCategory = "";
-        private String relatedExcludeKey = "";
-        private boolean guardAttached;
-        private boolean rendering;
-        private boolean destroyed;
-        private boolean fetching;
-        private long lastFetchAt;
-
-        private final Runnable enforceRunnable = new Runnable() {
-            @Override public void run() {
-                if (destroyed || rendering || exactItems == null || !isAlive(activity)) return;
-                if (!strictChildrenOnly()) renderExact();
-            }
-        };
-
-        StrictSectionController(Activity activity) {
-            this.activity = activity;
-        }
-
-        void start() {
-            if (destroyed || !isAlive(activity)) return;
-            readTarget();
-            bindViews();
-
-            if (itemsRoot == null) {
-                handler.postDelayed(new Runnable() {
-                    @Override public void run() {
-                        if (!destroyed) start();
-                    }
-                }, 180L);
-                return;
-            }
-
-            attachGuard();
-            applyTitle();
-
-            String cached = catalogPrefs(activity).getString(KEY_JSON, "");
-            if (isValidCatalog(cached)) {
-                setExactFromRaw(cached);
-            } else if (exactItems == null) {
-                showSectionMessage("جاري تحميل المحتوى...");
-            }
-
-            long now = System.currentTimeMillis();
-            if (!fetching && isOnline(activity) && now - lastFetchAt > 8000L) {
-                fetchLatest();
-            }
-        }
-
-        private void readTarget() {
-            try {
-                android.content.Intent intent = activity.getIntent();
-                if (intent != null) {
-                    sectionId = clean(intent.getStringExtra("section_id"));
-                    sectionTitle = clean(intent.getStringExtra("section_title"));
-                    if (sectionTitle.length() == 0) {
-                        sectionTitle = clean(intent.getStringExtra("section_name"));
-                    }
-                    sectionType = normalizeSearch(clean(intent.getStringExtra("section_type")));
-                    sectionMode = normalizeSearch(clean(intent.getStringExtra("section_mode")));
-                    relatedCategory = clean(intent.getStringExtra("related_category"));
-                    relatedExcludeKey = clean(intent.getStringExtra("related_exclude_key"));
-                }
-            } catch (Throwable ignored) { android.util.Log.w("CigramInjected", "readTarget", ignored); }
-
-            if (sectionId.length() == 0) {
-                String normalizedTitle = normalizeSearch(sectionTitle);
-                if ("احدث الافلام".equals(normalizedTitle)) {
-                    sectionId = "latest_movies";
-                } else if ("المسلسلات المميزه".equals(normalizedTitle)) {
-                    sectionId = "featured_series";
-                } else if ("احدث المسلسلات".equals(normalizedTitle)) {
-                    sectionId = "latest_series";
-                } else if (sectionTitle.length() == 0 && "movie".equals(sectionType)) {
-                    sectionId = "latest_movies";
-                    sectionTitle = "أحدث الأفلام";
-                } else if (sectionTitle.length() == 0 && "series".equals(sectionType)) {
-                    sectionId = "featured_series";
-                    sectionTitle = "المسلسلات المميزة";
-                }
-            }
-
-            if ("related".equals(sectionMode) || "__related__".equals(sectionId)) {
-                sectionTitle = "ذات صلة";
-            }
-
-            if (sectionTitle.length() == 0) {
-                if ("latest_movies".equalsIgnoreCase(sectionId)) {
-                    sectionTitle = "أحدث الأفلام";
-                } else if ("featured_series".equalsIgnoreCase(sectionId)) {
-                    sectionTitle = "المسلسلات المميزة";
-                } else if ("latest_series".equalsIgnoreCase(sectionId)) {
-                    sectionTitle = "أحدث المسلسلات";
-                }
-            }
-        }
-
-        private void bindViews() {
-            View root = findByIdName(activity, "linear_section_items");
-            if (root instanceof ViewGroup) {
-                itemsRoot = (ViewGroup) root;
-                itemsRoot.setBackgroundColor(0xFF0E0E10);
-                itemsRoot.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-                itemsRoot.setPadding(dpInt(activity, 8), dpInt(activity, 10),
-                        dpInt(activity, 8), dpInt(activity, 20));
-            }
-            View title = findByIdName(activity, "textview_section_title");
-            if (title instanceof TextView) titleView = (TextView) title;
-            View scroll = findByIdName(activity, "vscroll_section");
-            if (scroll instanceof android.widget.ScrollView) {
-                scrollView = (android.widget.ScrollView) scroll;
-                scrollView.setBackgroundColor(0xFF0E0E10);
-                scrollView.setVerticalScrollBarEnabled(false);
-            }
-            View pageRoot = findByIdName(activity, "linear_section_root");
-            if (pageRoot != null) pageRoot.setBackgroundColor(0xFF0E0E10);
-            View header = findByIdName(activity, "linear_section_header");
-            if (header instanceof LinearLayout) {
-                ((LinearLayout) header).setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-            }
-            final View back = findByIdName(activity, "imageview_section_back");
-            if (back != null) {
-                back.setClickable(true);
-                back.setOnClickListener(new View.OnClickListener() {
-                    @Override public void onClick(View view) { activity.finish(); }
-                });
-            }
-        }
-
-        private void applyTitle() {
-            if (titleView == null) return;
-            titleView.setText(sectionTitle.length() == 0 ? "القسم" : sectionTitle);
-            titleView.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-            titleView.setTextDirection(View.TEXT_DIRECTION_RTL);
-            titleView.setSingleLine(true);
-            titleView.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            titleView.setTypeface(cigramTypeface(activity), Typeface.BOLD);
-        }
-
-        private void attachGuard() {
-            if (guardAttached || itemsRoot == null) return;
-            guardAttached = true;
-            itemsRoot.setOnHierarchyChangeListener(new ViewGroup.OnHierarchyChangeListener() {
-                @Override public void onChildViewAdded(View parent, View child) {
-                    if (rendering || exactItems == null || destroyed) return;
-                    handler.removeCallbacks(enforceRunnable);
-                    handler.postDelayed(enforceRunnable, 70L);
-                }
-
-                @Override public void onChildViewRemoved(View parent, View child) {
-                    if (rendering || exactItems == null || destroyed) return;
-                    handler.removeCallbacks(enforceRunnable);
-                    handler.postDelayed(enforceRunnable, 70L);
-                }
-            });
-            attachSectionScrollWatcher();
-        }
-
-        private void attachSectionScrollWatcher() {
-            if (scrollView == null || scrollListener != null) return;
-            scrollListener = new android.view.ViewTreeObserver.OnScrollChangedListener() {
-                @Override public void onScrollChanged() {
-                    if (destroyed || scrollView == null || exactItems == null) return;
-                    View child = scrollView.getChildCount() > 0 ? scrollView.getChildAt(0) : null;
-                    if (child == null) return;
-                    int remaining = child.getHeight() - (scrollView.getScrollY() + scrollView.getHeight());
-                    if (remaining <= dpInt(activity, 900)) appendNextSectionBatch();
-                }
-            };
-            try {
-                scrollView.getViewTreeObserver().addOnScrollChangedListener(scrollListener);
-            } catch (Throwable ignored) { }
-        }
-
-        private boolean strictChildrenOnly() {
-            if (itemsRoot == null) return false;
-            int expected;
-            if (exactItems == null || exactItems.length() == 0) {
-                expected = 1;
-            } else {
-                int visible = Math.min(Math.max(0, renderedCount), exactItems.length());
-                expected = Math.max(1, (visible + 2) / 3);
-            }
-            if (itemsRoot.getChildCount() != expected) return false;
-            for (int i = 0; i < itemsRoot.getChildCount(); i++) {
-                Object tag = itemsRoot.getChildAt(i).getTag();
-                String text = tag == null ? "" : String.valueOf(tag);
-                if (!text.startsWith("cigram_strict_section_")) return false;
-            }
-            return true;
-        }
-
-        private void setExactFromRaw(String raw) {
-            final JSONArray extracted;
-            if ("related".equals(sectionMode) || "__related__".equals(sectionId)) {
-                extracted = extractRelatedCatalogItems(
-                        raw, sectionType, relatedCategory, relatedExcludeKey, 0);
-            } else {
-                extracted = extractStrictSectionItems(
-                        raw, sectionId, sectionTitle, sectionType);
-            }
-            exactItems = extracted;
-            handler.post(new Runnable() {
-                @Override public void run() {
-                    if (!destroyed && isAlive(activity)) renderExact();
-                }
-            });
-        }
-
-        private void fetchLatest() {
-            fetching = true;
-            lastFetchAt = System.currentTimeMillis();
-            IO.execute(new Runnable() {
-                @Override public void run() {
-                    try {
-                        FetchResult result = fetchCatalog(activity);
-                        if (result.ok && isValidCatalog(result.body)) {
-                            PreparedCatalog prepared = prepareCatalog(result.body);
-                            long now = System.currentTimeMillis();
-                            String hash = catalogHash(prepared.displayJson);
-                            installCatalogInMemory(prepared.displayJson, prepared.searchIndexJson);
-                            catalogPrefs(activity).edit()
-                                    .putString(KEY_JSON, prepared.displayJson)
-                                    .putString(KEY_JSON_HASH, hash)
-                                    .putLong(KEY_UPDATED, now)
-                                    .putString(KEY_SEARCH_JSON, prepared.searchIndexJson)
-                                    .putLong(KEY_SEARCH_UPDATED, now)
-                                    .apply();
-                            preloadCatalogImages(activity.getApplicationContext(), prepared.searchIndexJson);
-                            setExactFromRaw(prepared.displayJson);
-                        } else if (exactItems == null) {
-                            handler.post(new Runnable() {
-                                @Override public void run() {
-                                    if (!destroyed) showSectionMessage("تعذر تحميل محتوى القسم");
-                                }
-                            });
-                        }
-                    } finally {
-                        fetching = false;
-                    }
-                }
-            });
-        }
-
-        private void renderExact() {
-            if (itemsRoot == null || destroyed) return;
-            rendering = true;
-            try {
-                itemsRoot.removeAllViews();
-                renderedCount = 0;
-
-                if (exactItems == null || exactItems.length() == 0) {
-                    addMessageView("لا يوجد محتوى في هذا القسم");
-                    return;
-                }
-            } finally {
-                rendering = false;
-            }
-            appendNextSectionBatch();
-        }
-
-        private void appendNextSectionBatch() {
-            if (itemsRoot == null || destroyed || exactItems == null || appending) return;
-            if (renderedCount >= exactItems.length()) return;
-            appending = true;
-            rendering = true;
-            try {
-                final int startIndex = renderedCount;
-                final int endIndex = Math.min(exactItems.length(), startIndex + 30);
-                for (int start = startIndex; start < endIndex; start += 3) {
-                    LinearLayout row = new LinearLayout(activity);
-                    row.setTag("cigram_strict_section_row:" + (start / 3));
-
-                    // v4.4: item order reads right → left in every RTL setting (newest at the far
-                    // right of the first row), same data and paging as before.
-                    View[] cards = new View[3];
-                    for (int slot = 0; slot < 3; slot++) {
-                        int index = start + slot;
-                        View card = null;
-                        if (index < endIndex && index < exactItems.length()) {
-                            JSONObject item = exactItems.optJSONObject(index);
-                            card = item == null ? null : makeSectionGridCard(activity, item);
-                        }
-                        if (card == null) {
-                            card = new View(activity);
-                            card.setVisibility(View.INVISIBLE);
-                        }
-                        cards[slot] = card;
-                    }
-                    CigramDesign.fillGridRow(row, cards, dpInt(activity, 5));
-
-                    LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.WRAP_CONTENT);
-                    rowLp.bottomMargin = dpInt(activity, 16);
-                    itemsRoot.addView(row, rowLp);
-                }
-                renderedCount = endIndex;
-            } finally {
-                rendering = false;
-                appending = false;
-            }
-        }
-
-        private void showSectionMessage(String message) {
-            if (itemsRoot == null) return;
-            rendering = true;
-            try {
-                itemsRoot.removeAllViews();
-                renderedCount = 0;
-                addMessageView(message);
-            } finally {
-                rendering = false;
-            }
-        }
-
-        private void addMessageView(String message) {
-            TextView text = new TextView(activity);
-            text.setTag("cigram_strict_section_message");
-            text.setText(message);
-            text.setTextColor(0xFFB7C0C5);
-            text.setTextSize(15f);
-            text.setGravity(Gravity.CENTER);
-            text.setTypeface(cigramTypeface(activity));
-            text.setPadding(dpInt(activity, 18), dpInt(activity, 34),
-                    dpInt(activity, 18), dpInt(activity, 34));
-            itemsRoot.addView(text, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT));
-        }
-
-        void destroy() {
-            destroyed = true;
-            handler.removeCallbacks(enforceRunnable);
-            if (itemsRoot != null) {
-                try { itemsRoot.setOnHierarchyChangeListener(null); }
-                catch (Throwable ignored) { android.util.Log.w("CigramInjected", "destroy", ignored); }
-            }
-            if (scrollView != null && scrollListener != null) {
-                try {
-                    android.view.ViewTreeObserver observer = scrollView.getViewTreeObserver();
-                    if (observer.isAlive()) observer.removeOnScrollChangedListener(scrollListener);
-                } catch (Throwable ignored) { }
-            }
-            scrollListener = null;
-        }
-    }
-
-    private static JSONArray extractStrictSectionItems(
-            String raw,
-            String targetSectionId,
-            String targetSectionName,
-            String targetSectionType
-    ) {
-        JSONArray result = new JSONArray();
-        if (raw == null || raw.trim().length() == 0) return result;
-
-        try {
-            Object root = new JSONTokener(raw).nextValue();
-            java.util.ArrayList<JSONObject> matches = new java.util.ArrayList<JSONObject>();
-            collectStrictSectionContent(
-                    root,
-                    "",
-                    null,
-                    normalizeSearch(targetSectionId),
-                    normalizeSearch(targetSectionName),
-                    normalizeSearch(targetSectionType),
-                    matches,
-                    0);
-
-            java.util.LinkedHashMap<String, JSONObject> unique =
-                    new java.util.LinkedHashMap<String, JSONObject>();
-            java.util.LinkedHashMap<String, java.util.LinkedHashMap<String, JSONObject>> episodes =
-                    new java.util.LinkedHashMap<String, java.util.LinkedHashMap<String, JSONObject>>();
-
-            for (JSONObject item : matches) {
-                if (item == null) continue;
-                String key = dynamicDisplayItemKey(item);
-                if (key.length() == 0) {
-                    key = "item|" + unique.size() + "|" + contentRecency(item);
-                }
-
-                JSONObject old = unique.get(key);
-                if (old == null) {
-                    unique.put(key, new JSONObject(item.toString()));
-                } else {
-                    unique.put(key, mergeSearchItems(old, item));
-                }
-
-                if ("series".equals(inferContentType(item, ""))) {
-                    java.util.LinkedHashMap<String, JSONObject> group = episodes.get(key);
-                    if (group == null) {
-                        group = new java.util.LinkedHashMap<String, JSONObject>();
-                        episodes.put(key, group);
-                    }
-                    collectEpisodesFromItem(item, group);
-                }
-            }
-
-            java.util.ArrayList<JSONObject> ordered =
-                    new java.util.ArrayList<JSONObject>(unique.values());
-            CigramOrder.sortJson(ordered);   // v10.67
-
-            for (JSONObject item : ordered) {
-                String key = dynamicDisplayItemKey(item);
-                java.util.LinkedHashMap<String, JSONObject> group = episodes.get(key);
-                if (group != null && !group.isEmpty()) {
-                    java.util.ArrayList<JSONObject> list =
-                            new java.util.ArrayList<JSONObject>(group.values());
-                    java.util.Collections.sort(list, new java.util.Comparator<JSONObject>() {
-                        @Override public int compare(JSONObject a, JSONObject b) {
-                            int sa = intText(a, "season", "season_number");
-                            int sb = intText(b, "season", "season_number");
-                            if (sa != sb) return sa < sb ? -1 : 1;
-                            int ea = intText(a, "episode", "episode_number", "ep", "number");
-                            int eb = intText(b, "episode", "episode_number", "ep", "number");
-                            return ea < eb ? -1 : (ea == eb ? 0 : 1);
-                        }
-                    });
-                    JSONArray episodeArray = new JSONArray();
-                    for (JSONObject episode : list) episodeArray.put(episode);
-                    item.put("series_episodes_json", episodeArray.toString());
-                }
-                result.put(item);
-            }
-        } catch (Throwable error) {
-            android.util.Log.w("CigramStage2", "Strict section extraction failed", error);
-        }
-        return result;
-    }
-
-    private static void collectStrictSectionContent(
-            Object node,
-            String inheritedType,
-            JSONObject parentSection,
-            String targetId,
-            String targetName,
-            String targetType,
-            java.util.ArrayList<JSONObject> out,
-            int depth
-    ) throws Exception {
-        if (node == null || node == JSONObject.NULL || depth > 14) return;
-
-        if (node instanceof String) {
-            String text = ((String) node).trim();
-            if (text.startsWith("[") || text.startsWith("{")) {
-                try {
-                    collectStrictSectionContent(
-                            new JSONTokener(text).nextValue(), inheritedType, parentSection,
-                            targetId, targetName, targetType, out, depth + 1);
-                } catch (Throwable ignored) { android.util.Log.w("CigramInjected", "compare", ignored); }
-            }
-            return;
-        }
-
-        if (node instanceof JSONArray) {
-            JSONArray array = (JSONArray) node;
-            for (int i = 0; i < array.length(); i++) {
-                collectStrictSectionContent(
-                        array.opt(i), inheritedType, parentSection,
-                        targetId, targetName, targetType, out, depth + 1);
-            }
-            return;
-        }
-
-        if (!(node instanceof JSONObject)) return;
-        JSONObject object = (JSONObject) node;
-
-        boolean hasContainer = false;
-        for (String key : new String[]{
-                "movies", "series", "items", "data", "results",
-                "content", "sections", "catalog", "entries"
-        }) {
-            Object child = object.opt(key);
-            if (child instanceof JSONArray || child instanceof JSONObject) {
-                hasContainer = true;
-                break;
-            }
-            if (child instanceof String) {
-                String text = ((String) child).trim();
-                if (text.startsWith("[") || text.startsWith("{")) {
-                    hasContainer = true;
-                    break;
-                }
-            }
-        }
-
-        boolean looksLikeContent = !hasContainer
-                && jsonText(object, "title", "series_title", "name", "title_ar", "title_en").length() > 0
-                && (object.has("id") || object.has("series_id") || object.has("poster")
-                    || object.has("video") || object.has("link") || object.has("type")
-                    || object.has("episodes") || object.has("seasons")
-                    || object.has("series_episodes_json"));
-
-        if (looksLikeContent) {
-            JSONObject item = normalizeSearchItem(object, inheritedType, parentSection);
-            if (strictSectionMatches(item, targetId, targetName, targetType)) {
-                out.add(item);
-            }
-            return;
-        }
-
-        JSONObject sectionContext = parentSection;
-        if (object.has("section_id") || object.has("section_name")) {
-            sectionContext = object;
-        } else if (object.has("id") && object.has("name") && hasContainer) {
-            sectionContext = object;
-        }
-
-        java.util.ArrayList<String> keys = new java.util.ArrayList<String>();
-        java.util.Iterator<String> iterator = object.keys();
-        while (iterator.hasNext()) keys.add(iterator.next());
-
-        for (String key : keys) {
-            Object child = object.opt(key);
-            String nextType = inheritedType;
-            if ("movies".equals(key)) nextType = "movie";
-            else if ("series".equals(key)) nextType = "series";
-
-            if (child instanceof JSONArray || child instanceof JSONObject || child instanceof String) {
-                collectStrictSectionContent(
-                        child, nextType, sectionContext,
-                        targetId, targetName, targetType, out, depth + 1);
-            }
-        }
-    }
-
     private static boolean strictSectionMatches(
             JSONObject item,
             String targetId,
@@ -4213,123 +3687,6 @@ public final class CigramStage1InitProvider extends ContentProvider {
         if (targetType.length() == 0) return true;
         String itemType = inferContentType(item, "");
         return targetType.equals(itemType);
-    }
-
-    private static View makeStrictSectionRow(
-            final Activity activity,
-            final JSONObject item
-    ) {
-        try {
-            final float d = activity.getResources().getDisplayMetrics().density;
-            final Typeface font = cigramTypeface(activity);
-
-            final LinearLayout row = new LinearLayout(activity);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-            row.setGravity(Gravity.RIGHT | Gravity.TOP);
-            row.setPadding(dpInt(activity, 10), dpInt(activity, 10),
-                    dpInt(activity, 10), dpInt(activity, 10));
-            row.setClickable(true);
-            row.setFocusable(true);
-
-            GradientDrawable rowBackground = new GradientDrawable();
-            rowBackground.setColor(0xFF06232D);
-            rowBackground.setCornerRadius(dp(activity, 16f));
-            rowBackground.setStroke(Math.max(1, dpInt(activity, 1)), 0xFF50656E);
-            row.setBackground(rowBackground);
-
-            final android.widget.ImageView posterView =
-                    new android.widget.ImageView(activity);
-            posterView.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
-            posterView.setAdjustViewBounds(true);
-            GradientDrawable posterBackground = new GradientDrawable();
-            posterBackground.setColor(0xFF1C1C20);
-            posterBackground.setCornerRadius(dp(activity, 14f));
-            posterView.setBackground(posterBackground);
-            if (Build.VERSION.SDK_INT >= 21) posterView.setClipToOutline(true);
-
-            LinearLayout.LayoutParams posterLp =
-                    new LinearLayout.LayoutParams(dpInt(activity, 112), dpInt(activity, 158));
-            posterLp.leftMargin = dpInt(activity, 12);
-            row.addView(posterView, posterLp);
-
-            LinearLayout details = new LinearLayout(activity);
-            details.setOrientation(LinearLayout.VERTICAL);
-            details.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-            details.setGravity(Gravity.RIGHT);
-            details.setPadding(0, dpInt(activity, 4), 0, 0);
-
-            String type = inferContentType(item, "");
-            String title = jsonText(item,
-                    "series_title", "title", "title_ar", "title_en", "original_title", "name");
-            if (title.length() == 0) title = "بدون عنوان";
-
-            TextView titleText = new TextView(activity);
-            titleText.setText(title);
-            titleText.setTextColor(Color.WHITE);
-            titleText.setTextSize(19f);
-            titleText.setGravity(Gravity.RIGHT);
-            titleText.setTextDirection(View.TEXT_DIRECTION_RTL);
-            titleText.setMaxLines(2);
-            titleText.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            titleText.setTypeface(font, Typeface.BOLD);
-            details.addView(titleText, new LinearLayout.LayoutParams(-1, -2));
-
-            String year = jsonText(item, "year", "release_year");
-            String category = jsonText(item, "category", "genre", "genres");
-            StringBuilder metaBuilder = new StringBuilder();
-            if (year.length() > 0) metaBuilder.append(year);
-            if (category.length() > 0) {
-                if (metaBuilder.length() > 0) metaBuilder.append(" · ");
-                metaBuilder.append(category);
-            }
-
-            TextView meta = new TextView(activity);
-            meta.setText(metaBuilder.toString());
-            meta.setTextColor(0xFF91A1A9);
-            meta.setTextSize(14f);
-            meta.setGravity(Gravity.RIGHT);
-            meta.setTextDirection(View.TEXT_DIRECTION_RTL);
-            meta.setTypeface(font);
-            LinearLayout.LayoutParams metaLp = new LinearLayout.LayoutParams(-1, -2);
-            metaLp.topMargin = dpInt(activity, 6);
-            details.addView(meta, metaLp);
-
-            String rating = jsonText(item, "imdb", "rating", "imdb_rating", "vote_average", "score");
-            if (rating.length() > 0) {
-                TextView imdb = new TextView(activity);
-                imdb.setText(imdbLogoText(activity, rating, 14f));
-                imdb.setTextColor(0xFF71D5BB);
-                imdb.setTextSize(14f);
-                imdb.setGravity(Gravity.RIGHT);
-                imdb.setTypeface(font, Typeface.BOLD);
-                LinearLayout.LayoutParams imdbLp = new LinearLayout.LayoutParams(-1, -2);
-                imdbLp.topMargin = dpInt(activity, 7);
-                details.addView(imdb, imdbLp);
-            }
-
-            row.addView(details, new LinearLayout.LayoutParams(
-                    0, dpInt(activity, 158), 1f));
-
-            String posterUrl = "series".equals(type)
-                    ? jsonText(item, "series_poster", "poster", "season_poster", "image", "backdrop")
-                    : jsonText(item, "poster", "image", "backdrop");
-            loadDynamicPoster(activity, posterUrl, posterView);
-
-            final String finalTitle = title;
-            attachDetailsWarmTouch(activity, row, item);
-            row.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(final View view) {
-                    // v5.29: open at once (the press animation used to delay the details page)
-                    openDynamicDetails(activity, item, finalTitle, view);
-                }
-            });
-
-            return row;
-        } catch (Throwable error) {
-            android.util.Log.w("CigramStage2", "Strict section row failed", error);
-            return null;
-        }
     }
 
     private static String clean(String value) {
@@ -6109,9 +5466,13 @@ public final class CigramStage1InitProvider extends ContentProvider {
                     @Override public void onClick(View view) {
                         try {
                             JSONObject active = stage3DetailsItem(activity);
+                            String relatedKey = "related:" + relatedIdentityKey(active);
+                            CigramSectionStore.put(relatedKey, new CigramSectionStore.Page("__related__", "ذات صلة",
+                                    inferContentType(active, ""), relatedItems(activity, active), true));
                             Class<?> sectionClass = Class.forName(
                                     activity.getPackageName() + ".SectionActivity");
                             android.content.Intent intent = new android.content.Intent(activity, sectionClass);
+                            intent.putExtra("section_key", relatedKey);
                             intent.putExtra("section_id", "__related__");
                             intent.putExtra("section_title", "ذات صلة");
                             intent.putExtra("section_name", "ذات صلة");

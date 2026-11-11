@@ -799,7 +799,7 @@ public final class CigramLivePlayer {
         top.addView(logoBox, new LinearLayout.LayoutParams(dp(a, 46), dp(a, 46)));
 
         top.addView(iconButton(a, new Ic(a, Ic.BACK), "رجوع", new View.OnClickListener() {
-            @Override public void onClick(View v) { a.finish(); }
+            @Override public void onClick(View v) { CigramNav.back(a); }
         }), btnLp(a, 6));
         s.controls.addView(top, new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
 

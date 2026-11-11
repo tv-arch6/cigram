@@ -563,7 +563,7 @@ public class MyContentActivity extends AppCompatActivity {
 				android.view.View view
 				) {
 					
-					finish();
+					CigramNav.back(MyContentActivity.this);
 				}
 			}
 			);
