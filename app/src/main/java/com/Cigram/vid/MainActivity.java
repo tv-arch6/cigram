@@ -113,11 +113,26 @@ public class MainActivity extends AppCompatActivity {
 		binding = MainBinding.inflate(getLayoutInflater());
 		setContentView(binding.getRoot());
 		initialize(_savedInstanceState);
+		if (_savedInstanceState != null) {
+			// restored after the system killed Home: the sections come back from the saved catalogue, the reader goes back where they were
+			CigramStage1InitProvider.restoreHomeScrollWhenReady(this, _savedInstanceState.getInt(STATE_SCROLL_Y, 0));
+		}
 		
 		// ANR fix: AdMob initialisation can block for seconds; run it off the main thread
 		CigramConsent.gather(this); // UMP consent (EEA/UK), then CigramAdManager starts the SDK off the main thread
 		
 		initializeLogic();
+	}
+	
+	private static final String STATE_SCROLL_Y = "cigram_home_scroll_y";
+	
+	@Override
+	protected void onSaveInstanceState(Bundle outState) {
+		super.onSaveInstanceState(outState);
+		try {
+			android.widget.ScrollView page = (android.widget.ScrollView) findViewById(R.id.vscroll1);
+			if (page != null) outState.putInt(STATE_SCROLL_Y, page.getScrollY());
+		} catch (Throwable ignored) { }
 	}
 	
 	private void initialize(Bundle _savedInstanceState) {

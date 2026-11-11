@@ -97,24 +97,24 @@ final class CigramTopBar {
         button.setElevation(CigramUI.dp(activity, 6));
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(CigramUI.dp(activity, 44), CigramUI.dp(activity, 44),
                 Gravity.TOP | Gravity.RIGHT);
-        int margin = CigramUI.dp(activity, 8);
-        lp.setMargins(margin, margin + statusBar(activity), margin, 0);
+        final int margin = CigramUI.dp(activity, 8);
+        lp.setMargins(margin, margin, margin, 0);
         content.addView(button, lp);
         button.bringToFront();
-    }
-
-    private static int statusBar(Activity activity) {
-        try {
-            int id = activity.getResources().getIdentifier("status_bar_height", "dimen", "android");
-            // pages that draw edge to edge need the inset; pages with a normal window already sit below the bar
-            boolean edge = (activity.getWindow().getAttributes().flags
-                    & android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS) != 0
-                    || (activity.getWindow().getDecorView().getSystemUiVisibility() & View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN) != 0
-                    || (activity.getWindow().getDecorView().getSystemUiVisibility() & View.SYSTEM_UI_FLAG_LAYOUT_STABLE) != 0;
-            return edge && id > 0 ? activity.getResources().getDimensionPixelSize(id) : 0;
-        } catch (Throwable error) {
-            return 0;
-        }
+        // a screen that draws edge to edge (the player) lets the status bar overlap the top of its content: sit below it. A screen whose
+        // window already starts under the status bar gets a zero inset and keeps the plain margin.
+        button.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+            @Override public android.view.WindowInsets onApplyWindowInsets(View v, android.view.WindowInsets insets) {
+                int wanted = margin + Math.max(0, insets.getSystemWindowInsetTop());
+                ViewGroup.LayoutParams current = v.getLayoutParams();
+                if (current instanceof FrameLayout.LayoutParams && ((FrameLayout.LayoutParams) current).topMargin != wanted) {
+                    ((FrameLayout.LayoutParams) current).topMargin = wanted;
+                    v.setLayoutParams(current);
+                }
+                return insets;
+            }
+        });
+        button.requestApplyInsets();
     }
 
     /** Finds the back button of a bar built here (or any view tagged as one). */

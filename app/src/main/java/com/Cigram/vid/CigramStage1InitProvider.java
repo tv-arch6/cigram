@@ -2142,6 +2142,30 @@ public final class CigramStage1InitProvider extends ContentProvider {
         }
     }
 
+    /**
+     * After the system killed Home (memory) and brought it back, the sections are drawn again from the saved catalogue a moment after
+     * onCreate: put the reader back where they were once the page is tall enough, and give up the moment they touch it.
+     */
+    static void restoreHomeScrollWhenReady(final Activity activity, final int y) {
+        if (y <= 0) return;
+        final long deadline = android.os.SystemClock.uptimeMillis() + 5000L;
+        MAIN.post(new Runnable() {
+            @Override public void run() {
+                if (!isAlive(activity) || homeBusyScrolling()) return;          // gone, or the reader has taken over
+                View view = findByIdName(activity, "vscroll1");
+                if (!(view instanceof android.widget.ScrollView)) return;
+                android.widget.ScrollView scroll = (android.widget.ScrollView) view;
+                View content = scroll.getChildAt(0);
+                boolean tallEnough = content != null && content.getHeight() >= y + scroll.getHeight();
+                if (tallEnough || android.os.SystemClock.uptimeMillis() >= deadline) {
+                    scroll.scrollTo(0, y);
+                    return;
+                }
+                MAIN.postDelayed(this, 120L);
+            }
+        });
+    }
+
     /** The skeleton MainActivity shows until the first sections are drawn. Gone on every way out of a render, so it can never stay on top. */
     private static void clearHomeLoading(Activity activity) {
         try {
@@ -2858,7 +2882,9 @@ public final class CigramStage1InitProvider extends ContentProvider {
     /** The one entry point of MainActivity's catalogue listener: keep the catalogue and draw every Home section (the two classic rows too) from it. */
     static void homeCatalogReceived(Activity activity, String catalogJson) {
         if (!isAlive(activity) || !looksLikeCatalogText(catalogJson)) return;
-        prepareAndStoreCatalogAsync(activity, catalogJson);
+        // the saved copy / the early download is already in memory and on disk: only a catalogue this process has not seen is stored
+        String known = CATALOG_MEMORY_JSON;
+        if (catalogJson != known && !catalogJson.equals(known)) prepareAndStoreCatalogAsync(activity, catalogJson);
         renderDynamicSections(activity, catalogJson);
     }
 

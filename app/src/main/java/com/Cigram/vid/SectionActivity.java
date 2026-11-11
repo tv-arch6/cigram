@@ -478,11 +478,19 @@ public class SectionActivity extends AppCompatActivity {
             card.addView(rank, rlp);
 
             attachPressFeedback(card);
-            return new Holder(card, poster, rank, title, meta, genres, synopsis, badges);
+            final Holder holder = new Holder(card, poster, rank, title, meta, genres, synopsis, badges);
+            card.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    int at = holder.getBindingAdapterPosition();
+                    if (at == RecyclerView.NO_POSITION || at >= rows.size()) return;
+                    CigramStage1InitProvider.openTitleDetails(host, rows.get(at).item, holder.poster);
+                }
+            });
+            return holder;
         }
 
         @Override
-        public void onBindViewHolder(final Holder h, int position) {
+        public void onBindViewHolder(Holder h, int position) {
             final Row row = rows.get(position);
             final int rankNumber = position + 1;
             h.title.setText(CigramPageKit.rtl(row.title));
@@ -504,13 +512,6 @@ public class SectionActivity extends AppCompatActivity {
             }
 
             CigramStage1InitProvider.loadPosterInto(host, row.item, h.poster);
-
-            h.card.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View v) {
-                    CigramStage1InitProvider.openTitleDetails(host, row.item, h.poster);
-                }
-            });
-
             animateIn(h.card, position);
         }
 

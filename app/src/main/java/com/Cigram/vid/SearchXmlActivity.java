@@ -1096,6 +1096,8 @@ public class SearchXmlActivity extends AppCompatActivity {
 				final String type=cgType[0];
 				final String year=cgFilters.getString("year","all"), category=cgFilters.getString("category","all");
 				final float rating=number(cgFilters.getString("imdb_min","0"));
+				// the first query of a session reads the index off the main thread: say so (a search the user started, not a load on open)
+				if(!loaded)showMessage("جارٍ البحث…");
 				ensureIndex(new java.lang.Runnable(){@Override public void run(){
 					if(token!=searchToken||isFinishing()||isDestroyed())return;
 					final org.json.JSONArray index=items;
