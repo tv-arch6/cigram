@@ -95,3 +95,9 @@ Performance Engine (§5) + Auto Repair (§2) + لوحة ايموجي بشبكة 
 الإدارة (جديد): `StudioUi`, `SubLabActivity`, `BulkPlan`, `BulkWizardActivity`, `LiveHealth(+Activity)`, `CgVault` + نسخ مجموعة المحادثة؛ معدَّل: `DxHomeActivity`, `CgCfg`, `CgBase`, `CgUi`, `DxUi`, `AdChatActivity`, `AdMedia`, `AdVoice`, `CxSeasonUploadActivity`.
 مشترك (`com.Cigram.subhub`): `SubEncoding`, `SubRepair`, `SubCleaner`, `SubAutoSync`, `SubTools`, `SubProviders`.
 أداة: `docs/tools/build_emoji_atlas.py` (يعيد بناء أطلس الايموجي).
+
+## 12. إصلاح البناء في CodeAssist (بعد التسليم الأول)
+**الخطأ:** `aapt2: resource style/Theme.MaterialComponents.DayNight.NoActionBar.Bridge not found` (ومعه `colorPrimary` و`windowActionBar`…).
+**السبب:** CodeAssist يقرأ `app/build.gradle.kts` وينزّل كل مكتبة مكتوبة فيه، حتى مكتبات الاختبار. مكتبة الاختبارات (Robolectric) اللي انضافت في 19.2 كسرت التنزيل كله، فما انربطت appcompat ولا material وما انلكت الثيمات.
+**الإصلاح:** رجّعت `app/build.gradle.kts` نفس النص اللي صدّره CodeAssist بالضبط (تغيّر بس `versionCode` و`versionName`). الإعدادات اللي يحتاجها Gradle وحده (خيارات الاختبار، Robolectric، استثناء ملف ViewBinding، ذاكرة الاختبارات) نقلتها لملف `gradle/gradle-only.gradle`، ويتطبّق من `build.gradle.kts` الرئيسي.
+**تم التحقق في Gradle:** بناء نظيف من الصفر، 229 اختبار بصفر فشل، وAPK إصدار بالكود 94 والنسخة 19.2.0 (والإدارة 154 اختبار بصفر فشل). **ما تحققت منه في CodeAssist نفسه** لأنه ما موجود هنا.
