@@ -292,10 +292,9 @@ final class CgUi {
 
     static LinearLayout card(Context c) {
         LinearLayout l = vbox(c);
-        l.setBackground(bg(c, CgCfg.CARD, 18, CgCfg.STROKE));
+        l.setBackground(bg(c, CgCfg.CARD, 18, CgCfg.STROKE));      // Studio: a hairline instead of a shadow
         int p = dp(c, 16);
         l.setPadding(p, p, p, p);
-        elevate(l, 3);
         return l;
     }
 
@@ -660,7 +659,14 @@ final class CgUi {
                 view.addView(b, bp);
             }
             LinearLayout mid = vbox(a);
-            titleView = text(a, title, 21, CgCfg.TEXT, true);
+            titleView = text(a, title, 20, CgCfg.TEXT, true);
+            // Studio mark: a small red bar in front of every screen title (the app's one accent)
+            GradientDrawable mark = new GradientDrawable();
+            mark.setColor(CgCfg.ACCENT_D);
+            mark.setCornerRadius(dp(a, 2));
+            mark.setSize(dp(a, 4), dp(a, 20));
+            titleView.setCompoundDrawablesWithIntrinsicBounds(null, null, mark, null);
+            titleView.setCompoundDrawablePadding(dp(a, 9));
             mid.addView(titleView, new LinearLayout.LayoutParams(MATCH, WRAP));
             subtitleView = muted(a, "");
             subtitleView.setVisibility(View.GONE);

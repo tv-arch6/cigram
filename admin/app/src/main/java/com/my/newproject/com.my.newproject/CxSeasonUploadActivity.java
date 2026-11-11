@@ -113,6 +113,19 @@ public class CxSeasonUploadActivity extends CxBase implements CgUploadManager.Li
             }
         }
         showStep(startStep);
+        // 3.0 Bulk Upload Wizard: the files were picked (and checked) in the wizard; they arrive here already loaded
+        try {
+            ArrayList<Uri> fromWizard = getIntent().getParcelableArrayListExtra("wizard_uris");
+            if (fromWizard != null && !fromWizard.isEmpty()) {
+                int ws = getIntent().getIntExtra("wizard_season", 0);
+                if (ws > 0 && getIntent().getIntExtra("season", 0) <= 0) defSeason = ws;
+                int ignored = addFiles(fromWizard);
+                if (step == 1) showStep(1);
+                snack(fromWizard.size() - ignored + " ملف من معالج الرفع الجماعي" + (startStep == 0 ? " — اختر المسلسل للمتابعة." : "."), CxUi.GOOD);
+            }
+        } catch (Throwable wizardError) {
+            Log.w(CgMediaAnalyzer.TAG, "wizard files not loaded", wizardError);
+        }
     }
 
     @Override

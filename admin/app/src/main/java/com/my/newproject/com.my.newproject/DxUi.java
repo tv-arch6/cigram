@@ -55,10 +55,9 @@ final class DxUi {
     /** Softly-lifted rounded card with comfortable padding. */
     static LinearLayout card(Context c) {
         LinearLayout l = CgUi.vbox(c);
-        l.setBackground(CgUi.bg(c, CgCfg.CARD, 20, 0));
+        l.setBackground(CgUi.bg(c, CgCfg.CARD, 20, CgCfg.STROKE));
         int p = dp(c, 16);
         l.setPadding(p, p, p, p);
-        CgUi.elevate(l, 3);
         return l;
     }
 

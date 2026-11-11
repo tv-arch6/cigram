@@ -58,6 +58,7 @@ public abstract class CgBase extends Activity {
         column.addView(body, new LinearLayout.LayoutParams(CgUi.MATCH, 0, 1f));
         frame.addView(column, new FrameLayout.LayoutParams(CgUi.MATCH, CgUi.MATCH));
         setContentView(frame);
+        CgVault.apply(this);              // 3.0 privacy: screen guard (when the admin switched it on)
         CgSystemBars.fit(this);           // Android 15+ / targetSdk 35+: keep the page between the bars and above the keyboard
         CgUi.applyTree(frame);            // the app font on every text, including views added later
         try {
@@ -70,8 +71,21 @@ public abstract class CgBase extends Activity {
     }
 
     @Override
+    protected void onPause() {
+        CgVault.onPause();
+        super.onPause();
+    }
+
+    @Override
+    protected void onActivityResult(int request, int result, android.content.Intent data) {
+        super.onActivityResult(request, result, data);
+        CgVault.onResult(this, request, result);
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
+        CgVault.onResume(this);           // 3.0 privacy: app lock after a minute in the background (when switched on)
         // any screen that got a 401 asks for the token again (it was wrong, or never entered)
         if (CgHttp.unauthorized) {
             CgHttp.unauthorized = false;

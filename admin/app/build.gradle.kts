@@ -30,6 +30,12 @@ android {
     buildFeatures {
         viewBinding = true
     }
+
+    // 3.0: the UI tests (Robolectric) run the real Android view code on the JVM and need the app's assets
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 dependencies {
@@ -40,5 +46,17 @@ dependencies {
     implementation("com.google.firebase:firebase-messaging:24.1.2")
     implementation("androidx.databinding:viewbinding:8.2.0")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("org.json:json:20240303")
+}
+
+// The UI tests (Robolectric) need the Android runtime jar. Where Maven Central cannot be reached from the test JVM,
+// download it once and point ROBOLECTRIC_DEPS at its folder; without the variable Robolectric fetches it itself.
+tasks.withType<Test>().configureEach {
+    val deps = System.getenv("ROBOLECTRIC_DEPS")
+    if (deps != null && deps.isNotEmpty()) {
+        systemProperty("robolectric.offline", "true")
+        systemProperty("robolectric.dependency.dir", deps)
+    }
+    maxHeapSize = "2g"
 }

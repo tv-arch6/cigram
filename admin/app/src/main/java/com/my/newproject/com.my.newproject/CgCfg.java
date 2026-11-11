@@ -18,9 +18,28 @@ final class CgCfg {
 
     private static final String TOKEN_KEY = "admin_token";
 
+    private static final String TOKEN_SEALED_KEY = "admin_token_sealed";
+
+    /**
+     * 3.0: the token is kept ENCRYPTED (see {@link CgVault}). A plain token saved by an earlier version is sealed here
+     * once and its plain copy removed. Where sealing is impossible (Android 5.x) the previous behaviour stays.
+     */
     static void loadToken(android.content.Context c) {
         try {
-            TOKEN = c.getApplicationContext().getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE).getString(TOKEN_KEY, "").trim();
+            android.content.SharedPreferences p = c.getApplicationContext().getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE);
+            String sealed = p.getString(TOKEN_SEALED_KEY, "");
+            String plain = p.getString(TOKEN_KEY, "").trim();
+            String opened = sealed.length() > 0 ? CgVault.open(sealed) : null;
+            if (opened != null && opened.trim().length() > 0) {
+                TOKEN = opened.trim();
+                if (plain.length() > 0) p.edit().remove(TOKEN_KEY).apply();
+                return;
+            }
+            TOKEN = plain;
+            if (plain.length() > 0) {                                  // migrate the plain copy
+                String s = CgVault.seal(plain);
+                if (s != null && plain.equals(CgVault.open(s))) p.edit().putString(TOKEN_SEALED_KEY, s).remove(TOKEN_KEY).apply();
+            }
         } catch (Exception e) {
             TOKEN = "";
         }
@@ -29,7 +48,11 @@ final class CgCfg {
     static void saveToken(android.content.Context c, String token) {
         TOKEN = token == null ? "" : token.trim();
         try {
-            c.getApplicationContext().getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE).edit().putString(TOKEN_KEY, TOKEN).apply();
+            android.content.SharedPreferences.Editor e = c.getApplicationContext().getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE).edit();
+            String s = TOKEN.length() == 0 ? null : CgVault.seal(TOKEN);
+            if (s != null && TOKEN.equals(CgVault.open(s))) e.putString(TOKEN_SEALED_KEY, s).remove(TOKEN_KEY);
+            else e.putString(TOKEN_KEY, TOKEN).remove(TOKEN_SEALED_KEY);
+            e.apply();
         } catch (Exception ignored) { }
     }
 
@@ -39,20 +62,22 @@ final class CgCfg {
 
     static final String PREFS = "cigram_admin_v2";
 
-    // 2026 Cigram identity: the same charcoal ladder as the Cigram app (near-black page, four graduated surfaces),
+    // 3.0 «Cigram Studio»: cool graphite surfaces separated by one hairline (the previous warm charcoal ladder is gone);
+    // red stays the one primary colour, gold the second accent. Every screen reads its colours from here.
+    // (2026 note kept for history) Cigram identity: the same charcoal ladder as the Cigram app (near-black page, four graduated surfaces),
     // the Cigram red as the one primary action colour and Cigram gold as the second accent. Only the values changed
     // (every screen reads them from here), so no screen logic is touched.
-    static final int PAGE = 0xFF0B0B0D;      // window / page background (deepest)
-    static final int PAGE2 = 0xFF111114;     // hero / header wash
-    static final int CARD = 0xFF16161A;      // cards
-    static final int CARD2 = 0xFF1E1E23;     // raised / pressed / tonal surfaces
-    static final int CARD3 = 0xFF27272D;     // highest surface (chips, inner tiles)
-    static final int STROKE = 0xFF303037;    // dividers, hairlines
-    static final int STROKE_SOFT = 0xFF222228; // barely-there separators
-    static final int FIELD = 0xFF101013;     // text inputs
-    static final int TEXT = 0xFFF5F5F7;      // primary text
-    static final int MUTED = 0xFFA1A1AA;     // secondary text
-    static final int FAINT = 0xFF71717A;     // tertiary / faint captions
+    static final int PAGE = 0xFF0A0B0E;      // window / page background (deepest)
+    static final int PAGE2 = 0xFF0F1116;     // hero / header wash
+    static final int CARD = 0xFF12141A;      // cards
+    static final int CARD2 = 0xFF191C24;     // raised / pressed / tonal surfaces
+    static final int CARD3 = 0xFF222632;     // highest surface (chips, inner tiles)
+    static final int STROKE = 0xFF252A35;    // dividers, hairlines
+    static final int STROKE_SOFT = 0xFF1B1F28; // barely-there separators
+    static final int FIELD = 0xFF0E1015;     // text inputs
+    static final int TEXT = 0xFFF4F5F7;      // primary text
+    static final int MUTED = 0xFF9BA1AE;     // secondary text
+    static final int FAINT = 0xFF687080;     // tertiary / faint captions
     static final int ON_ACCENT = 0xFFFFFFFF; // text on accent fills
 
     static final int ACCENT = 0xFFFF6A5E;    // links, icons, selection (light Cigram red, readable on charcoal)
