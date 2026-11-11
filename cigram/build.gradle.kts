@@ -3,3 +3,11 @@
 plugins {
     id("com.android.application") version "8.13.0" apply false
 }
+
+// Gradle-only test / build settings live in gradle/gradle-only.gradle, NOT in app/build.gradle.kts: CodeAssist reads
+// that file and must only see the app's real dependencies (a test library there broke its dependency download).
+subprojects {
+    pluginManager.withPlugin("com.android.application") {
+        apply(from = rootProject.file("gradle/gradle-only.gradle"))
+    }
+}

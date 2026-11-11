@@ -1,0 +1,36 @@
+// Settings for a plain Gradle build ONLY (Android Studio, the GitHub workflow, the command line).
+//
+// CodeAssist reads app/build.gradle.kts and downloads every dependency written there (test ones included). The JVM /
+// UI test setup (Robolectric) used to sit in that file and broke CodeAssist's dependency download: no appcompat /
+// material resources -> "resource style/Theme.MaterialComponents... not found". So app/build.gradle.kts stays exactly
+// as CodeAssist exports it, and everything that only Gradle needs is applied from here (see the root build.gradle.kts).
+
+android {
+    testOptions {
+        // JVM unit tests call code that logs through android.util.Log: the stub android.jar returns defaults
+        unitTests.returnDefaultValues = true
+        // the UI tests (Robolectric) run the real Android view code on the JVM and need the app's resources and assets
+        unitTests.includeAndroidResources = true
+    }
+}
+
+dependencies {
+    testImplementation "org.robolectric:robolectric:4.14.1"
+}
+
+// The ViewBinding stub in src/main/java exists for CodeAssist (it generates the binding classes but does not add the
+// library). Gradle adds the official library itself, so its Java compiler skips the stub: no duplicate class.
+tasks.withType(JavaCompile).configureEach {
+    exclude "androidx/viewbinding/ViewBinding.java"
+}
+
+// Robolectric needs the Android runtime jar. Where Maven Central cannot be reached from the test JVM, download it once
+// and point ROBOLECTRIC_DEPS at its folder; without the variable Robolectric fetches it itself.
+tasks.withType(Test).configureEach {
+    def deps = System.getenv("ROBOLECTRIC_DEPS")
+    if (deps != null && !deps.isEmpty()) {
+        systemProperty "robolectric.offline", "true"
+        systemProperty "robolectric.dependency.dir", deps
+    }
+    maxHeapSize = "2g"
+}
