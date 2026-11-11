@@ -120,7 +120,7 @@ public class PlayerActivity extends AppCompatActivity {
 	@Override
 	protected void onCreate(Bundle _savedInstanceState) {
 		super.onCreate(_savedInstanceState);
-		// Companion player (com.cigram.player): plays the title and serves the Cigram campaigns. Falls back to this player.
+		// 19.2.1: one player for every film and episode — the companion hand-off is off (CigramPlayerLauncher.isEnabled).
 		if (CigramPlayerLauncher.forward(this, getIntent())) { finish(); return; }
 		binding = PlayerBinding.inflate(getLayoutInflater());
 		setContentView(binding.getRoot());
@@ -1790,14 +1790,36 @@ public class PlayerActivity extends AppCompatActivity {
 			}
 			
 			android.graphics.drawable.Drawable makeBackground(int kind) {
-				// 19.2 «Cigram Signature»: round red play button in a red-to-gold ring, glass discs for the seek buttons
-				return CigramPlayerButtons.background(kind, dp);
+				android.graphics.drawable.GradientDrawable shape = new android.graphics.drawable.GradientDrawable();
+				android.graphics.drawable.GradientDrawable mask = new android.graphics.drawable.GradientDrawable();
+				mask.setColor(android.graphics.Color.WHITE);
+				if (kind == 2) {
+					shape.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+					shape.setCornerRadius(26f * dp);
+					shape.setOrientation(android.graphics.drawable.GradientDrawable.Orientation.TL_BR);
+					shape.setColors(new int[]{0xFFFF3B2F, 0xFFE21B14, 0xFFB0100C});
+					shape.setStroke(Math.max(1, (int) (1f * dp)), 0x40FFFFFF);
+					mask.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+					mask.setCornerRadius(26f * dp);
+				} else if (kind == 1) {
+					shape.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+					shape.setColor(0x4D000000);
+					shape.setStroke(Math.max(1, (int) (1.2f * dp)), 0x33FFFFFF);
+					mask.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+				} else {
+					shape.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+					shape.setColor(0x00000000);
+					mask.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+				}
+				return new android.graphics.drawable.RippleDrawable(
+				android.content.res.ColorStateList.valueOf(kind == 2 ? 0x55FFFFFF : 0x33FFFFFF), shape, mask);
 			}
 			
 			void apply(android.widget.ImageButton button, int iconType, boolean mainButton) {
 				boolean plain = iconType == ICON_PREVIOUS || iconType == ICON_NEXT;
 				button.setBackground(makeBackground(mainButton ? 2 : plain ? 0 : 1));
-				button.setImageDrawable(new CigramPlayerButtons.Icon(iconType, cgPlayerPrefs));
+				button.setImageDrawable(new ControlIcon(iconType));
+				button.setColorFilter(android.graphics.Color.WHITE, android.graphics.PorterDuff.Mode.SRC_IN);
 				button.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
 				int padding = (int) ((mainButton ? 19f : plain ? 11f : 12f) * dp);
 				button.setPadding(padding, padding, padding, padding);
@@ -1812,7 +1834,8 @@ public class PlayerActivity extends AppCompatActivity {
 			}
 			
 			void setPlayState(android.widget.ImageButton button, boolean playing) {
-				button.setImageDrawable(new CigramPlayerButtons.Icon(playing ? ICON_PAUSE : ICON_PLAY, cgPlayerPrefs));
+				button.setImageDrawable(new ControlIcon(playing ? ICON_PAUSE : ICON_PLAY));
+				button.setColorFilter(android.graphics.Color.WHITE, android.graphics.PorterDuff.Mode.SRC_IN);
 			}
 			
 			void press(final android.view.View button) {
@@ -2835,13 +2858,11 @@ public class PlayerActivity extends AppCompatActivity {
 						new android.app.AlertDialog.Builder(PlayerActivity.this)
 						.setTitle("تعذّر إصلاح البث")
 						.setMessage(message)
-						.setCancelable(false)
+						.setCancelable(true)   // 19.2.1: the dialog never closes the player; the viewer decides
 						.setPositiveButton("إعادة المحاولة", new android.content.DialogInterface.OnClickListener() {
 							@Override public void onClick(android.content.DialogInterface d, int w) { retry.run(); }
 						})
-						.setNegativeButton("رجوع", new android.content.DialogInterface.OnClickListener() {
-							@Override public void onClick(android.content.DialogInterface d, int w) { finish(); }
-						})
+						.setNegativeButton("إغلاق", null)
 						.show();
 					} catch (Throwable ignored) { }
 				}
@@ -3034,7 +3055,7 @@ public class PlayerActivity extends AppCompatActivity {
 					
 				} else {
 					
-					exoPlayer.seekTo(
+					CigramSeekGuard.cancel(); exoPlayer.seekTo(
 					0L
 					);
 				}
@@ -3059,7 +3080,7 @@ public class PlayerActivity extends AppCompatActivity {
 				long current =
 				Math.max(
 				0L,
-				exoPlayer.getCurrentPosition()
+				CigramSeekGuard.pendingTarget() >= 0L ? CigramSeekGuard.pendingTarget() : exoPlayer.getCurrentPosition()   // 19.2.1: repeated taps add up
 				);
 				
 				
@@ -3070,7 +3091,8 @@ public class PlayerActivity extends AppCompatActivity {
 				);
 				
 				
-				exoPlayer.seekTo(
+				CigramSeekGuard.seek(   // 19.2.1: same seek path as the bar
+				exoPlayer,
 				target
 				);
 				
@@ -3137,7 +3159,7 @@ public class PlayerActivity extends AppCompatActivity {
 				long current =
 				Math.max(
 				0L,
-				exoPlayer.getCurrentPosition()
+				CigramSeekGuard.pendingTarget() >= 0L ? CigramSeekGuard.pendingTarget() : exoPlayer.getCurrentPosition()   // 19.2.1: repeated taps add up
 				);
 				
 				
@@ -3167,7 +3189,8 @@ public class PlayerActivity extends AppCompatActivity {
 				}
 				
 				
-				exoPlayer.seekTo(
+				CigramSeekGuard.seek(   // 19.2.1: same seek path as the bar
+				exoPlayer,
 				Math.max(
 				0L,
 				target
@@ -3587,7 +3610,7 @@ public class PlayerActivity extends AppCompatActivity {
 				CigramSeekPreview.start(PlayerActivity.this, bar, exoPlayer);
 				
 				pendingSeekPosition[0] =
-				playerTimeEngine.getPositionMs();
+				CigramSeekGuard.pendingTarget() >= 0L ? CigramSeekGuard.pendingTarget() : playerTimeEngine.getPositionMs();
 				
 				
 				if (
@@ -3671,7 +3694,7 @@ public class PlayerActivity extends AppCompatActivity {
 		playerHost,
 		new CigramSkipIntro.Host() {
 			@Override public void seekTo(long ms) {
-				try { exoPlayer.seekTo(Math.max(0L, ms)); } catch (Throwable ignored) {}
+				try { CigramSeekGuard.cancel(); exoPlayer.seekTo(Math.max(0L, ms)); } catch (Throwable ignored) {}
 			}
 			@Override public boolean isSeries() { return isSeries; }
 			@Override public boolean hasNext() {
@@ -3769,13 +3792,15 @@ public class PlayerActivity extends AppCompatActivity {
 					// Current time
 					// ---------------------------------------------
 					
+					// 19.2.1: a seek that waits for its part of an embed stream is shown at once at its target
+					final long cgShownPosition = CigramSeekGuard.pendingTarget() >= 0L ? CigramSeekGuard.pendingTarget() : position;
 					if (
 					!dragging[0]
 					) {
 						
 						currentTime.setText(
 						playerTimeEngine.format(
-						position
+						cgShownPosition
 						)
 						);
 					}
@@ -3834,7 +3859,7 @@ public class PlayerActivity extends AppCompatActivity {
 							
 							timeBar.setProgress(
 							playerTimeEngine.getPositionSeconds(
-							position,
+							cgShownPosition,
 							maxSeconds
 							)
 							);
@@ -4826,7 +4851,7 @@ public class PlayerActivity extends AppCompatActivity {
 				long current =
 				Math.max(
 				0L,
-				exoPlayer.getCurrentPosition()
+				CigramSeekGuard.pendingTarget() >= 0L ? CigramSeekGuard.pendingTarget() : exoPlayer.getCurrentPosition()   // 19.2.1: repeated taps add up
 				);
 				
 				
@@ -4847,7 +4872,8 @@ public class PlayerActivity extends AppCompatActivity {
 					);
 					
 					
-					exoPlayer.seekTo(
+					CigramSeekGuard.seek(   // 19.2.1: same seek path as the bar
+				exoPlayer,
 					target
 					);
 					
@@ -4884,7 +4910,8 @@ public class PlayerActivity extends AppCompatActivity {
 					}
 					
 					
-					exoPlayer.seekTo(
+					CigramSeekGuard.seek(   // 19.2.1: same seek path as the bar
+				exoPlayer,
 					Math.max(
 					0L,
 					target
@@ -8877,7 +8904,7 @@ public class PlayerActivity extends AppCompatActivity {
 						cgCasting[0] = false;
 						cgCastLoadedUrl[0] = "";
 						
-						exoPlayer.seekTo(Math.max(0L, position));
+						CigramSeekGuard.cancel(); exoPlayer.seekTo(Math.max(0L, position));
 						exoPlayer.setPlayWhenReady(shouldPlay);
 						
 						uiHandler.removeCallbacks(updateProgress);
@@ -8924,7 +8951,7 @@ public class PlayerActivity extends AppCompatActivity {
 							long target =
 							Math.max(
 							0L,
-							exoPlayer.getCurrentPosition() + delta
+							(CigramSeekGuard.pendingTarget() >= 0L ? CigramSeekGuard.pendingTarget() : exoPlayer.getCurrentPosition()) + delta
 							);
 							
 							long duration = exoPlayer.getDuration();
@@ -8937,7 +8964,7 @@ public class PlayerActivity extends AppCompatActivity {
 								target = Math.min(target, duration);
 							}
 							
-							exoPlayer.seekTo(target);
+							CigramSeekGuard.seek(exoPlayer, target);   // 19.2.1: the ±10 buttons and the bar use one seek path
 							
 							return;
 						}

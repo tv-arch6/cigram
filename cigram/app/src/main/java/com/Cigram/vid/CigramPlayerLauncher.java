@@ -38,10 +38,14 @@ final class CigramPlayerLauncher {
         }
     }
 
+    /**
+     * 19.2.1: OFF for good. Titles with a direct link were handed to the companion app while embed titles stayed
+     * here, so the viewer saw two different players (and the companion one had none of this player's seek and
+     * repair work). Every film and every episode now opens in this app's own player. The class is kept so the
+     * companion can be brought back deliberately later; the ads logic reads this too (no companion = in-app ads).
+     */
     static boolean isEnabled(Context c) {
-        if (!BuildConfig.EXTERNAL_PLAYER) return false;
-        SharedPreferences p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        return p.getBoolean(KEY_EXTERNAL, true);
+        return false;
     }
 
     static void setEnabled(Context c, boolean on) {

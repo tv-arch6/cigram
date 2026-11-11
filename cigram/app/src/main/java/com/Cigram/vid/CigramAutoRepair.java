@@ -14,10 +14,19 @@ import android.os.SystemClock;
  * <ol>
  *   <li><b>an error</b> (the player stopped with a PlaybackException): classified and repaired by the ladder of
  *   {@link CigramRepairPlan};</li>
- *   <li><b>a broken stream</b>: «buffering» for 18 s while NOTHING arrives (the buffered amount does not grow). A slow
- *   but living connection is left alone — it only gets a «الاتصال بطيء» note;</li>
- *   <li><b>a frozen picture</b>: the player says it is playing but the position has not moved for 8 s.</li>
+ *   <li><b>a broken stream</b>: «buffering» for 40 s while NOTHING arrives (the buffered amount does not grow). A slow
+ *   but living connection is left alone — it only gets a «الاتصال بطيء» note.</li>
  * </ol>
+ *
+ * 19.2.1 — the watchdog never stops a film by itself any more:
+ * <ul>
+ *   <li>the «frozen picture» guess (playing, but the clock stood still for 8 s) is gone: it also fired on a healthy
+ *   film (an audio clock that pauses for a moment, a seek being prepared) and reopened it again and again until the
+ *   «تعذّر إصلاح البث» dialog closed the player — the stops the viewers reported;</li>
+ *   <li>a waiting stream is waited for patiently (40 s with nothing arriving, nothing while a seek is prepared) and is
+ *   only reopened, never given up: when its ladder ends it simply starts over after the next 40 s;</li>
+ *   <li>only a real player error can end in the dialog, and that dialog no longer closes the player.</li>
+ * </ul>
  *
  * Every repair goes through the screen's own loader (the same code that opened the title), at the second where
  * playback stopped minus two seconds, so no line of dialogue is lost. What a repair learned is remembered for the
@@ -47,7 +56,7 @@ final class CigramAutoRepair {
     }
 
     static final String PREFS = "cigram_auto_repair";
-    private static final long TICK_MS = 1000, HUNG_MS = 18000, FROZEN_MS = 8000, HEALTHY_MS = 8000, LOAD_GRACE_MS = 20000;
+    private static final long TICK_MS = 1000, HUNG_MS = 40000, HEALTHY_MS = 8000, LOAD_GRACE_MS = 20000;
 
     private final Host host;
     private final Handler ui;
@@ -103,6 +112,7 @@ final class CigramAutoRepair {
     /** The loader calls this when it starts (or restarts) a stream: the watchdog gives it time to become ready. */
     void onLoadStarted() {
         long now = SystemClock.elapsedRealtime();
+        gaveUp = false;                                        // a new load (another episode, a retry) is watched again
         loadStartedAt = now;
         lastMoveAt = lastBufferGrowAt = now;
         lastPosition = -1;
@@ -178,18 +188,15 @@ final class CigramAutoRepair {
         if (buffered > lastBuffered + 200) lastBufferGrowAt = now;
         lastBuffered = buffered;
 
-        if (!wants || state == com.google.android.exoplayer2.Player.STATE_ENDED || state == com.google.android.exoplayer2.Player.STATE_IDLE) {
-            lastMoveAt = lastBufferGrowAt = now;               // paused / finished / not started: nothing to repair
+        if (!wants || state == com.google.android.exoplayer2.Player.STATE_ENDED || state == com.google.android.exoplayer2.Player.STATE_IDLE
+                || CigramSeekGuard.pendingTarget() >= 0L) {
+            lastMoveAt = lastBufferGrowAt = now;               // paused / finished / not started / a seek is prepared: nothing to repair
             return;
         }
         boolean inGrace = now - loadStartedAt < LOAD_GRACE_MS;
 
-        if (state == com.google.android.exoplayer2.Player.STATE_READY && p.isPlaying()) {
-            if (now - lastMoveAt >= FROZEN_MS && !inGrace) {   // "playing", but the picture stands still
-                rememberPosition(p);
-                beginOrContinue(CigramRepairPlan.STALL, 0);
-                return;
-            }
+        if (state == com.google.android.exoplayer2.Player.STATE_READY) {
+            lastBufferGrowAt = now;                            // ready = the film can go on: never a "broken stream"
             if (attempt > 0 || incidentKind != 0) {
                 if (healthySince == 0) healthySince = now;
                 if (now - healthySince >= HEALTHY_MS) incidentOver();
@@ -236,6 +243,17 @@ final class CigramAutoRepair {
         if (action == CigramRepairPlan.WAIT_NETWORK) {
             waitingNetwork = true;
             host.status(CigramRepairPlan.statusText(action, attempt));
+            return;
+        }
+        if (action == CigramRepairPlan.GIVE_UP && kind == CigramRepairPlan.STALL) {
+            // a stream that waits is not a broken film: no dialog, the ladder starts over after the next long wait
+            incidentKind = 0;
+            attempt = 0;
+            long now = SystemClock.elapsedRealtime();
+            lastMoveAt = lastBufferGrowAt = now;
+            slowNoteAt = now;
+            host.status(CigramPlaybackError.hasNetwork(app) ? "الاتصال بطيء — يتم التحميل…" : "لا يوجد اتصال بالإنترنت");
+            ui.postDelayed(clearSlowNote, 5000);
             return;
         }
         if (action == CigramRepairPlan.GIVE_UP) {

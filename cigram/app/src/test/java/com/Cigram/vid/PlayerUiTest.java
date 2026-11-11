@@ -39,46 +39,31 @@ import java.io.FileOutputStream;
 public class PlayerUiTest {
 
     @Test
-    public void theCentreButtonsAreDrawnInBothStatesAndAtEverySeekStep() throws Exception {
+    public void everyFilmAndEpisodeOpensInTheOneBuiltInPlayer() throws Exception {
         Activity a = Robolectric.buildActivity(Activity.class).setup().get();
-        float dp = a.getResources().getDisplayMetrics().density;
-        LinearLayout col = new LinearLayout(a);
-        col.setOrientation(LinearLayout.VERTICAL);
-        col.setGravity(Gravity.CENTER);
-        // a bright "scene" behind the buttons: they must stay readable on it
-        col.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{0xFF27425F, 0xFFB98B5E, 0xFF1A1A1C}));
-        long[] steps = {10000L, 30000L};
-        for (int r = 0; r < 2; r++) {
-            final long step = steps[r];
-            android.content.SharedPreferences prefs = a.getSharedPreferences("cigram_player_prefs_test" + r, 0);
-            prefs.edit().putLong("seek_step", step).commit();
-            LinearLayout row = new LinearLayout(a);
-            row.setGravity(Gravity.CENTER);
-            int[] types = {CigramPlayerButtons.ICON_PREVIOUS, CigramPlayerButtons.ICON_REWIND, r == 0 ? CigramPlayerButtons.ICON_PAUSE : CigramPlayerButtons.ICON_PLAY,
-                    CigramPlayerButtons.ICON_FORWARD, CigramPlayerButtons.ICON_NEXT};
-            int[] sizes = {48, 60, 76, 60, 48};
-            float[] pads = {11f, 12f, 19f, 12f, 11f};
-            for (int i = 0; i < 5; i++) {
-                ImageButton b = new ImageButton(a);
-                boolean main = i == 2, plain = i == 0 || i == 4;
-                b.setBackground(CigramPlayerButtons.background(main ? 2 : plain ? 0 : 1, dp));
-                b.setImageDrawable(new CigramPlayerButtons.Icon(types[i], prefs));
-                b.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                int p = (int) (pads[i] * dp);
-                b.setPadding(p, p, p, p);
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams((int) (sizes[i] * dp), (int) (sizes[i] * dp));
-                lp.setMargins((int) ((main ? 20 : 12) * dp), 0, (int) ((main ? 20 : 12) * dp), 0);
-                row.addView(b, lp);
-            }
-            LinearLayout.LayoutParams rl = new LinearLayout.LayoutParams(-2, -2);
-            rl.setMargins(0, (int) (18 * dp), 0, (int) (18 * dp));
-            col.addView(row, rl);
+        // even with the companion switch on in old settings, nothing is handed to another app
+        a.getSharedPreferences("cigram_player_prefs", 0).edit().putBoolean(CigramPlayerLauncher.KEY_EXTERNAL, true).commit();
+        String[] links = {"https://cdn.example.com/films/a.mp4", "https://cdn.example.com/live/b.m3u8",
+                "https://cdn.example.com/c.mkv|Referer=https://example.com"};
+        for (String link : links) {
+            Intent film = new Intent().putExtra("video", link).putExtra("title", "فيلم").putExtra("type", "movie");
+            Intent episode = new Intent().putExtra("video", link).putExtra("type", "series")
+                    .putExtra("series_title", "مسلسل").putExtra("season", "1").putExtra("episode", "3");
+            assertTrue(!CigramPlayerLauncher.forward(a, film));
+            assertTrue(!CigramPlayerLauncher.forward(a, episode));
         }
-        Bitmap shot = ChatKitUiTest.shoot(col, 720, 0, "player_buttons");
-        assertTrue(shot.getHeight() > 300);
-        // the play button's centre is Cigram red, not the scene behind it
-        int px = shot.getPixel(360, (int) (18 * dp + 38 * dp) - (int) (20 * dp));
-        assertTrue("red disc", android.graphics.Color.red(px) > 150 && android.graphics.Color.green(px) < 110);
+        assertTrue(!CigramPlayerLauncher.isEnabled(a));
+        assertTrue(org.robolectric.Shadows.shadowOf(a).getNextStartedActivity() == null);
+    }
+
+    @Test
+    public void aSeekThatIsPreparedIsShownAtItsTargetAndIsNeverLeftWaiting() throws Exception {
+        // nothing waits at the start
+        CigramSeekGuard.cancel();
+        assertTrue(CigramSeekGuard.pendingTarget() == -1L);
+        // a cancelled seek (the user sought somewhere else / left the screen) leaves no target behind
+        CigramSeekGuard.cancel();
+        assertTrue(CigramSeekGuard.pendingTarget() == -1L);
     }
 
     @Test

@@ -17,6 +17,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  * is while the target is asked for, again and again (a new cache key each time, which also makes the server
  * prepare it); the moment the target is there the player moves to it. Nothing is shown on screen meanwhile.
  * A target that is already buffered, a normal file or a channel are sought at once, exactly as before.
+ *
+ * 19.2.1: the seek bar and the clock show the TARGET while it is prepared ({@link #pendingTarget}): before, the bar
+ * jumped back to the old position on release and the seek looked as if it had failed. The wait is limited to 45 s
+ * (then the player is moved there anyway and buffers), and the ±10 s buttons and the double tap use this same path.
  */
 final class CigramSeekGuard {
 
@@ -30,13 +34,21 @@ final class CigramSeekGuard {
     });
     private static final AtomicInteger GENERATION = new AtomicInteger();
     /** How long the film keeps playing while the target is prepared; then the seek is made anyway. */
-    private static final long GIVE_UP_MS = 150000L;
+    private static final long GIVE_UP_MS = 45000L;
+    /** The target of a seek that is waiting for its part, -1 when none. */
+    private static volatile long PENDING = -1L;
+
+    /** Where the viewer asked to go while that part is prepared (-1 = no seek is waiting). */
+    static long pendingTarget() {
+        return PENDING;
+    }
 
     private CigramSeekGuard() { }
 
     /** A newer request (or leaving the screen) cancels the one waiting. */
     static void cancel() {
         GENERATION.incrementAndGet();
+        PENDING = -1L;
     }
 
     private static long indexTime(com.google.android.exoplayer2.source.hls.playlist.HlsMediaPlaylist mp, int i) {
@@ -45,6 +57,7 @@ final class CigramSeekGuard {
 
     static void seek(final ExoPlayer exo, final long target) {
         final int gen = GENERATION.incrementAndGet();
+        PENDING = -1L;
         try {
             Object manifest = exo.getCurrentManifest();
             if (!(manifest instanceof com.google.android.exoplayer2.source.hls.HlsManifest)) { exo.seekTo(target); return; }
@@ -65,6 +78,7 @@ final class CigramSeekGuard {
             if (CigramSegmentAccel.has(url) && CigramSegmentAccel.has(next)) { exo.seekTo(target); return; }
 
             final long startedAt = android.os.SystemClock.elapsedRealtime();
+            PENDING = target;
             POOL.execute(new Runnable() {
                 @Override public void run() {
                     while (gen == GENERATION.get()) {
@@ -75,6 +89,7 @@ final class CigramSeekGuard {
                             MAIN.post(new Runnable() {
                                 @Override public void run() {
                                     if (gen != GENERATION.get()) return;   // the user sought somewhere else meanwhile
+                                    PENDING = -1L;
                                     try { exo.seekTo(target); } catch (Throwable ignored) { }
                                 }
                             });
@@ -87,6 +102,7 @@ final class CigramSeekGuard {
             // start preparing it now (the piece itself is fetched by the download store as well)
             try { CigramSegmentAccel.prefetch(url); } catch (Throwable ignored) { }
         } catch (Throwable t) {
+            PENDING = -1L;
             try { exo.seekTo(target); } catch (Throwable ignored) { }
         }
     }
