@@ -193,6 +193,8 @@ function subsOsQueries(t) {
   if (subsOsId(t.tmdb_id)) add(Object.assign(tv ? { parent_tmdb_id: subsOsId(t.tmdb_id) } : { tmdb_id: subsOsId(t.tmdb_id) }, se));
   if (subsOsId(t.imdb_id)) add(Object.assign(tv ? { parent_imdb_id: subsOsId(t.imdb_id) } : { imdb_id: subsOsId(t.imdb_id) }, se));
   if (!out.length) add(Object.assign({ query: t.original || t.title }, se));
+  // 19.4: the byte hash of OUR video (see subhub_moviehash.js) rides on every variant; rows with moviehash_match are exact
+  if (/^[0-9a-f]{16}$/.test(cleanString(t.moviehash))) for (const q of out) q.moviehash = t.moviehash;
   return out;
 }
 
@@ -221,6 +223,7 @@ async function subsSearchOpenSubs(env, t) {
           author: cleanString(a.uploader && a.uploader.name), downloads: numOf(a.download_count), rating: Number(a.ratings) || 0,
           hi: Boolean(a.hearing_impaired), season: numOf(fd.season_number), episode: numOf(fd.episode_number), full_season: false, dl: "opensubtitles:" + file.file_id,
           trusted: Boolean(a.from_trusted), ai_translated: Boolean(a.ai_translated), machine_translated: Boolean(a.machine_translated), fps: Number(a.fps) || 0,
+          hash_match: Boolean(t.moviehash) && a.moviehash_match === true,   // 19.4: same release, byte-exact
         });
       }
       if (items.length) return { items };
@@ -623,5 +626,6 @@ const SUBHUB_ROUTES = (() => {
     "POST /admin/subhub/translate/batch": A("batch", handleSubhubBatch),
     "POST /admin/subhub/approval": A("approval", handleSubhubApproval),
     "GET /admin/subhub/approvals": A("approvals", handleSubhubApprovals),
+    "GET /admin/subhub/moviehash": A("moviehash", handleSubhubMovieHash),
   };
 })();

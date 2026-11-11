@@ -75,3 +75,16 @@ Not integrated. Their access methods and terms were not verified; never bypass C
 ## 19.0 (chat history, push, backups)
 `cigram-ads-api/apply_patch_19.py` (+ `chat19_hub_methods.js`, `chat19_functions.js`) is a second stage applied after `apply_patch.py` by `build_deploy.sh`.
 Tests: `tests/ads_chat19_test.mjs` (24). Owner scripts: `scripts/preflight_backup.sh`, `scripts/post_deploy_smoke.sh`. `../backups/2026-11-09/` holds the catalogue snapshot taken before this work (5,685 records, sha256 inside).
+
+## 19.4 — OpenSubtitles moviehash (byte-exact timing match), `cigram-admin-api/subhub_moviehash.js`
+A name / TMDB / IMDb search finds the right **title**; the timing only fits when the subtitle was made on the same **release**.
+OpenSubtitles identifies the release by the OSDb `moviehash` = `(size + Σ uint64_le(first 64 KiB) + Σ uint64_le(last 64 KiB)) mod 2^64`.
+- The Worker computes it from the R2 video itself (`MOVIES_BUCKET`): **one HEAD + two 64 KiB range reads**, never the whole file,
+  nothing uploaded. Cached per R2 key + etag (memory + `subhub/moviehash.json`), so a replaced video is hashed again.
+- Every OpenSubtitles query of a library movie / episode carries `moviehash`; rows with `moviehash_match` are flagged `hash_match`
+  and get +35 in the ranking. When a hash exists, OpenSubtitles is asked even after a good SubDL guess.
+- Never fatal: videos outside R2 (`not_r2`), files < 128 KiB (`too_small`), missing objects or R2 errors → the search runs as before.
+  `target.moviehash_state` says which. Custom domains serving the same bucket: optional var `MOVIES_PUBLIC_HOSTS` (comma list).
+- Diagnostics: `GET /admin/subhub/moviehash?item_id=…[&fresh=1]` (admin token).
+- Flow unchanged: search → result → approval. Tests: `tests/subhub_moviehash_test.mjs` (9, checked against an independent implementation
+  and the all-zero vector). Wyzie Subs and other aggregators/scrapers stay out (unknown file origin).

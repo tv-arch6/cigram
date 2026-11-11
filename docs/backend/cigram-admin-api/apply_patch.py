@@ -14,6 +14,7 @@ import sys
 
 src, dst = sys.argv[1], sys.argv[2]
 HUB_JS = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "subhub_providers.js"), encoding="utf-8").read()
+MH_JS = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "subhub_moviehash.js"), encoding="utf-8").read()
 FEED_JS = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "catalog_feed.js"), encoding="utf-8").read()
 s = open(src, encoding="utf-8").read()
 
@@ -101,7 +102,7 @@ async function handleWnDecisions(request, env) {
   return okResponse({ items: doc.items || {} });
 }
 
-''' + HUB_JS + FEED_JS + '''
+''' + HUB_JS + MH_JS + FEED_JS + '''
 // ----------------------------------------------------------------------------- route table
 ''')
 rep('''    "POST /admin/discover/collection": A(handleWnCollection),''', '''    "POST /admin/discover/collection": A(handleWnCollection),
@@ -172,6 +173,18 @@ rep("""      // Movies
 
       // Movies
       if (request.method === "GET" && path === "/movies") {""")
+
+# 19.4) moviehash: hash the R2 video once per search, always ask OpenSubtitles when we have it, byte matches first
+rep("""  const sources = [["subdl", subsSearchSubdl], ["subsource", subsSearchSubsource], ["opensubtitles", subsSearchOpenSubs]];""",
+    """  await subsAttachMovieHash(env, t);   // 19.4: two 64 KiB R2 range reads (cached per etag); never throws
+  const sources = [["subdl", subsSearchSubdl], ["subsource", subsSearchSubsource], ["opensubtitles", subsSearchOpenSubs]];""")
+rep("""    if (!all && usable) { status[name] = "not_needed"; continue; }""",
+    """    if (!all && usable && !(name === "opensubtitles" && t.moviehash)) { status[name] = "not_needed"; continue; }   // 19.4: a byte match beats a good guess""")
+rep("  if (c.ai_translated) s -= 8;\n", "  if (c.ai_translated) s -= 8;\n  if (c.hash_match) s += 35;   // 19.4: OpenSubtitles moviehash match = timing made on these exact bytes\n")
+rep("trusted: Boolean(c.trusted), dl: c.dl.startsWith(\"http\") ? \"\" : c.dl };",
+    "trusted: Boolean(c.trusted), hash_match: Boolean(c.hash_match), dl: c.dl.startsWith(\"http\") ? \"\" : c.dl };")
+rep("""season: t.season, episode: t.episode, release: t.release };""",
+    """season: t.season, episode: t.episode, release: t.release, moviehash: cleanString(t.moviehash), moviehash_state: cleanString(t.moviehash_state) };""")
 
 open(dst, "w", encoding="utf-8").write(s)
 print("patched:", dst)
