@@ -20,7 +20,7 @@ final class CgVidbolt {
     /** True for any VidBolt link (vidbolt.pro, or the older vidbolt.xyz links saved earlier). */
     static boolean is(String url) {
         if (url == null) return false;
-        String t = url.trim().toLowerCase();
+        String t = url.trim().toLowerCase(java.util.Locale.ROOT);
         return t.contains("vidbolt.pro") || t.contains("vidbolt.xyz");
     }
 

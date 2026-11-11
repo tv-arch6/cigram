@@ -67,6 +67,7 @@ final class CigramAutoRepair {
     private long lastPosition = -1, lastMoveAt, lastBuffered = -1, lastBufferGrowAt, loadStartedAt, healthySince, resumeAt;
     private long slowNoteAt;
     private int repairsDone;
+    private String cid = "";                                   // 19.3: ties the events of one incident together
 
     private CigramAutoRepair(Context c, Host h, Handler ui) {
         this.app = c.getApplicationContext();
@@ -232,7 +233,7 @@ final class CigramAutoRepair {
     // ------------------------------------------------------------------ repairing
 
     private void beginOrContinue(int kind, int http) {
-        if (incidentKind == 0) attempt = 0;
+        if (incidentKind == 0) { attempt = 0; cid = CigramDiag.newCorrelationId(); }
         else if (kind != incidentKind && kind != CigramRepairPlan.STALL) attempt = Math.min(attempt, 1);   // a new kind of failure restarts near the top
         incidentKind = kind;
         incidentHttp = http;
@@ -257,6 +258,7 @@ final class CigramAutoRepair {
             return;
         }
         if (action == CigramRepairPlan.GIVE_UP) {
+            CigramDiag.recovery("autorepair", "give-up", categoryName(kind, http), "ladder ended", cid, attempt, "failed:gave-up");
             gaveUp = true;
             host.status(null);
             String reason = CigramRepairPlan.giveUpText(kind, http);
@@ -270,6 +272,7 @@ final class CigramAutoRepair {
             return;
         }
         pendingAction = action;
+        CigramDiag.recovery("autorepair", "action-" + action, categoryName(kind, http), "attempt " + (attempt + 1), cid, attempt + 1, "started");
         host.status(CigramRepairPlan.statusText(action, attempt));
         schedule(CigramRepairPlan.delayMs(kind, attempt, http));
     }
@@ -320,6 +323,7 @@ final class CigramAutoRepair {
 
     private void incidentOver() {
         boolean repaired = attempt > 0;
+        if (repaired) CigramDiag.recovery("autorepair", "incident", categoryName(incidentKind, incidentHttp), "playing again", cid, attempt, "ok");
         incidentKind = 0;
         incidentHttp = 0;
         attempt = 0;
@@ -343,6 +347,19 @@ final class CigramAutoRepair {
         try {
             if (host.hasSeparateSource()) host.reopenFromSource(resumeAt); else host.reopen(resumeAt);
         } catch (Throwable ignored) { }
+    }
+
+    private static String categoryName(int kind, int http) {
+        switch (kind) {
+            case CigramRepairPlan.NETWORK: return "NETWORK";
+            case CigramRepairPlan.HTTP_STATUS: return CigramDiag.categoryOfHttp(http);
+            case CigramRepairPlan.PARSING: return "PARSE";
+            case CigramRepairPlan.DECODER: return "DECODER";
+            case CigramRepairPlan.AUDIO: return "AUDIO";
+            case CigramRepairPlan.LIVE_WINDOW: return "LIVE_WINDOW";
+            case CigramRepairPlan.STALL: return "STALL";
+            default: return "OTHER";
+        }
     }
 
     private void learnCeiling(int height) {

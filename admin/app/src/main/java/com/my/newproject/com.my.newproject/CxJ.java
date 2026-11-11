@@ -55,7 +55,7 @@ final class CxJ {
 
     static boolean isUrl(String v) {
         if (v == null) return false;
-        String t = v.trim().toLowerCase();
+        String t = v.trim().toLowerCase(java.util.Locale.ROOT);
         return t.startsWith("http://") || t.startsWith("https://");
     }
 

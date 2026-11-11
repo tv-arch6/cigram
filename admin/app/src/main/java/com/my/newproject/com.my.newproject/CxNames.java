@@ -36,7 +36,7 @@ final class CxNames {
     }
 
     static boolean isSubtitle(String name) {
-        String n = name == null ? "" : name.toLowerCase();
+        String n = name == null ? "" : name.toLowerCase(java.util.Locale.ROOT);
         int q = n.indexOf('?');
         if (q > 0) n = n.substring(0, q);
         return n.endsWith(".srt") || n.endsWith(".vtt");

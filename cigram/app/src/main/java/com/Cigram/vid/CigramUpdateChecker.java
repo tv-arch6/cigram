@@ -610,7 +610,7 @@ public final class CigramUpdateChecker {
                         long total = c.getLong(c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
                         if (status == android.app.DownloadManager.STATUS_SUCCESSFUL) {
                             sheet.dismiss();
-                            installDownloaded(activity, dm, id, url);
+                            installDownloaded(activity, dm, id, url, m, live);
                             return;
                         }
                         if (status == android.app.DownloadManager.STATUS_FAILED) {
@@ -641,8 +641,46 @@ public final class CigramUpdateChecker {
         }
     }
 
-    private static void installDownloaded(final Activity activity, android.app.DownloadManager dm,
-                                          long id, final String url) {
+    /**
+     * 19.3: the package is checked (not empty, the manifest's sha256 when it has one, this app and a newer build) on the
+     * updater's own thread BEFORE the installer is opened; a refused file is deleted and the viewer is told why.
+     */
+    private static void installDownloaded(final Activity activity, final android.app.DownloadManager dm,
+                                          final long id, final String url, final JSONObject m, final int live) {
+        final java.io.File dir = activity.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS);
+        final java.io.File apk = dir == null ? null : new java.io.File(dir, "cigram-update-" + live + ".apk");
+        if (apk == null || !apk.exists()) { openInstaller(activity, dm, id, url); return; }
+        IO.execute(new Runnable() {
+            @Override public void run() {
+                final CigramUpdateVerify.Verdict verdict =
+                        CigramUpdateVerify.verify(activity, apk, m, installedCode(activity));
+                MAIN.post(new Runnable() {
+                    @Override public void run() {
+                        if (activity.isFinishing()) return;
+                        if (verdict == CigramUpdateVerify.Verdict.OK) { openInstaller(activity, dm, id, url); return; }
+                        try { dm.remove(id); } catch (Throwable ignored) { }
+                        try { apk.delete(); } catch (Throwable ignored) { }
+                        CigramDiag.recovery("updater", "verify", "INTEGRITY", "update refused: " + verdict.name(), null, 0, "failed");
+                        CigramUI.sheet(activity)
+                                .icon(CigramUI.ICON_WARN, CigramUI.AMBER)
+                                .title("لم يُفتح التحديث")
+                                .message(CigramUpdateVerify.messageFor(verdict))
+                                .primary("حاول مرة أخرى", CigramUI.AMBER, new CigramUI.Click() {
+                                    @Override public boolean onClick(CigramUI.Sheet s) {
+                                        startUpdate(activity, m, url);
+                                        return false;
+                                    }
+                                })
+                                .secondary("إغلاق", null)
+                                .show();
+                    }
+                });
+            }
+        });
+    }
+
+    private static void openInstaller(final Activity activity, android.app.DownloadManager dm,
+                                      long id, final String url) {
         try {
             Uri uri = dm.getUriForDownloadedFile(id);
             String type = dm.getMimeTypeForDownloadedFile(id);

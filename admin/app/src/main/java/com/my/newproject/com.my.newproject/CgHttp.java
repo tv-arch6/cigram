@@ -81,7 +81,7 @@ final class CgHttp {
         if (e instanceof UnknownHostException) return "لا يوجد اتصال بالإنترنت أو تعذر الوصول للخادم.";
         if (e instanceof SocketTimeoutException) return "انتهت مهلة الاتصال.";
         String m = e.getMessage() == null ? "" : e.getMessage();
-        if (m.toLowerCase().contains("cleartext")) {
+        if (m.toLowerCase(java.util.Locale.ROOT).contains("cleartext")) {
             return "الرابط يبدأ بـ http والتطبيق يمنع الاتصال غير المشفّر (cleartext). استخدم https أو فعّل cleartext في Manifest.";
         }
         return friendly(m);
@@ -90,7 +90,7 @@ final class CgHttp {
     /** Never show Java / HTTP exception text to the admin: unknown technical messages become a clear Arabic one. */
     static String friendly(String m) {
         String s = m == null ? "" : m.trim();
-        String low = s.toLowerCase();
+        String low = s.toLowerCase(java.util.Locale.ROOT);
         if (s.length() == 0 || low.contains("java.") || low.contains("exception") || low.contains("null object")
                 || low.contains("android.") || low.contains("org.json") || low.contains("httpurlconnection")
                 || low.contains("ssl") || low.contains("socket") || low.contains("unexpected end of stream")

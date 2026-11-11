@@ -118,7 +118,7 @@ public class CxMovieActivity extends CxBase {
         CxJ.put(st, "duration", CxJ.s(it, "duration"));
         CxJ.put(st, "tmdb_id", CxJ.s(it, "tmdb"));
         String imdb = CxJ.s(it, "imdb");
-        if (imdb.toLowerCase().matches("tt\\d{5,12}")) CxJ.put(st, "imdb_id", imdb);
+        if (imdb.toLowerCase(java.util.Locale.ROOT).matches("tt\\d{5,12}")) CxJ.put(st, "imdb_id", imdb);
         else {
             CxJ.put(st, "rating", imdb);
             CxJ.put(st, "imdb_id", CxJ.s(it, "imdb_id"));
@@ -642,7 +642,7 @@ public class CxMovieActivity extends CxBase {
         if (tm.length() > 0 && !tm.equals(CxJ.s(orig, "tmdb"))) CxJ.put(ch, "tmdb", tm);
         String rating = stateValue("rating");
         String oi = CxJ.s(orig, "imdb");
-        if (rating.length() > 0 && !oi.toLowerCase().matches("tt\\d{5,12}") && !rating.equals(oi)) CxJ.put(ch, "imdb", rating);
+        if (rating.length() > 0 && !oi.toLowerCase(java.util.Locale.ROOT).matches("tt\\d{5,12}") && !rating.equals(oi)) CxJ.put(ch, "imdb", rating);
         return ch;
     }
 

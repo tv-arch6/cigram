@@ -671,13 +671,13 @@ public class CgChannelsActivity extends CgBase {
             if (code == 429) return new String[]{"rate_limited", "429"};
             if (code >= 500) return new String[]{"server_error", String.valueOf(code)};
             if (code < 200 || code >= 300) return new String[]{"http_error", String.valueOf(code)};
-            String type = c.getContentType() == null ? "" : c.getContentType().toLowerCase();
+            String type = c.getContentType() == null ? "" : c.getContentType().toLowerCase(java.util.Locale.ROOT);
             InputStream in = c.getInputStream();
             byte[] buf = new byte[2048];
             int n = in.read(buf);
             try { in.close(); } catch (Exception ignored) { }
             if (n <= 0) return new String[]{"empty", String.valueOf(code)};
-            if (url.toLowerCase().contains(".m3u8") || type.contains("mpegurl")) {
+            if (url.toLowerCase(java.util.Locale.ROOT).contains(".m3u8") || type.contains("mpegurl")) {
                 String head = new String(buf, 0, n, "UTF-8");
                 if (!head.trim().startsWith("#EXTM3U")) return new String[]{"not_video", String.valueOf(code)};
             } else if (type.contains("text/html") || type.contains("application/json")) {

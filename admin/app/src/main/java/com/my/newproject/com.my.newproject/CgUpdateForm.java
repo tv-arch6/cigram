@@ -793,7 +793,7 @@ final class CgUpdateForm {
             fUrl.error("أدخل رابط APK أولاً.");
             return;
         }
-        if (!url.toLowerCase().startsWith("https://")) {
+        if (!url.toLowerCase(java.util.Locale.ROOT).startsWith("https://")) {
             fUrl.error("يجب أن يبدأ الرابط بـ https://");
             return;
         }
@@ -1422,7 +1422,7 @@ final class CgUpdateForm {
                 if (external) mark(TAB_APK, fUrl, null, "أدخل رابط ملف APK.");
                 else mark(TAB_APK, null, apkError, "ارفع ملف APK أو اختر «رابط خارجي». لا يمكن النشر بدون APK.");
             }
-        } else if (external && !url.toLowerCase().startsWith("https://")) {
+        } else if (external && !url.toLowerCase(java.util.Locale.ROOT).startsWith("https://")) {
             mark(TAB_APK, fUrl, null, "رابط التحميل غير صالح. يجب أن يبدأ بـ https:// ويشير إلى ملف APK.");
         } else if (!draft && infoApplies() && apkVc > 0 && code > 0 && apkVc != code) {
             mark(TAB_INFO, fCode, null, "رقم الإصدار داخل ملف APK (" + apkVc + ") لا يطابق Version Code المكتوب (" + code

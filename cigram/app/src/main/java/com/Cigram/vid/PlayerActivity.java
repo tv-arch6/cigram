@@ -2970,6 +2970,8 @@ public class PlayerActivity extends AppCompatActivity {
 				}
 				saveCurrentProgress();
 				
+				// 19.3: a seek of the episode we are leaving that is still waiting for its part must not fire on the next one
+				try { CigramSeekGuard.cancel(); } catch (Throwable ignored) { }
 				currentEpisodeIndex[0] = index;
 				currentSeason[0] = data.season;
 				currentEpisode[0] = data.episode;

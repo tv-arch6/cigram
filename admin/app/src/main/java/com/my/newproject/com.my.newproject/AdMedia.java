@@ -154,7 +154,7 @@ public final class AdMedia {
             p.w = wh[0];
             p.h = wh[1];
             p.size = out.length();
-            if (!name.toLowerCase().endsWith(".jpg") && !name.toLowerCase().endsWith(".jpeg")) p.name = stripExt(name) + ".jpg";
+            if (!name.toLowerCase(java.util.Locale.ROOT).endsWith(".jpg") && !name.toLowerCase(java.util.Locale.ROOT).endsWith(".jpeg")) p.name = stripExt(name) + ".jpg";
             return p;
         }
         long declared = displaySize(c, uri);

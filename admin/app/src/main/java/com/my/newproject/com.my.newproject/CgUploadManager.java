@@ -451,6 +451,8 @@ final class CgUploadManager {
             store.put(s);
             publish(s, true);
         } catch (CgMultipartUpload.NetworkDown nd) {
+            CgDiag.init(app);
+            CgDiag.recovery("upload", "network-down", "NETWORK", "waiting for the network, uploaded parts are kept", s.id, 0, "waiting");
             s.state = CgUploadSession.PAUSED;
             s.waitingNetwork = true;
             s.message = "انقطع الاتصال بالإنترنت. سيُستكمل الرفع تلقائياً عند عودته (الأجزاء المرفوعة محفوظة).";
@@ -494,6 +496,9 @@ final class CgUploadManager {
     }
 
     private void fail(CgUploadSession s, String message, String code) {
+        // 19.3: a failed upload leaves a trace (code + message, never the file name or the link) that explains it later
+        CgDiag.init(app);
+        CgDiag.recovery("upload", "failed", code == null || code.length() == 0 ? "OTHER" : code, message == null ? "" : message, s.id, 0, "failed:" + (code == null ? "" : code));
         s.state = CgUploadSession.FAILED;
         s.message = message;
         s.autoResume = false;

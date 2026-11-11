@@ -30,6 +30,7 @@ final class CigramStability {
         if (context == null || started) return;
         started = true;
         final Context app = context.getApplicationContext();
+        try { CigramDiag.init(app); } catch (Throwable ignored) { }          // 19.3: structured, private, bounded
         try {
             recoverFromCrashLoop(app);
         } catch (Throwable error) {
@@ -44,11 +45,12 @@ final class CigramStability {
                         long now = System.currentTimeMillis();
                         long last = p.getLong("last_crash_at", 0L);
                         int count = now - last < LOOP_WINDOW_MS ? p.getInt("recent_crashes", 0) + 1 : 1;
-                        String text = String.valueOf(error);
-                        if (text.length() > 400) text = text.substring(0, 400);
+                        // 19.3: the record is shown on screen and kept on disk: tokens / e-mails in a message are removed first
+                        String text = CigramDiag.redact(String.valueOf(error));
+                        try { CigramDiag.error("crash", "uncaught:" + thread.getName(), "uncaught", error); } catch (Throwable ignored) { }
                         p.edit().putLong("last_crash_at", now).putInt("recent_crashes", count)
                                 .putString("last_crash", text)
-                                .putString("last_crash_trace", crashTrace(error))   // v10.65: shown once on a TV
+                                .putString("last_crash_trace", CigramDiag.redactLines(crashTrace(error)))   // v10.65: shown once on a TV
                                 .putBoolean("trace_pending", true)
                                 .commit();   // the process is about to end
                     } catch (Throwable ignored) { }

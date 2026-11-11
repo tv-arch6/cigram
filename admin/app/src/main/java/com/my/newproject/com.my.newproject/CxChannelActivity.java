@@ -547,7 +547,7 @@ public class CxChannelActivity extends CxBase {
     // ------------------------------------------------------------------ duplicates
 
     private static String normUrl(String u) {
-        String t = u == null ? "" : u.trim().toLowerCase();
+        String t = u == null ? "" : u.trim().toLowerCase(java.util.Locale.ROOT);
         while (t.endsWith("/")) t = t.substring(0, t.length() - 1);
         return t;
     }
