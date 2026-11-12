@@ -211,6 +211,11 @@
 			android:theme="@style/CigramDarkTheme"
 			android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
 			android:exported="false" />
+		<!-- «المتابعة بحساب Google»: no UI of its own (account picker → auth worker → back) -->
+		<activity
+			android:name=".CigramGoogleAuth"
+			android:theme="@android:style/Theme.Translucent.NoTitleBar"
+			android:exported="false" />
 		<!-- Terms and Conditions page -->
 		<activity
 			android:name=".CigramTermsActivity"

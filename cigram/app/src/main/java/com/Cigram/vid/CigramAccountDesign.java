@@ -330,6 +330,22 @@ final class CigramAccountDesign {
                 linkLp.topMargin = dp(a, 12);
                 linkLp.leftMargin = dp(a, 4);
                 linkLp.rightMargin = dp(a, 4);
+                // the fastest way in, for a new viewer and a returning one: the phone's Google account, one tap
+                if (CigramGoogleAuth.enabled()) {
+                    LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(-1, dp(a, 54));
+                    gp.topMargin = dp(a, 12);
+                    gp.leftMargin = dp(a, 4);
+                    gp.rightMargin = dp(a, 4);
+                    box.addView(CigramGoogleAuth.button(a), gp);
+                }
+                // the account that signed out last on this phone: its e-mail is already written in the form
+                final String lastMail = CigramLogout.last(a, "email");
+                if (lastMail.length() > 0) {
+                    View field = byId(a, "edittext_login_email");
+                    if (field instanceof TextView && ((TextView) field).getText().length() == 0) ((TextView) field).setText(lastMail);
+                    String lastName = CigramLogout.last(a, "name");
+                    hint.setText(lastName.length() > 0 ? "أهلاً بعودتك يا " + lastName + " · بياناتك محفوظة" : "أهلاً بعودتك · بياناتك محفوظة");
+                }
                 box.addView(link, linkLp);
                 box.addView(themeLink, new LinearLayout.LayoutParams(-1, -2));
                 reveal(a, logo, welcome, hint, benefits, open, link);

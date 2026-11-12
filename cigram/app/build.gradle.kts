@@ -58,6 +58,7 @@ dependencies {
     implementation("de.hdodenhof:circleimageview:3.1.0")
     implementation("com.google.android.gms:play-services-ads:23.4.0")
     implementation("com.google.android.ump:user-messaging-platform:3.1.0")
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.code.gson:gson:2.11.0")
     implementation("org.jsoup:jsoup:1.17.2")

@@ -203,6 +203,8 @@ final class CigramTerms {
             box.setOnCheckedChangeListener(new android.widget.CompoundButton.OnCheckedChangeListener() {
                 @Override public void onCheckedChanged(android.widget.CompoundButton b, boolean on) {
                     b.setContentDescription("أوافق على الشروط والأحكام، " + (on ? "محدد" : "غير محدد"));
+                    // the tick itself is the consent: it is saved the moment it is given, not only when the form is sent
+                    if (on) recordAcceptance(a, typedEmail(a));
                 }
             });
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
