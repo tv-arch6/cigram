@@ -26,11 +26,11 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 
 /**
- * شاشة «تواصل معنا» (communication.xml ← CommunicationActivity).
+ * شاشة «أرسل طلبك أو مشكلتك» (communication.xml ← CommunicationActivity) — iOS، أبيض وأسود.
  *
  *   [ طلب فيلم ] [ طلب مسلسل ] [ طلب قناة ]      ← اسم العنوان ثم Gmail (أو إرسال مباشر)، ويُحفظ في «طلباتي»
  *   طلباتي                                        ← كل طلب مع حالته (قيد المراجعة / تمت الإضافة / ...)
- *   [ حل مشكلة ]                                  ← شفاف بخط أبيض، يعرض المشاكل المقترحة
+ *   [ حل مشكلة ]                                  ← شفاف بخط أبيض، يفتح محادثة الدعم بالمشكلة جاهزة
  *   لاحقاً                                        ← إغلاق الشاشة
  *
  * البريد المستلم: CigramReport.SUPPORT_EMAIL (app.cigram@gmail.com).
@@ -75,12 +75,10 @@ public final class CigramCommunication {
             View title = byId(a, "textview_communication_title");
             if (title instanceof TextView) {
                 TextView t = (TextView) title;
-                t.setText("تواصل معنا");
+                t.setText("أرسل طلبك أو مشكلتك");
                 t.setTextColor(0xFFFFFFFF);
                 t.setTypeface(CigramUI.font(a), android.graphics.Typeface.BOLD);
             }
-            View back = byId(a, "imageview_communication_back");
-            if (back != null) CigramNav.bind(a, back);
 
             View bodyView = byId(a, "linear_communication_body");
             if (!(bodyView instanceof LinearLayout)) return;
@@ -92,9 +90,10 @@ public final class CigramCommunication {
             if (blp != null) { blp.height = ViewGroup.LayoutParams.MATCH_PARENT; body.setLayoutParams(blp); }
 
             // ---- عنوان + وصف
-            TextView head = CigramUI.label(a, "كيف نقدر نساعدك؟", 24f, CigramUI.TEXT, true);
+            TextView head = CigramUI.label(a, "أرسل طلبك أو مشكلتك", 26f, CigramUI.TEXT, true);
+            head.setTypeface(CigramTypefaces.bold() != null ? CigramTypefaces.bold() : CigramUI.font(a), android.graphics.Typeface.BOLD);
             body.addView(head, new LinearLayout.LayoutParams(-1, -2));
-            TextView sub = CigramUI.label(a, "اطلب فيلماً أو مسلسلاً أو قناة وتابع حالة طلبك هنا، أو راسلنا لحل أي مشكلة.",
+            TextView sub = CigramUI.label(a, "اطلب فيلماً أو مسلسلاً أو قناة وتابع ردّ المدير هنا، أو اكتب لنا مشكلتك.",
                     14f, CigramGlass.muted(a), false);
             sub.setLineSpacing(0f, 1.2f);
             LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-1, -2);
@@ -105,9 +104,9 @@ public final class CigramCommunication {
             LinearLayout row = new LinearLayout(a);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-            row.addView(requestTile(a, body, Pic.FILM, CigramUI.TEAL, "طلب فيلم", CigramRequests.MOVIE), tileLp(a));
-            row.addView(requestTile(a, body, Pic.SERIES, PURPLE, "طلب مسلسل", CigramRequests.SERIES), tileLp(a));
-            row.addView(requestTile(a, body, Pic.CHANNEL, CigramUI.GREEN, "طلب قناة", CigramRequests.CHANNEL), tileLp(a));
+            row.addView(requestTile(a, body, Pic.FILM, 0xFFFFFFFF, "طلب فيلم", CigramRequests.MOVIE), tileLp(a));
+            row.addView(requestTile(a, body, Pic.SERIES, 0xFFFFFFFF, "طلب مسلسل", CigramRequests.SERIES), tileLp(a));
+            row.addView(requestTile(a, body, Pic.CHANNEL, 0xFFFFFFFF, "طلب قناة", CigramRequests.CHANNEL), tileLp(a));
             LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(-1, -2);
             rlp.topMargin = CigramUI.dp(a, 24);
             body.addView(row, rlp);
@@ -171,7 +170,7 @@ public final class CigramCommunication {
 
         LinearLayout badge = new LinearLayout(a);
         badge.setGravity(Gravity.CENTER);
-        badge.setBackground(CigramUI.round((accent & 0x00FFFFFF) | 0x26000000, 22, a));
+        badge.setBackground(CigramUI.round(0x1AFFFFFF, 0x40FFFFFF, 28, a));     // white line art on a glass disc
         badge.addView(new Pic(a, kind, accent), new LinearLayout.LayoutParams(CigramUI.dp(a, 30), CigramUI.dp(a, 30)));
         tile.addView(badge, new LinearLayout.LayoutParams(CigramUI.dp(a, 56), CigramUI.dp(a, 56)));
 
@@ -199,28 +198,19 @@ public final class CigramCommunication {
 
         CigramUI.sheet(a)
                 .title("طلب " + label)
-                .message("اكتب الاسم ثم أرسله عبر Gmail. نحفظ طلبك في «طلباتي» ونخبرك عند إضافته.")
+                .message("اكتب الاسم وأرسله. يصل طلبك للمدير فوراً، وتتابع ردّه في «طلباتي».")
                 .view(input)
-                .primary("متابعة إلى Gmail", CigramUI.TEAL, new CigramUI.Click() {
+                .primary("إرسال الطلب", 0xFFFFFFFF, new CigramUI.Click() {
                     @Override public boolean onClick(CigramUI.Sheet s) {
                         String name = input.getText().toString().trim();
                         if (name.length() < 2) { input.setError("اكتب الاسم"); return true; }
                         CigramRequests.add(a, kind, name, "");
-                        openMail(a, "طلب " + label + ": " + name);
+                        CigramChannelReports.snack(a, "وصل طلبك للمدير", null, null);
                         refreshMine(a, body);
                         return false;
                     }
                 })
-                .secondary("إرسال بدون Gmail", new CigramUI.Click() {
-                    @Override public boolean onClick(CigramUI.Sheet s) {
-                        String name = input.getText().toString().trim();
-                        if (name.length() < 2) { input.setError("اكتب الاسم"); return true; }
-                        CigramRequests.add(a, kind, name, "");
-                        Toast.makeText(a, "تم إرسال طلبك ✓", Toast.LENGTH_SHORT).show();
-                        refreshMine(a, body);
-                        return false;
-                    }
-                })
+                .secondary("إلغاء", null)
                 .show();
         input.requestFocus();
     }
@@ -266,9 +256,22 @@ public final class CigramCommunication {
         text.addView(name, new LinearLayout.LayoutParams(-1, -2));
         String meta = CigramRequests.kindLabel(r.optString("kind"));
         String note = r.optString("admin_note", "");
-        if (note.length() > 0) meta += " · " + note;
-        else if (CigramRequests.ADDED.equals(status) && r.optString("match_id").length() > 0) meta += " · اضغط للمشاهدة";
-        TextView sub = CigramUI.label(a, meta, 12.5f, CigramUI.MUTED, false);
+        boolean ready = CigramRequests.ADDED.equals(status) && r.optString("match_id").length() > 0;
+        CharSequence line;
+        if (ready) {
+            // «تم رفعها، انقر هنا» — the last two words in blue, they open the title itself
+            String before = "تم رفعها، ", link = "انقر هنا";
+            android.text.SpannableString sp = new android.text.SpannableString(before + link);
+            sp.setSpan(new android.text.style.ForegroundColorSpan(0xFF0A84FF), before.length(), sp.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            sp.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), before.length(), sp.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            line = sp;
+        } else if (CigramRequests.IN_PROGRESS.equals(status)) {
+            line = "المدير وافق، سيتم إضافته قريباً" + (note.length() > 0 ? " · " + note : "");
+        } else {
+            line = note.length() > 0 ? meta + " · " + note : meta;
+        }
+        TextView sub = CigramUI.label(a, "", 12.5f, CigramUI.MUTED, false);
+        sub.setText(line);
         sub.setMaxLines(2);
         text.addView(sub, new LinearLayout.LayoutParams(-1, -2));
         row.addView(text, new LinearLayout.LayoutParams(0, -2, 1f));
@@ -278,7 +281,7 @@ public final class CigramCommunication {
         chip.setGravity(Gravity.CENTER);
         chip.setSingleLine(true);
         chip.setPadding(CigramUI.dp(a, 10), CigramUI.dp(a, 4), CigramUI.dp(a, 10), CigramUI.dp(a, 4));
-        chip.setBackground(CigramUI.round((color & 0x00FFFFFF) | 0x26000000, 12, a));
+        chip.setBackground(CigramUI.round(0x14FFFFFF, 0x33FFFFFF, 12, a));
         LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(-2, -2);
         cl.leftMargin = CigramUI.dp(a, 8);
         row.addView(chip, cl);
@@ -348,7 +351,7 @@ public final class CigramCommunication {
     private static void showProblems(final Activity a) {
         final CigramUI.Sheet sheet = CigramUI.sheet(a)
                 .title("ما المشكلة التي تواجهك؟")
-                .message("اختر الأقرب لمشكلتك وسيكون عنوان الرسالة كما اخترت.");
+                .message("اختر الأقرب لمشكلتك وتُفتح محادثة «الدعم والتواصل» بها جاهزة.");
 
         final int maxH = (int) (a.getResources().getDisplayMetrics().heightPixels * 0.42f);
         ScrollView sv = new ScrollView(a) {
@@ -374,7 +377,7 @@ public final class CigramCommunication {
     }
 
     private static View problemRow(final Activity a, final CigramUI.Sheet sheet, String text, final String subject, boolean other) {
-        TextView row = CigramUI.label(a, text, 15f, other ? CigramUI.TEAL : CigramUI.TEXT, other);
+        TextView row = CigramUI.label(a, text, 15f, CigramUI.TEXT, other);
         row.setMinHeight(CigramUI.dp(a, 52));
         row.setPadding(CigramUI.dp(a, 16), 0, CigramUI.dp(a, 16), 0);
         row.setBackground(CigramUI.round(CigramUI.BG_SOFT, CigramUI.STROKE, 16, a));
@@ -384,10 +387,26 @@ public final class CigramCommunication {
         row.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
                 try { sheet.dialog.dismiss(); } catch (Throwable ignored) { }
-                openMail(a, subject);
+                openProblem(a, subject);
             }
         });
         return row;
+    }
+
+    /**
+     * The problem goes to the support conversation inside the app (signed-in accounts), written and ready to send.
+     * Nothing is handed to an e-mail app unless the viewer has no account to talk from.
+     */
+    static void openProblem(Activity a, String subject) {
+        try {
+            if (CigramUserData.isLoggedIn(a)) {
+                Intent chat = new Intent(a, AdsChatActivity.class);
+                chat.putExtra("prefill", SUBJECT_OTHER.equals(subject) ? "أواجه مشكلة: " : "أواجه مشكلة: " + subject + " — ");
+                a.startActivity(chat);
+                return;
+            }
+        } catch (Throwable ignored) { }
+        openMail(a, subject);
     }
 
     /** يفتح Gmail مباشرة: المستلم app.cigram@gmail.com، الموضوع جاهز، والنص فارغ. */

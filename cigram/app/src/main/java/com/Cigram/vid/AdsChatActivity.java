@@ -173,6 +173,14 @@ public class AdsChatActivity extends Activity {
         AdsFileProvider.cleanOld(this);
         AdsMedia.cleanOld(this);
         restoreCache();
+        // opened from «أرسل طلبك أو مشكلتك»: the chosen problem is already written, the viewer completes and sends it
+        try {
+            String prefill = getIntent() == null ? null : getIntent().getStringExtra("prefill");
+            if (b == null && prefill != null && prefill.length() > 0 && input != null) {
+                input.setText(prefill);
+                input.setSelection(input.getText().length());
+            }
+        } catch (Throwable ignored) { }
         refreshSuggest();
         bootstrap();
         askNotifPermission();

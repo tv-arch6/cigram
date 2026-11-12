@@ -352,7 +352,7 @@ public final class CigramRequests {
                     JSONObject o = a.optJSONObject(i);
                     if (o == null) continue;
                     String status = o.optString("status");
-                    if (!(ADDED.equals(status) || UNAVAILABLE.equals(status))) continue;
+                    if (!(ADDED.equals(status) || UNAVAILABLE.equals(status) || IN_PROGRESS.equals(status))) continue;
                     if (status.equals(o.optString("notified"))) continue;
                     o.put("notified", status);
                     fire.add(new JSONObject(o.toString()));
@@ -373,12 +373,28 @@ public final class CigramRequests {
                 nm.createNotificationChannel(ch);
             }
             boolean added = ADDED.equals(r.optString("status"));
+            boolean approved = IN_PROGRESS.equals(r.optString("status"));
             String kind = kindLabel(r.optString("kind"));
             String title = r.optString("match_title", "");
             if (title.length() == 0) title = r.optString("title");
-            String head = added ? "تمت إضافة طلبك 🎉" : "بخصوص طلبك";
+            // added:    «شاهد هَسّه» + the title, its description and a preview of its backdrop
+            // approved: «المدير وافق، سيتم إضافته قريبًا، اصبر»
+            String overview = "";
+            String backdrop = "";
+            if (added) {
+                try {
+                    JSONObject item = CigramContent.find(SERIES.equals(r.optString("match_type", r.optString("kind"))) ? "series" : "movie",
+                            r.optString("match_id"), title);
+                    if (item != null) {
+                        overview = CigramContent.text(item, "description", "overview", "plot", "synopsis");
+                        backdrop = CigramContent.text(item, "backdrop", "backdrop_url", "cover", "poster", "poster_url", "image");
+                    }
+                } catch (Throwable ignored) { }
+            }
+            String head = added ? "شاهد هَسّه · " + title : approved ? "المدير وافق" : "بخصوص طلبك";
             String body = added
-                    ? kind + " «" + title + "» صار متوفراً على سيكرام. اضغط للمشاهدة."
+                    ? (overview != null && overview.trim().length() > 0 ? overview.trim() : kind + " «" + title + "» صار متوفراً على سيكرام.")
+                    : approved ? "«" + r.optString("title") + "» سيتم إضافته قريبًا، اصبر"
                     : "«" + r.optString("title") + "» غير متوفر حالياً."
                       + (r.optString("admin_note").length() > 0 ? " " + r.optString("admin_note") : "");
 
@@ -406,6 +422,33 @@ public final class CigramRequests {
                     .setAutoCancel(true)
                     .setContentIntent(pi);
             nm.notify("cigram_request", code, b.build());
+            // the backdrop arrives a moment later and the same notification grows a picture
+            if (added && backdrop != null && backdrop.startsWith("http")) {
+                final String pictureUrl = backdrop, bigTitle = head, bigText = body;
+                final Notification.Builder again = b;
+                final NotificationManager manager = nm;
+                final int id = code;
+                new Thread(new Runnable() {
+                    @Override public void run() {
+                        java.net.HttpURLConnection c = null;
+                        try {
+                            c = (java.net.HttpURLConnection) new java.net.URL(pictureUrl).openConnection();
+                            c.setConnectTimeout(8000);
+                            c.setReadTimeout(10000);
+                            android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
+                            o.inSampleSize = 2;
+                            android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(c.getInputStream(), null, o);
+                            if (bmp == null) return;
+                            again.setLargeIcon(bmp).setStyle(new Notification.BigPictureStyle().bigPicture(bmp)
+                                    .setBigContentTitle(bigTitle).setSummaryText(bigText));
+                            manager.notify("cigram_request", id, again.build());
+                        } catch (Throwable ignored) {
+                        } finally {
+                            if (c != null) c.disconnect();
+                        }
+                    }
+                }, "cigram-request-picture").start();
+            }
         } catch (Throwable error) {
             android.util.Log.w("CigramRequests", "notify failed", error);
         }

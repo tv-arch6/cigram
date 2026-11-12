@@ -45,6 +45,7 @@ public final class CigramFonts {
     private static final String K_BG_MODE = "subtitle_background";     // none | black | color
     private static final String K_BG_COLOR = "subtitle_bg_color";
     private static final String K_TEXT_COLOR = "subtitle_text_color";
+    private static final String K_PREVIEW = "preview_text";            // the viewer's own preview words
     private static final String K_CUSTOM = "custom_fonts";             // JSONArray [{file,name}]
     private static final String PAGE_TAG = "cigram_fonts_page";
     private static final String SUBFONT_DIR = "subfonts";
@@ -381,7 +382,9 @@ public final class CigramFonts {
 
             final FrameLayout page = new FrameLayout(activity);
             page.setTag(PAGE_TAG);
-            page.setBackgroundColor(0xFF111113);
+            final CigramPalette pagePal = CigramPalette.of(activity);
+            page.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{0xFF19191C, 0xFF131315, 0xFF0F0F11, 0xFF0B0B0C}));   // the app's dark page (the rows below are drawn for it)
             page.setClickable(true);
             page.setFocusableInTouchMode(true);
             page.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
@@ -396,22 +399,20 @@ public final class CigramFonts {
             bar.setOrientation(LinearLayout.HORIZONTAL);
             bar.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
             bar.setGravity(Gravity.CENTER_VERTICAL);
-            bar.setPadding(dp(activity, 10), dp(activity, 14), dp(activity, 10), dp(activity, 10));
+            bar.setPadding(dp(activity, 12), dp(activity, 40), dp(activity, 12), dp(activity, 12));
 
-            FrameLayout backBox = new FrameLayout(activity);
-            backBox.setBackground(CigramUI.round(0x14FFFFFF, 0x1FFFFFFF, 14, activity));
-            backBox.setClickable(true);
-            backBox.setFocusable(true);
-            backBox.addView(new AdsIcons.Icon(activity, AdsIcons.BACK, 0xFFFFFFFF),
-                    new FrameLayout.LayoutParams(dp(activity, 22), dp(activity, 22), Gravity.CENTER));
-            bar.addView(backBox, new LinearLayout.LayoutParams(dp(activity, 42), dp(activity, 42)));
-
-            TextView title = CigramUI.label(activity, "خطوطي", 20f, 0xFFFFFFFF, true);
-            title.setTypeface(appFont(activity), Typeface.BOLD);
+            final View backBox = new View(activity);          // no arrow on the account's sections: system Back closes
+            TextView title = CigramUI.label(activity, "الخطوط", 28f, 0xFFFFFFFF, true);
+            title.setTypeface(CigramTypefaces.bold() != null ? CigramTypefaces.bold() : appFont(activity), Typeface.BOLD);
             title.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
+            LinearLayout titles = new LinearLayout(activity);
+            titles.setOrientation(LinearLayout.VERTICAL);
+            titles.addView(title, new LinearLayout.LayoutParams(-1, -2));
+            TextView under = CigramUI.label(activity, "كل تغيير يُحفظ وحده ويظهر فوراً في المعاينة", 12.5f, 0x99FFFFFF, false);
+            titles.addView(under, new LinearLayout.LayoutParams(-1, -2));
             LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, -2, 1f);
-            titleLp.setMarginStart(dp(activity, 12));
-            bar.addView(title, titleLp);
+            titleLp.setMarginStart(dp(activity, 8));
+            bar.addView(titles, titleLp);
             column.addView(bar, new LinearLayout.LayoutParams(-1, -2));
 
             ScrollView scroller = new ScrollView(activity);
@@ -425,8 +426,22 @@ public final class CigramFonts {
             column.addView(scroller, new LinearLayout.LayoutParams(-1, 0, 1f));
 
             // بطاقة المعاينة
-            final TextView preview = new TextView(activity);
-            preview.setText(SAMPLE);
+            // LIVE preview: the viewer writes his own words (a name, a line) and they are saved as he types
+            final android.widget.EditText preview = new android.widget.EditText(activity);
+            preview.setText(prefs(activity).getString(K_PREVIEW, SAMPLE));
+            preview.setHint("اكتب اسماً للمعاينة");
+            preview.setHintTextColor(0x80FFFFFF);
+            preview.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+            preview.setMaxLines(2);
+            preview.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE);
+            preview.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(60)});
+            preview.addTextChangedListener(new android.text.TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence t, int a1, int b1, int c1) { }
+                @Override public void onTextChanged(CharSequence t, int a1, int b1, int c1) { }
+                @Override public void afterTextChanged(android.text.Editable e) {
+                    prefs(activity).edit().putString(K_PREVIEW, e.toString()).apply();      // saved by itself
+                }
+            });
             preview.setTextSize(22);
             preview.setGravity(Gravity.CENTER);
             preview.setPadding(dp(activity, 16), dp(activity, 26), dp(activity, 16), dp(activity, 26));
@@ -448,10 +463,10 @@ public final class CigramFonts {
 
             FrameLayout previewWrap = new FrameLayout(activity);
             GradientDrawable pv = new GradientDrawable();
-            pv.setColors(new int[]{0xFF14323F, 0xFF0A1E28});
+            pv.setColors(new int[]{0xFF3A3A3F, 0xFF18181B, 0xFF050506});       // a dim film frame, no colour cast
             pv.setOrientation(GradientDrawable.Orientation.TL_BR);
-            pv.setCornerRadius(dp(activity, 18));
-            pv.setStroke(dp(activity, 1), 0x22FFFFFF);
+            pv.setCornerRadius(dp(activity, 24));
+            pv.setStroke(dp(activity, 1), 0x40FFFFFF);
             previewWrap.setBackground(pv);
             previewWrap.setPadding(dp(activity, 10), dp(activity, 10), dp(activity, 10), dp(activity, 10));
             previewWrap.addView(preview, new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER));
@@ -579,7 +594,7 @@ public final class CigramFonts {
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(selected ? 0xFF1B536B : 0xFF262629);
         bg.setCornerRadius(dp(a, 14));
-        if (selected) bg.setStroke(dp(a, 1), 0xFF29A9E0);
+        if (selected) bg.setStroke(dp(a, 1), 0xFFFFFFFF);
         row.setBackground(bg);
         row.setClickable(true);
         row.setFocusable(true);
@@ -635,14 +650,18 @@ public final class CigramFonts {
 
     // لوحات الألوان
     private static final int[] BG_COLORS = {
-            0xCC000000, 0xCC1C1C1C, 0xCC0B2545, 0xCC2A1A4A, 0xCC3A0B16, 0xCC0A2F22
+            0xCC000000, 0xFF000000, 0x80000000, 0xCC1C1C1C, 0xCCFFFFFF, 0x66FFFFFF,
+            0xCC0B2545, 0xCC2A1A4A, 0xCC3A0B16, 0xCC0A2F22, 0xCC3B2A12, 0xCC10343A, 0xCC3A1036, 0xCC1F2937
     };
-    private static final String[] BG_NAMES = {"أسود", "رمادي", "كحلي", "بنفسجي", "نبيذي", "أخضر"};
+    private static final String[] BG_NAMES = {"أسود", "أسود كامل", "ظل خفيف", "رمادي", "أبيض", "زجاجي",
+            "كحلي", "بنفسجي", "نبيذي", "أخضر", "قهوة", "بترولي", "توتي", "فحمي"};
 
     private static final int[] TEXT_COLORS = {
-            0xFFFFFFFF, 0xFFFFEB3B, 0xFF4FE3FF, 0xFF7CFF9B, 0xFFFF8AE0, 0xFFFFA94D
+            0xFFFFFFFF, 0xFFE5E5EA, 0xFF000000, 0xFFFFEB3B, 0xFFFFD60A, 0xFF4FE3FF, 0xFF7CFF9B,
+            0xFFFF8AE0, 0xFFFFA94D, 0xFFFF6B6B, 0xFFB79CFF, 0xFF9BE7C4, 0xFFF5E6C8
     };
-    private static final String[] TEXT_NAMES = {"أبيض", "أصفر", "سماوي", "أخضر", "وردي", "برتقالي"};
+    private static final String[] TEXT_NAMES = {"أبيض", "فضي", "أسود", "أصفر", "ذهبي", "سماوي", "أخضر",
+            "وردي", "برتقالي", "مرجاني", "بنفسجي", "نعناعي", "عاجي"};
 
     private static void buildColorSection(final Activity a, final LinearLayout parent, String heading,
                                           final boolean isBackground, final Runnable updatePreview) {
@@ -725,8 +744,8 @@ public final class CigramFonts {
         GradientDrawable g = new GradientDrawable();
         g.setShape(GradientDrawable.OVAL);
         if (color == Color.TRANSPARENT) {
-            g.setColor(0xFF0E2530);
-            g.setStroke(dp(a, 2), selected ? 0xFF29A9E0 : 0x55FFFFFF);
+            g.setColor(0x00000000);
+            g.setStroke(dp(a, selected ? 3 : 1), selected ? 0xFFFFFFFF : 0x55FFFFFF);
         } else {
             g.setColor((color & 0x00FFFFFF) | 0xFF000000);
             g.setStroke(dp(a, selected ? 3 : 1), selected ? 0xFFFFFFFF : 0x33FFFFFF);
