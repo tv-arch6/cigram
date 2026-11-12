@@ -95,6 +95,7 @@ final class CigramPlayerLauncher {
             long resume = CigramResume.position(a, isSeries, seriesTitle, title, id, season, episode);
             if (resume > 0L) i.putExtra("resume_ms", resume);
             a.startActivity(i);
+            CigramRateCard.externalPlayerOpened();
             return true;
         } catch (Throwable t) {
             return false;   // anything unexpected: fall back to the built-in player

@@ -381,6 +381,11 @@ public final class CigramStage1InitProvider extends ContentProvider {
                         public void onActivityResumed(final Activity activity) {
                             try { CigramTheme.onResumed(activity); } catch (Throwable ignored) { }   // v10.70
                             try {
+                                String screen = activity.getClass().getSimpleName();
+                                if ("PlayerActivity".equals(screen)) CigramRateCard.playerOpened();
+                                else if ("DetailsActivity".equals(screen)) CigramRateCard.detailsResumed(activity);
+                            } catch (Throwable ignored) { }
+                            try {
                                 CigramProfile.restore(activity);
                                 CigramProfile.snapshot(activity);
                                 CigramProfile.syncPending(activity);
@@ -454,6 +459,9 @@ public final class CigramStage1InitProvider extends ContentProvider {
 
                         @Override
                         public void onActivityDestroyed(Activity activity) {
+                            try {
+                                if ("PlayerActivity".equals(activity.getClass().getSimpleName())) CigramRateCard.playerClosed();
+                            } catch (Throwable ignored) { }
                             synchronized (MAIN_SETUP) {
                                 MAIN_SETUP.remove(activity);
                             }
@@ -4592,7 +4600,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                 watch.setStateListAnimator(null);
                 watch.setElevation(0f);
             }
-            watch.setBackground(CigramDesign.primaryPill(activity, 23f));
+            watch.setBackground(CigramWatchGlyphs.over(CigramDesign.primaryPill(activity, 23f), activity.getResources().getDisplayMetrics().density));
         }
 
         View laterView = findByIdName(activity, "linear_watch_later");
@@ -4728,7 +4736,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             ((TextView) watch).setMinimumWidth(0);
             ((TextView) watch).setTextSize(16.5f);
         }
-        watch.setBackground(CigramDesign.primaryPill(activity, 26f));
+        watch.setBackground(CigramWatchGlyphs.over(CigramDesign.primaryPill(activity, 26f), activity.getResources().getDisplayMetrics().density));
         row.addView(watch, new LinearLayout.LayoutParams(-1, dpInt(activity, 52)));
         page.addView(row, at, new LinearLayout.LayoutParams(-1, -2));
         actions.setGravity(Gravity.CENTER);
@@ -6146,6 +6154,11 @@ public final class CigramStage1InitProvider extends ContentProvider {
                 System.currentTimeMillis()
         );
         stage3RenderReactionCache(activity, contentKey);
+        // the reaction springs up over the page with its new public count
+        try {
+            if (wanted == STAGE3_REACTION_LIKE) CigramFx.reaction(activity, true, optimisticLikes);
+            else if (wanted == STAGE3_REACTION_DISLIKE) CigramFx.reaction(activity, false, optimisticDislikes);
+        } catch (Throwable ignored) { }
 
         synchronized (STAGE3_REACTION_SUBMITTING) {
             STAGE3_REACTION_SUBMITTING.put(activity, Boolean.TRUE);
@@ -6692,6 +6705,25 @@ public final class CigramStage1InitProvider extends ContentProvider {
         }
         if (changedAny) stage3WriteItems(context, PREF_SERIES_SUBSCRIPTIONS, out);
     }
+    /** The title shown by this details page ("" when the page has none yet). */
+    static String cigramDetailsTitle(Activity activity) {
+        try {
+            String t = CigramContent.title(stage3DetailsItem(activity));
+            return t == null ? "" : t.trim();
+        } catch (Throwable e) {
+            return "";
+        }
+    }
+
+    /** «أعجبني» / «لا يعجبني» for the title of this details page, exactly as its own buttons do it. */
+    static void cigramReact(Activity activity, boolean like) {
+        try {
+            stage3HandleReaction(activity, like ? STAGE3_REACTION_LIKE : STAGE3_REACTION_DISLIKE);
+        } catch (Throwable error) {
+            android.util.Log.w("CigramInjected", "react failed", error);
+        }
+    }
+
     private static JSONObject stage3DetailsItem(Activity activity) {
         JSONObject item = resolvedDetailsItem(activity);
         if (item == null) item = new JSONObject();
