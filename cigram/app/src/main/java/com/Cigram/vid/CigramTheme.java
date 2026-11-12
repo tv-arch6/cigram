@@ -55,7 +55,7 @@ public final class CigramTheme {
     private static final String[] THEMED = {
             "MainActivity", "SearchXmlActivity", "SectionActivity", "DetailsActivity", "AccountActivity",
             "SettingsActivity", "NotificationsActivity", "MyContentActivity", "ChannelsActivity",
-            "CommunicationActivity", "AdsActivity", "CigramDiscoverActivity"
+            "CommunicationActivity", "CigramDiscoverActivity"
     };
 
     // ---------------------------------------------------------------- palette (dark RGB -> light RGB)

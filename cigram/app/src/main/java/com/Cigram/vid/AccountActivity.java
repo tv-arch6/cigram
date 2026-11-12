@@ -352,18 +352,6 @@ public class AccountActivity extends AppCompatActivity {
 			}
 		});
 		
-		binding.ads.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View _view) {
-				android.content.Intent adsIntent =
-				new android.content.Intent(
-				AccountActivity.this,
-				AdsActivity.class
-				);
-				
-				startActivity(adsIntent);
-			}
-		});
 		
 		_req_register_request_listener = new RequestNetwork.RequestListener() {
 			@Override
@@ -1579,47 +1567,7 @@ public class AccountActivity extends AppCompatActivity {
 			}
 		}
 		);
-		final android.view.View helpSupportRow =
-		findViewById(
-		R.id.linear_help_support
-		);
 		
-		final android.content.SharedPreferences supportAuth =
-		getSharedPreferences(
-		"auth_session",
-		MODE_PRIVATE
-		);
-		
-		boolean supportLoggedIn =
-		supportAuth.getBoolean(
-		"logged_in",
-		false
-		);
-		
-		String supportToken =
-		supportAuth.getString(
-		"token",
-		""
-		);
-		
-		if (
-		supportLoggedIn
-		&&
-		supportToken != null
-		&&
-		!supportToken.trim().equals("")
-		) {
-			
-			helpSupportRow.setVisibility(
-			android.view.View.VISIBLE
-			);
-			
-		} else {
-			
-			helpSupportRow.setVisibility(
-			android.view.View.GONE
-			);
-		}
 		// Two independent cards: fixed avatar first, values immediately underneath.
 		final android.widget.LinearLayout cgAvatarCard=(android.widget.LinearLayout)findViewById(R.id.linear_profile_avatar_row);
 		final android.widget.LinearLayout cgInfoCard=(android.widget.LinearLayout)findViewById(R.id.linear_profile_info);
@@ -1656,7 +1604,7 @@ public class AccountActivity extends AppCompatActivity {
 			text.setLayoutParams(new android.widget.LinearLayout.LayoutParams(-1,-2));
 		}
 		int[] cgAccountButtons={R.id.linear_account_settings,R.id.linear_account_subtitle_font,R.id.linear_my_content,
-			R.id.linear_help_support,R.id.button_open_login,R.id.button_login,R.id.button_register};
+			R.id.button_open_login,R.id.button_login,R.id.button_register};
 		for(int id:cgAccountButtons) {android.view.View view=findViewById(id);cgGlass.bind(view,24,true);cgGlass.press(view);if(view instanceof android.widget.TextView)((android.widget.TextView)view).setTextColor(0xFFFFFFFF);}
 		findViewById(R.id.linear_account_content).setBackgroundColor(0xFF111113);
 		if (!getIntent().getBooleanExtra("cigram_nav_reveal", false)) {
@@ -1766,10 +1714,7 @@ public class AccountActivity extends AppCompatActivity {
 				cgGlass.px(6)
 				);
 				
-				android.view.View cgHelpRow =
-				findViewById(
-				R.id.linear_help_support
-				);
+				android.view.View cgHelpRow = null;
 				
 				int cgContactIndex =
 				cgContactParent.getChildCount();

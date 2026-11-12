@@ -22,7 +22,7 @@ import com.google.android.gms.ads.appopen.AppOpenAd;
  * The App open format is used on purpose: AdMob does not allow a normal interstitial on app load,
  * App open ads are the format made for this moment.
  *
- * Wiring (AdsOverlay.onAppOpen, called from MainActivity onCreate):
+ * Wiring (onAppOpen, called from MainActivity onCreate):
  *   1. {@link #preload(Activity)} starts the request at once, in parallel with the in-house splash.
  *   2. {@link #showOrSkip(Activity, Runnable)} runs only when the in-house (paid) splash did NOT show
  *      this launch. It shows the ad if it is ready, or waits for it while we are still inside
@@ -75,6 +75,15 @@ public final class CigramAppOpenAd {
      * No app-open ad for this launch (the in-house splash will show). Also stops a later
      * MainActivity re-creation in the same process from starting one in the middle of a session.
      */
+    /** App start: request the AdMob App Open ad and show it once it is ready (never for Cigram Plus). */
+    public static void onAppOpen(final Activity activity) {
+        try {
+            if (activity == null || CigramPlus.isPlus(activity)) return;
+            preload(activity);
+            showOrSkip(activity, null);
+        } catch (Throwable ignored) { }
+    }
+
     public static void skipThisLaunch() {
         if (started) return;
         started = true;

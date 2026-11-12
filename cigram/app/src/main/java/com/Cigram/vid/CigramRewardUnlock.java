@@ -463,25 +463,14 @@ public final class CigramRewardUnlock {
         afterHost(r, r.go); // the black screen goes first, so the chooser / player appears on the film page
     }
 
-    /** No AdMob ad could be shown (not the viewer's fault): in-house break ad if cached, then open. */
+    /** No AdMob ad could be shown (not the viewer's fault): open at once. */
     private static void noFill(final Request r, String why) {
         if (r.finished || r.started) return;
         finish(r);
         CigramAdManager.report(r.app, "ad_skipped", PLACEMENT, why);
         afterHost(r, new Runnable() {
             @Override public void run() {
-                boolean adminShown = false;
-                try {
-                    if (AdsUi.alive(r.activity)) {
-                        adminShown = AdsOverlay.showBreak(r.activity, new Runnable() {
-                            @Override public void run() {
-                                CigramAdManager.recordSupportAdShown(r.app);
-                                r.go.run();
-                            }
-                        });
-                    }
-                } catch (Throwable ignored) { }
-                if (!adminShown) r.go.run();
+                r.go.run();
             }
         });
     }

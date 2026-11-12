@@ -79,9 +79,8 @@ public final class CigramAccountUI {
             restyleRowAs(a, byId(a, "linear_account_settings"), "الإعدادات", "التطبيق والإشعارات وأيقونة التطبيق", AdsIcons.GEAR, 0);
             restyleExisting(a, byId(a, "linear_account_subtitle_font"), AdsIcons.FONT, 0, "شكل وحجم الخط");
             restyleRowAs(a, byId(a, "linear_my_content"), "قائمة المشاهدة", "المفضلة والمشاهدة لاحقاً وما شاهدته", AdsIcons.BOOKMARK, 0);
-            restyleRowAs(a, byId(a, "linear_help_support"), "المساعدة", "أسئلة شائعة عن التطبيق", AdsIcons.HELP, 0);
             restyleExisting(a, host.findViewWithTag(TAG_UPDATE), AdsIcons.REFRESH, 0, "");
-            restyleRowAs(a, host.findViewWithTag(TAG_CONTACT), "الدعم والتواصل", "راسل فريق Cigram أو اطلب عنواناً", AdsIcons.HEADSET, 0);
+            restyleRowAs(a, host.findViewWithTag(TAG_CONTACT), "أرسل طلبك أو مشكلتك", "اطلب فيلماً أو مسلسلاً أو قناة، أو بلّغ عن مشكلة", AdsIcons.SEND, 0);
             removeAdsRow(host); // v5.29: «أعلن هنا» is no longer shown anywhere in the app
             CigramAccountDesign.guest(a);   // v10.71: the guest hero + the brand action button
             CigramAuthPolish.apply(a); // v10.29: صفحة الدخول/إنشاء الحساب (التصميم «أ»)
@@ -97,15 +96,9 @@ public final class CigramAccountUI {
      * v5.29 section groups:
      *   «الحساب»  الإعدادات · خطوطي · محتوياتي
      *   (المشاهدة لاحقاً)
-     *   «الدعم»   المساعدة والدعم · التحقق من التحديثات · تواصل معنا
+     *   «الدعم»   الدعم والتواصل · أرسل طلبك أو مشكلتك · التحقق من التحديثات
      */
     private static void arrangeGroups(Activity a, LinearLayout host) {
-        View help = byId(a, "linear_help_support");
-        View update = host.findViewWithTag(TAG_UPDATE);
-        if (help != null && update != null && help.getParent() == host && update.getParent() == host) {
-            host.removeView(help);
-            host.addView(help, host.indexOfChild(update));
-        }
         CigramAccountDash.arrange(a, host);
     }
 

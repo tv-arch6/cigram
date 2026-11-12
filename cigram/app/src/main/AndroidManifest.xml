@@ -184,10 +184,6 @@
 			android:theme="@style/CigramDarkTheme"
 			android:windowSoftInputMode="stateHidden" />
 		<activity
-			android:name=".AdsActivity"
-			android:theme="@style/CigramDarkTheme"
-			android:windowSoftInputMode="stateHidden" />
-		<activity
 			android:name=".LiveActivity"
 			android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
 			android:hardwareAccelerated="true"
@@ -209,12 +205,7 @@
 		<activity
 			android:name=".CommunicationActivity"
 			android:theme="@style/CigramDarkTheme" />
-		<!-- 2026: About Cigram (founder) and Terms and Conditions pages -->
-		<activity
-			android:name=".CigramAboutActivity"
-			android:theme="@style/CigramDarkTheme"
-			android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
-			android:exported="false" />
+		<!-- Terms and Conditions page -->
 		<activity
 			android:name=".CigramTermsActivity"
 			android:theme="@style/CigramDarkTheme"
@@ -412,18 +403,8 @@
     android:theme="@android:style/Theme.Material.NoActionBar" />
 
 <activity
-    android:name="com.Cigram.vid.AdvertiseActivity"
-    android:exported="false"
-    android:configChanges="orientation|screenSize|keyboardHidden|fontScale"
-    android:theme="@android:style/Theme.Material.NoActionBar"
-    android:windowSoftInputMode="adjustResize" />
-<activity
     android:name="com.Cigram.vid.AdsChatActivity"
     android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|keyboard|uiMode"
-    android:theme="@android:style/Theme.Material.NoActionBar"
-    android:windowSoftInputMode="adjustResize" />
-<activity
-    android:name="com.Cigram.vid.MyAdsActivity"
     android:theme="@android:style/Theme.Material.NoActionBar"
     android:windowSoftInputMode="adjustResize" />
 <provider

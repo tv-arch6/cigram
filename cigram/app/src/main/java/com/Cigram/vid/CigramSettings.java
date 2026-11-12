@@ -308,13 +308,8 @@ public final class CigramSettings {
             col.addView(app);
 
             // ---------------------------------------------------------- about
-            col.addView(heading(a, "عن Cigram"));
+            col.addView(heading(a, "الشروط"));
             LinearLayout aboutCard = card(a);
-            aboutCard.addView(row(a, CigramUI.ICON_INFO, CigramUI.TEAL, "حول التطبيق", "ما هو Cigram ومن يقف خلفه", false,
-                    new View.OnClickListener() {
-                        @Override public void onClick(View v) { a.startActivity(new android.content.Intent(a, CigramAboutActivity.class)); }
-                    }));
-            aboutCard.addView(divider(a));
             aboutCard.addView(row(a, CigramUI.ICON_FLAG, CigramUI.TEAL, "الشروط والأحكام", "شروط استخدام Cigram", false,
                     new View.OnClickListener() {
                         @Override public void onClick(View v) { a.startActivity(new android.content.Intent(a, CigramTermsActivity.class)); }
@@ -358,7 +353,7 @@ public final class CigramSettings {
             col.addView(store);
 
             // ---------------------------------------------------------- support
-            col.addView(heading(a, "الدعم وحول التطبيق"));
+            col.addView(heading(a, "الدعم والتحديثات"));
             LinearLayout help = card(a);
             String version = CigramUpdateChecker.installedName(a);
             help.addView(row(a, CigramUI.ICON_UPDATE, CigramUI.GREEN, "التحقق من التحديثات",

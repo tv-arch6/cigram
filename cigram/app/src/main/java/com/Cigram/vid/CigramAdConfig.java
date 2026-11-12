@@ -158,31 +158,10 @@ public final class CigramAdConfig {
      * true (current, v1.6.8) = AdMob is fully back: app-open, interstitial, rewarded, episode, support, mid-roll in the player.
      * false = the AdMob SDK is never started, no AdMob ad is requested or shown (app-open, interstitial,
      * rewarded, episode, support, TV) and the remote config cannot turn it back on.
-     * The in-house ads from the Cigram ads worker (home slots, splash/popup) are NOT affected.
      * true = the old behaviour (AdMob + remote switches).
      */
     public static final boolean ADMOB_ENABLED = true;
 
-    /**
-     * In-house ads (the campaigns of the Cigram ads worker, shown by AdsOverlay.showBreak) inside the BUILT-IN player:
-     * before an episode / on «شاهد هسه», and as mid-rolls at the CigramAdBreaks positions.
-     * They are used instead of AdMob when ADMOB_ENABLED is false. Remote key "inhouse_breaks_enabled" can switch them off.
-     */
-    public static final boolean INHOUSE_BREAKS_ENABLED = true;
-
-    public static boolean inHouseBreaksEnabled(Context c) {
-        return flag(c, "inhouse_breaks_enabled", INHOUSE_BREAKS_ENABLED);
-    }
-
-    /** AdMob is off but the in-house breaks are on. */
-    public static boolean inHouseOnly(Context c) {
-        if (ADMOB_ENABLED || !inHouseBreaksEnabled(c)) return false;
-        // The companion Cigram Player takes the title over and shows ITS OWN ads (AdMob): no second ad before it opens.
-        try {
-            if (CigramPlayerLauncher.isEnabled(c) && CigramPlayerLauncher.isInstalled(c)) return false;
-        } catch (Throwable ignored) { }
-        return true;
-    }
 
     public static boolean adsEnabled(Context c) {
         if (!ADMOB_ENABLED) return false;

@@ -57,7 +57,6 @@ final class CigramAccountDash {
     private static final String TAG_PLUS = "cigram_row_plus";
     private static final String TAG_SWITCH = "cigram_row_switch";
     private static final String TAG_AD_REQUEST = "cigram_row_ad_request";
-    private static final String TAG_ABOUT = "cigram_row_about";
     private static final String TAG_TERMS = "cigram_row_terms";
     private static final String TAG_TELEGRAM = "cigram_row_telegram";
     private static final String TAG_PROFILES = "cigram_row_profiles";
@@ -98,7 +97,6 @@ final class CigramAccountDash {
         View settings = byId(a, "linear_account_settings");
         View fonts = byId(a, "linear_account_subtitle_font");
         View mine = byId(a, "linear_my_content");
-        View help = byId(a, "linear_help_support");
         View update = host.findViewWithTag(TAG_UPDATE);
         View contact = host.findViewWithTag(TAG_CONTACT);
         View widget = host.findViewWithTag(TAG_WIDGET);
@@ -130,13 +128,9 @@ final class CigramAccountDash {
                     @Override public void onClick(View v) { showSwitchDialog(a); }
                 });
         // 18.2: same entry, new experience — Cigram Private Support (the private conversation with the developer)
-        View adRequest = ensureRow(a, host, TAG_AD_REQUEST, "أريد إعلاناً", "الدعم الخاص: تواصل مباشرة مع مطوّر Cigram",
+        View adRequest = ensureRow(a, host, TAG_AD_REQUEST, "الدعم والتواصل", "أسعار Cigram Plus · المزايا · المشاكل",
                 AdsIcons.CHAT, 0, new View.OnClickListener() {
                     @Override public void onClick(View v) { CigramSupport.open(a); }
-                });
-        View about = ensureRow(a, host, TAG_ABOUT, "حول التطبيق", "ما هو Cigram ومن يقف خلفه", AdsIcons.INFO, 0,
-                new View.OnClickListener() {
-                    @Override public void onClick(View v) { openPage(a, CigramAboutActivity.class); }
                 });
         View terms = ensureRow(a, host, TAG_TERMS, "الشروط والأحكام", "شروط استخدام Cigram", AdsIcons.DOC, 0,
                 new View.OnClickListener() {
@@ -209,9 +203,9 @@ final class CigramAccountDash {
         if (mine != null && !accountRows.contains(mine)) experience.add(mine);
         add(experience, profiles, calendar, switchRow, theme, fonts, perf, widget);
         ArrayList<View> support = new ArrayList<View>();
-        add(support, adRequest, contact, help, update);
+        add(support, adRequest, contact, update);
         ArrayList<View> info = new ArrayList<View>();
-        add(info, about, terms);
+        add(info, terms);
         ArrayList<View> actions = new ArrayList<View>();
         add(actions, logout);
         ArrayList<View> follow = new ArrayList<View>();
@@ -226,7 +220,7 @@ final class CigramAccountDash {
         sequence.addAll(experience);
         sequence.add(title(a, "support", "الدعم والتواصل"));
         sequence.addAll(support);
-        sequence.add(title(a, "info", "عن Cigram"));
+        sequence.add(title(a, "info", "الشروط"));
         sequence.addAll(info);
         sequence.add(title(a, "actions", "إجراءات الحساب"));
         sequence.addAll(actions);

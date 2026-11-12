@@ -32,7 +32,7 @@ public final class CigramTvMode {
 
     /** الشاشات التي كانت «Portrait» في إعدادات المشروع (قفل الطول يُطبَّق الآن من هنا على غير التلفاز). */
     private static final String[] PHONE_PORTRAIT = {
-            "MainActivity", "DetailsActivity", "SettingsActivity", "AdsActivity",
+            "MainActivity", "DetailsActivity", "SettingsActivity",
             "MyContentActivity", "SectionActivity", "NotificationsActivity"
     };
 

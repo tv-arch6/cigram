@@ -3092,16 +3092,8 @@ public class MainActivity extends AppCompatActivity {
 			}
 		}
 		
-		// CIGRAM ADS — إعلانات الشركات (تظهر فقط عند وجود إعلان معتمد، ولا تأخذ حيّزاً بدونه)
-		{
-			android.widget.LinearLayout cgAdRoot = (android.widget.LinearLayout) findViewById(R.id.linear1);
-			if (cgAdRoot != null) {
-				AdSlotView.install(MainActivity.this, cgAdRoot, "hero", Math.min(2, cgAdRoot.getChildCount()));
-				AdSlotView.install(MainActivity.this, cgAdRoot, "sponsor", Math.min(3, cgAdRoot.getChildCount()));
-				AdSlotView.installSticky(MainActivity.this, 64);
-			}
-			AdsOverlay.onAppOpen(MainActivity.this);
-		}
+		// AdMob App Open (الإعلان الوحيد عند الفتح؛ لا يظهر لمشتركي Cigram Plus)
+		CigramAppOpenAd.onAppOpen(MainActivity.this);
 		
 	}
 	

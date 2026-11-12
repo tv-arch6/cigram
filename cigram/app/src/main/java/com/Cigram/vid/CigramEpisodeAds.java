@@ -236,7 +236,7 @@ public final class CigramEpisodeAds {
             }
             final Context app = activity.getApplicationContext();
             long now = SystemClock.elapsedRealtime();
-            boolean enabled = CigramAdConfig.episodeAdsEnabled(app) || CigramAdConfig.inHouseOnly(app);
+            boolean enabled = CigramAdConfig.episodeAdsEnabled(app);
             // v4.1: same hourly / session / cooldown limits as the mid-roll (shared, persisted)
             String why = enabled ? CigramAdManager.episodeAdBlockReason(app, TOKEN) : "episode_ads_disabled";
             // v6.2 / v10.34: a press of «شاهد هسه» ALWAYS gets its ad: no cooldown, no hourly or
@@ -330,26 +330,8 @@ public final class CigramEpisodeAds {
                 return;
             }
 
-            // 2) Admin-app ad (cached copy only, never waits on the network)
-            showing = true; // set first: onClosed may run synchronously if the dialog cannot be shown
-            showingSince = now;
-            boolean adminShown = AdsOverlay.showBreak(activity, new Runnable() {
-                @Override public void run() {
-                    showing = false;
-                    lastShownAt = SystemClock.elapsedRealtime();
-                    CigramAdManager.recordSupportAdShown(app);
-                    go.run();
-                    hideCoverSoon();
-                }
-            });
-            if (adminShown) {
-                if (!done[0]) runQuietly(pause);
-                preload(activity);
-                return;
-            }
-            showing = false;
 
-            // 3) nothing ready: open the episode now, get an ad ready for next time
+            // 2) nothing ready: open the episode now, get an ad ready for next time
             diag(app, "no ad ready (init=" + CigramAdManager.isInitialized() + " loading=" + loading
                     + " backoffMs=" + Math.max(0L, nextLoadAt - SystemClock.elapsedRealtime()) + ")");
             preload(activity);
