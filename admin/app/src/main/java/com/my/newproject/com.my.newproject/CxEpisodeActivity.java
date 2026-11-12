@@ -944,10 +944,6 @@ public class CxEpisodeActivity extends CxBase {
         int s = CxJ.n(st, "season");
         int e = CxJ.n(st, "episode");
         String name = CxJ.s(st, "title").length() > 0 ? CxJ.s(st, "title") : "الحلقة " + e;
-        page.addView(CgUi.sectionTitle(this, "هكذا ستظهر الحلقة"));
-        page.addView(CxPreview.episodeCard(this, h == null ? "" : CxJ.firstNonEmpty(CgData.s(h, "backdrop"), CxOps2.posterOf(h)),
-                CxNames.code(s, e) + (h == null ? "" : " • " + CgData.s(h, "title")), name,
-                CxJ.s(st, "video").length() > 0, CxJ.s(st, "subtitle").length() > 0));
         page.addView(CxUi.notice(this, CxUi.GOOD, "الحلقة ستُربط بالمسلسل «" + (h == null ? "" : CgData.s(h, "title")) + "» عبر series_id — لن يُنشأ مسلسل جديد."));
         if (CxJ.s(st, "subtitle").length() == 0) page.addView(CxUi.notice(this, CxUi.INFO, "بدون ترجمة — ليس خطأً، ويمكن إضافتها لاحقاً."));
         TextView player = CgUi.button(this, "▶  معاينة بالمشغل", 1);

@@ -552,13 +552,6 @@ public class CxMovieActivity extends CxBase {
     // step 3 ------------------------------------------------------------------------
 
     private void stepPreview() {
-        page.addView(CgUi.sectionTitle(this, "هكذا سيظهر الفيلم"));
-        page.addView(CxPreview.contentPage(this, st, false, new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                CxMedia.openPlayer(CxMovieActivity.this, CxJ.s(st, "title"), CxJ.s(st, "video"), CxJ.s(st, "subtitle"));
-            }
-        }));
         page.addView(CgUi.sectionTitle(this, "فحص الاكتمال"));
         page.addView(CxUi.notice(this, CxUi.GOOD, "رابط الفيديو موجود."));
         if (CxJ.s(st, "subtitle").length() == 0) page.addView(CxUi.notice(this, CxUi.INFO, "بدون ترجمة — يمكن إضافتها لاحقاً (ليس خطأً)."));

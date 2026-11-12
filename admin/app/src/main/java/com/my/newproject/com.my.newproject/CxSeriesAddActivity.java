@@ -250,8 +250,6 @@ public class CxSeriesAddActivity extends CxBase {
 
     private void stepPublish() {
         form = null;
-        page.addView(CgUi.sectionTitle(this, "هكذا سيظهر المسلسل"));
-        page.addView(CxPreview.contentPage(this, st, true, null));
         LinearLayout c = CgUi.card(this);
         c.addView(CgUi.text(this, "ما الذي سيحدث؟", 14.5f, CgCfg.TEXT, true));
         c.addView(CgUi.muted(this, "• يُنشأ سجل مسلسل واحد فقط: " + (CxJ.s(st, "tmdb_id").length() > 0 ? "series_" + CxJ.s(st, "tmdb_id") : "بمعرّف مبني على الـ Slug")

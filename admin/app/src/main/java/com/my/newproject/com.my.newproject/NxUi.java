@@ -37,11 +37,11 @@ final class NxUi {
     static final int SUB = CgCfg.MUTED;
     static final int DIM = 0xFF6E6E78;
 
-    static final int BLUE = 0xFF6C8CFF;          // active users
-    static final int VIOLET = 0xFF9E7BFF;        // watching now
-    static final int ORANGE = 0xFFFFB45D;        // ads
-    static final int TEAL = 0xFF35D6C0;          // accounts / channels
-    static final int PINK = 0xFFFF7AA8;
+    static final int BLUE = 0xFFFFFFFF;          // active users
+    static final int VIOLET = 0xFFD1D1D6;        // watching now
+    static final int ORANGE = 0xFFE5E5EA;        // ads
+    static final int TEAL = 0xFFFFFFFF;          // accounts / channels
+    static final int PINK = 0xFFC7C7CC;
     static final int UP = 0xFF3DDC97;
     static final int DOWN = 0xFFFF6B7D;
     static final int LIVE = 0xFFFF6B7D;

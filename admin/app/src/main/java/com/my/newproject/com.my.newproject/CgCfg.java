@@ -67,30 +67,30 @@ final class CgCfg {
     // (2026 note kept for history) Cigram identity: the same charcoal ladder as the Cigram app (near-black page, four graduated surfaces),
     // the Cigram red as the one primary action colour and Cigram gold as the second accent. Only the values changed
     // (every screen reads them from here), so no screen logic is touched.
-    static final int PAGE = 0xFF0A0B0E;      // window / page background (deepest)
-    static final int PAGE2 = 0xFF0F1116;     // hero / header wash
-    static final int CARD = 0xFF12141A;      // cards
-    static final int CARD2 = 0xFF191C24;     // raised / pressed / tonal surfaces
-    static final int CARD3 = 0xFF222632;     // highest surface (chips, inner tiles)
-    static final int STROKE = 0xFF252A35;    // dividers, hairlines
-    static final int STROKE_SOFT = 0xFF1B1F28; // barely-there separators
-    static final int FIELD = 0xFF0E1015;     // text inputs
-    static final int TEXT = 0xFFF4F5F7;      // primary text
-    static final int MUTED = 0xFF9BA1AE;     // secondary text
-    static final int FAINT = 0xFF687080;     // tertiary / faint captions
+    static final int PAGE = 0xFF000000;      // window / page background (deepest)
+    static final int PAGE2 = 0xFF0A0A0B;     // hero / header wash
+    static final int CARD = 0xFF111113;      // cards
+    static final int CARD2 = 0xFF1C1C1F;     // raised / pressed / tonal surfaces
+    static final int CARD3 = 0xFF2C2C2F;     // highest surface (chips, inner tiles)
+    static final int STROKE = 0xFF2C2C2F;    // dividers, hairlines
+    static final int STROKE_SOFT = 0xFF1C1C1F; // barely-there separators
+    static final int FIELD = 0xFF0E0E10;     // text inputs
+    static final int TEXT = 0xFFFFFFFF;      // primary text
+    static final int MUTED = 0xFFAEAEB2;     // secondary text
+    static final int FAINT = 0xFF8E8E93;     // tertiary / faint captions
     static final int ON_ACCENT = 0xFFFFFFFF; // text on accent fills
 
-    static final int ACCENT = 0xFFFF6A5E;    // links, icons, selection (light Cigram red, readable on charcoal)
+    static final int ACCENT = 0xFFFFFFFF;    // links, icons, selection (light Cigram red, readable on charcoal)
     static final int ACCENT_D = 0xFFE21B14;  // primary button fill (Cigram red)
     static final int ACCENT_P = 0xFFB8150F;  // primary pressed
-    static final int ACCENT_2 = 0xFFF2C14E;  // Cigram gold (second accent)
+    static final int ACCENT_2 = 0xFFE5E5EA;  // Cigram gold (second accent)
     static final int ACCENT_G1 = 0xFFF0362B; // primary gradient start
     static final int ACCENT_G2 = 0xFFB3120D; // primary gradient end
-    static final int CYAN = 0xFF7CC7E8;      // cool highlight (charts)
+    static final int CYAN = 0xFFD1D1D6;      // cool highlight (charts)
 
-    static final int ORANGE = 0xFFFFB45D;    // highlights / current step
+    static final int ORANGE = 0xFFE5E5EA;    // highlights / current step
     static final int GOOD = 0xFF3DDC97;
     static final int WARN = 0xFFFFC24D;
     static final int BAD = 0xFFFF6B7D;
-    static final int GRAY = 0xFF7F8CA6;
+    static final int GRAY = 0xFF8E8E93;
 }

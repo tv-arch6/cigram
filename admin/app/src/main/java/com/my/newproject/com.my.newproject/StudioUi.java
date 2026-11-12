@@ -32,17 +32,17 @@ final class StudioUi {
 
     private StudioUi() { }
 
-    static final int INK = 0xFF0A0B0E;          // page
-    static final int PANEL = 0xFF12141A;        // panels / rows
-    static final int PANEL_HI = 0xFF191C24;     // pressed / raised
-    static final int LINE = 0xFF252A35;         // hairline
-    static final int RED = 0xFFE21B14;
-    static final int GOLD = 0xFFF2C14E;
-    static final int SKY = 0xFF5CC8F0;
-    static final int MINT = 0xFF3DDC97;
-    static final int VIOLET = 0xFFA78BFA;
-    static final int ORANGE = 0xFFFF9F45;
-    static final int PINK = 0xFFFF6FA5;
+    static final int INK = 0xFF000000;          // page
+    static final int PANEL = 0xFF111113;        // panels / rows
+    static final int PANEL_HI = 0xFF1C1C1F;     // pressed / raised
+    static final int LINE = 0xFF2C2C2F;         // hairline
+    static final int RED = 0xFFFFFFFF;
+    static final int GOLD = 0xFFE5E5EA;
+    static final int SKY = 0xFFFFFFFF;
+    static final int MINT = 0xFFE5E5EA;
+    static final int VIOLET = 0xFFD1D1D6;
+    static final int ORANGE = 0xFFFFFFFF;
+    static final int PINK = 0xFFC7C7CC;
 
     static int dp(Context c, float v) { return CgUi.dp(c, v); }
 
