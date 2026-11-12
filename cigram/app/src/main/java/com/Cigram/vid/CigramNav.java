@@ -66,6 +66,65 @@ final class CigramNav {
             "CigramTvActivity", "CigramTvDetailsActivity", "CigramMediaViewer"};
 
     /**
+     * The Channels page, the Account page and every section opened from the Account page show NO back arrow at all:
+     * the system Back button / gesture is the way out there (it still goes through {@link #back}'s target,
+     * {@code onBackPressed()}).
+     */
+    private static final String[] HIDE_BACK = {
+            "ChannelsActivity", "AccountActivity", "SettingsActivity", "MyContentActivity", "CommunicationActivity",
+            "NotificationsActivity", "CigramTermsActivity", "CigramPlusActivity", "CigramPlusCodeActivity",
+            "CigramWatchCalendarActivity", "AdsChatActivity", "CigramUpdateActivity", "CigramWatchlistMoreActivity"};
+
+    static boolean hidesBack(String simpleName) {
+        for (String n : HIDE_BACK) if (n.equals(simpleName)) return true;
+        return false;
+    }
+
+    /** Pages build their headers in steps (some after a network answer): the arrow is removed now and again shortly after. */
+    private static void hideBackLater(final Activity activity) {
+        hideBackNow(activity);
+        final View content = activity.findViewById(android.R.id.content);
+        if (content == null) return;
+        for (long delay : new long[]{120L, 500L, 1500L}) {
+            content.postDelayed(new Runnable() {
+                @Override public void run() {
+                    if (!activity.isFinishing() && !activity.isDestroyed()) hideBackNow(activity);
+                }
+            }, delay);
+        }
+    }
+
+    private static void hideBackNow(Activity activity) {
+        try {
+            for (String id : BACK_IDS) {
+                View v = byId(activity, id);
+                if (v != null) v.setVisibility(View.GONE);
+            }
+            View channelsBack = byId(activity, "imageview_channels_back");
+            if (channelsBack != null) channelsBack.setVisibility(View.GONE);
+            hideBackIn(activity.findViewById(android.R.id.content));
+        } catch (Throwable ignored) { }
+    }
+
+    private static void hideBackIn(View root) {
+        if (root == null) return;
+        boolean isBack = CigramTopBar.TAG_BACK.equals(root.getTag());
+        CharSequence description = root.getContentDescription();
+        if (!isBack && description != null && root.isClickable()) {
+            String d = description.toString().trim();
+            isBack = d.equals("رجوع") || d.equalsIgnoreCase("back") || d.equals("العودة");
+        }
+        if (isBack) {
+            root.setVisibility(View.GONE);
+            return;
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) hideBackIn(group.getChildAt(i));
+        }
+    }
+
+    /**
      * The guarantee: after this call the screen has ONE visible back button that goes through {@link #back}.
      *
      *  1. the screen's own XML header arrow is made a real button (48 dp target, «رجوع», tap = {@link #back}) when nothing else wired it;
@@ -81,6 +140,10 @@ final class CigramNav {
             String name = activity.getClass().getSimpleName();
             for (String skip : NO_BACK_BUTTON) if (skip.equals(name)) return;
             if (CigramTvMode.isTv(activity)) return;
+            if (hidesBack(name)) {
+                hideBackLater(activity);
+                return;
+            }
             View content = activity.findViewById(android.R.id.content);
             if (!(content instanceof ViewGroup)) return;
 

@@ -376,7 +376,14 @@ public final class CigramAccountHeader {
             backdrop.setLayoutParams(new LayoutParams(-1, coverH, Gravity.TOP));
             video.setLayoutParams(new LayoutParams(-1, coverH, Gravity.TOP));
 
-            // 2026: the user's banner is shown as it is: no fade / gradient painted over it any more
+            // The banner sits BEHIND the page: its lower edge melts into the page colour (no line between the two) and
+            // the page's own scroll position decides how much of it shows (see watchScroll)
+            View melt = new View(a);
+            melt.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{pal.page & 0x00FFFFFF, (pal.page & 0x00FFFFFF) | 0x99000000, pal.page}));
+            addView(melt, new LayoutParams(-1, CigramUI.dp(a, 64), Gravity.TOP));
+            ((LayoutParams) melt.getLayoutParams()).topMargin = coverH - CigramUI.dp(a, 64) + 1;
+            bannerMelt = melt;
 
             TextView cover = CigramUI.label(a, "الغلاف", 12f, 0xFFFFFFFF, false);
             cover.setGravity(Gravity.CENTER);
@@ -416,6 +423,9 @@ public final class CigramAccountHeader {
             LayoutParams gl = new LayoutParams(CigramUI.dp(a, 34), CigramUI.dp(a, 34), Gravity.TOP | Gravity.RIGHT);
             gl.setMargins(0, CigramUI.dp(a, 12), CigramUI.dp(a, 16), 0);
             addView(gear, gl);
+            bannerButtons = new View[]{cover, gear};
+            bannerHeight = coverH;
+            watchScroll();
 
             // avatar: a ring in the page colour (it reads as a cut-out of the cover), overlapping the cover's lower edge
             int ringSize = CigramUI.dp(a, 92);
@@ -488,6 +498,59 @@ public final class CigramAccountHeader {
             addView(texts, tl);
         }
 
+        // ---- the banner follows the page: pulled down it is fully there, pushed up it sinks and fades step by step
+        private View bannerMelt;
+        private View[] bannerButtons;
+        private int bannerHeight;
+        private android.view.ViewTreeObserver.OnScrollChangedListener scrollWatch;
+
+        private View scroller() {
+            android.view.ViewParent p = getParent();
+            while (p instanceof View) {
+                if (p instanceof android.widget.ScrollView) return (View) p;
+                p = p.getParent();
+            }
+            return null;
+        }
+
+        private void watchScroll() {
+            addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
+                @Override public void onViewAttachedToWindow(View v) {
+                    if (scrollWatch != null) return;
+                    scrollWatch = new android.view.ViewTreeObserver.OnScrollChangedListener() {
+                        @Override public void onScrollChanged() { applyScroll(); }
+                    };
+                    try { getViewTreeObserver().addOnScrollChangedListener(scrollWatch); } catch (Throwable ignored) { }
+                    applyScroll();
+                }
+                @Override public void onViewDetachedFromWindow(View v) {
+                    try { if (scrollWatch != null) getViewTreeObserver().removeOnScrollChangedListener(scrollWatch); } catch (Throwable ignored) { }
+                    scrollWatch = null;
+                }
+            });
+        }
+
+        private void applyScroll() {
+            if (bannerHeight <= 0) return;
+            View sv = scroller();
+            float y = sv == null ? 0f : Math.max(0, sv.getScrollY());
+            float k = Math.min(1f, y / bannerHeight);          // 0 = page at rest, 1 = the banner's height scrolled away
+            float alpha = 1f - k * k * (3f - 2f * k);          // smooth step: no sudden cut at either end
+            float sink = y * 0.45f;                            // the banner moves slower than the page: it stays behind it
+            backdrop.setTranslationY(sink);
+            video.setTranslationY(sink);
+            backdrop.setAlpha(alpha);
+            video.setAlpha(alpha);
+            if (bannerMelt != null) bannerMelt.setTranslationY(sink);
+            if (bannerButtons != null) {
+                for (View b : bannerButtons) {
+                    if (b == null) continue;
+                    b.setAlpha(Math.max(0f, 1f - k * 2.2f));
+                    b.setEnabled(k < 0.4f);
+                }
+            }
+        }
+
         void bindProfile(final Activity a) {
             String n = textOf(a, "textview_profile_username_row");
             name.setText(n.length() == 0 ? "المستخدم" : n);
@@ -518,7 +581,9 @@ public final class CigramAccountHeader {
             phoneEmail.setVisibility(mail.length() == 0 ? View.GONE : View.VISIBLE);
             boolean plus = false;
             try { plus = CigramPlus.isPlus(a); } catch (Throwable ignored) { }
-            statusChip.setText(plus ? "Cigram Plus" : "عضو في سيكرام");
+            // a subscriber already carries the verification mark on the picture: no second "Cigram Plus" label here
+            statusChip.setVisibility(plus ? View.GONE : View.VISIBLE);
+            statusChip.setText("عضو في سيكرام");
             statusChip.setTextColor(plus ? pal.gold : pal.text2);
             statusChip.setBackground(CigramPalette.round(a, plus ? pal.goldSoft : pal.surfaceHi,
                     plus ? CigramPalette.alpha(pal.gold, 0x66) : pal.stroke, 13));
