@@ -35,6 +35,7 @@ import java.util.Random;
  */
 final class CigramPlusUI {
 
+    /** The old Plus box of the Account page (removed: the subscription is shown inside the Cigram Plus page only). */
     static final String TAG_BOX = "cigram_plus_box";
 
     static final int GOLD_LIGHT = 0xFFFFE7A0;
@@ -128,108 +129,6 @@ final class CigramPlusUI {
     }
 
     interface Click { void onClick(); }
-
-    // ================================================================== the small box on the account page
-
-    /**
-     * The Plus entry of the account page (logged-in accounts only): a gold-framed card. Without Plus it invites to discover the
-     * benefits (or to enter a code in the Play build); with Plus it is the member card: dates, days left, progress, and a way into
-     * the members' area.
-     */
-    static View buildBox(final Activity a) {
-        final boolean plus = CigramPlus.isPlus(a);
-        final long ended = CigramPlus.expiredAt(a);
-        final boolean sales = CigramPlus.salesEnabled();
-
-        FrameLayout root = new FrameLayout(a);
-        root.setTag(TAG_BOX);
-        root.setBackground(CigramPlusArt.hero(a, 24));
-        root.setElevation(CigramUI.dp(a, 3));
-        View glow = new View(a);
-        glow.setBackground(CigramPlusArt.glow(a, 24));
-        root.addView(glow, new FrameLayout.LayoutParams(-1, -1));
-
-        LinearLayout col = new LinearLayout(a);
-        col.setOrientation(LinearLayout.VERTICAL);
-        col.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        int pad = CigramUI.dp(a, 18);
-        col.setPadding(pad, pad, pad, pad);
-
-        LinearLayout head = new LinearLayout(a);
-        head.setOrientation(LinearLayout.HORIZONTAL);
-        head.setGravity(Gravity.CENTER_VERTICAL);
-        ImageView crown = new ImageView(a);
-        crown.setImageDrawable(new CrownDrawable(GOLD));
-        head.addView(crown, new LinearLayout.LayoutParams(CigramUI.dp(a, 28), CigramUI.dp(a, 23)));
-        TextView t = CigramUI.label(a, "Cigram Plus", 18f, GOLD, true);
-        t.setPadding(CigramUI.dp(a, 10), 0, 0, 0);
-        head.addView(t, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        if (plus) {
-            TextView ok = CigramUI.label(a, "مفعّل ✓", 12f, 0xFFFFFFFF, true);
-            ok.setGravity(Gravity.CENTER);
-            ok.setPadding(CigramUI.dp(a, 12), CigramUI.dp(a, 4), CigramUI.dp(a, 12), CigramUI.dp(a, 4));
-            ok.setBackground(CigramPlusArt.ring(a, 12, 0xFF22B573, 0, 0));
-            head.addView(ok);
-        }
-        col.addView(head);
-
-        if (plus) {
-            TextView period = CigramUI.label(a, CigramPlus.periodText(a), 14f, 0xFFFFFFFF, true);
-            LinearLayout.LayoutParams pl = new LinearLayout.LayoutParams(-1, -2);
-            pl.topMargin = CigramUI.dp(a, 12);
-            col.addView(period, pl);
-            col.addView(CigramUI.label(a, "متبقٍّ " + CigramPlus.daysLeft(a) + " يوم", 12f, 0xFF9FD8BF, false));
-            long from = CigramPlus.activatedAt(a), to = CigramPlus.until(a);
-            if (from > 0L && to > from) {
-                float f = Math.max(0f, Math.min(1f, (System.currentTimeMillis() - from) / (float) (to - from)));
-                int w = a.getResources().getDisplayMetrics().widthPixels - CigramUI.dp(a, 28 + 36);
-                FrameLayout track = new FrameLayout(a);
-                track.setBackground(CigramPlusArt.ring(a, 4, 0x33FFFFFF, 0, 0));
-                View fill = new View(a);
-                fill.setBackground(CigramPlusArt.ring(a, 4, GOLD, 0, 0));
-                track.addView(fill, new FrameLayout.LayoutParams(Math.max(CigramUI.dp(a, 8), (int) (w * f)), CigramUI.dp(a, 6), Gravity.RIGHT));
-                LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, CigramUI.dp(a, 6));
-                tp.topMargin = CigramUI.dp(a, 10);
-                col.addView(track, tp);
-            }
-        } else {
-            String line = ended > 0L ? "انتهى اشتراكك في " + CigramPlus.formatDate(ended) + " · جدّده الآن"
-                    : "بدون إعلانات · جودة حتى 4K · صورة داخل صورة · قنوات HD";
-            TextView sub = CigramUI.label(a, line, 12.5f, ended > 0L ? 0xFFFF9A9A : 0xCCFFFFFF, false);
-            sub.setLineSpacing(0f, 1.2f);
-            LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(-1, -2);
-            sl.topMargin = CigramUI.dp(a, 10);
-            col.addView(sub, sl);
-        }
-
-        TextView go = CigramUI.label(a, plus ? "أقسام Plus" : (sales ? "اكتشف المزايا" : "ضع كود التفعيل"), 15f, plus ? 0xFFFFFFFF : GOLD_INK, true);
-        go.setGravity(Gravity.CENTER);
-        go.setMinHeight(CigramUI.dp(a, 48));
-        go.setBackground(plus ? CigramPlusArt.ring(a, 16, 0x26F2B63D, 0x88F2B63D, 1f) : goldBg(a, 16));
-        go.setClickable(true);
-        go.setFocusable(true);
-        go.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { openPage(a, !plus && sales ? "pay" : "code"); }
-        });
-        LinearLayout.LayoutParams gl = new LinearLayout.LayoutParams(-1, -2);
-        gl.topMargin = CigramUI.dp(a, 14);
-        col.addView(go, gl);
-
-        root.addView(col, new FrameLayout.LayoutParams(-1, -2));
-        root.setClickable(false);
-        return root;
-    }
-
-    /** Re-draws the box in place (after the server answered with a new plan). */
-    static void refreshBox(Activity a, LinearLayout host) {
-        if (host == null) return;
-        View old = host.findViewWithTag(TAG_BOX);
-        if (old == null) return;
-        int at = host.indexOfChild(old);
-        ViewGroup.LayoutParams lp = old.getLayoutParams();
-        host.removeViewAt(at);
-        host.addView(buildBox(a), at, lp);
-    }
 
     /** True when the account has Plus; otherwise shows the small "this is a Plus service" card and returns false. */
     static boolean requirePlus(Activity a, String feature) {
@@ -405,6 +304,8 @@ final class CigramPlusUI {
         final ViewGroup root = (ViewGroup) a.findViewById(android.R.id.content);
         if (root == null) return;
         final boolean animate = animationsOn(a);
+        // activation: shapes fly in from the left and the right edge and are gone at once (drawn above the card)
+        root.postDelayed(new Runnable() { @Override public void run() { CigramFx.celebrate(a); } }, 220L);
 
         final FrameLayout overlay = new FrameLayout(a);
         overlay.setBackgroundColor(0xE6000000);

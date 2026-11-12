@@ -54,9 +54,8 @@ public final class CigramAccountExtras {
             if (plusCode != null && plusCode.getParent() instanceof ViewGroup) ((ViewGroup) plusCode.getParent()).removeView(plusCode);
             // Play build: the box is only worth showing to someone who already has Plus (no selling there)
             final boolean plusShown = CigramUserData.isLoggedIn(activity);
-            final boolean plusBoxShown = plusShown && (CigramPlus.salesEnabled() || CigramPlus.isPlus(activity));
+            final boolean plusBoxShown = false;   // the period and the account are shown INSIDE the Cigram Plus page only
             if (plusShown) {
-                if (plusBox == null && plusBoxShown) plusBox = CigramPlusUI.buildBox(activity);
                 if (plusCode == null) plusCode = buildPlusCodeRow(activity);
                 styleRow(activity, plusCode);
             }
@@ -93,13 +92,7 @@ public final class CigramAccountExtras {
                     next++;
                 }
                 host.addView(plusCode, next, rowParams(activity));
-                // server answer changes the plan -> redraw only the box
-                final LinearLayout hostRef = host;
-                CigramPlus.refresh(activity, false, new Runnable() {
-                    @Override public void run() {
-                        if (!activity.isFinishing()) CigramPlusUI.refreshBox(activity, hostRef);
-                    }
-                });
+                CigramPlus.refresh(activity, false, null);
             }
 
             // "add the Cigram widget to your home screen": optional, so a problem here can never remove the rows above

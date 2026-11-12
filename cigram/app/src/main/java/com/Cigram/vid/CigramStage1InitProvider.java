@@ -382,7 +382,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                             try { CigramTheme.onResumed(activity); } catch (Throwable ignored) { }   // v10.70
                             try {
                                 String screen = activity.getClass().getSimpleName();
-                                if ("PlayerActivity".equals(screen)) CigramRateCard.playerOpened();
+                                if ("PlayerActivity".equals(screen)) { CigramRateCard.playerOpened(); CigramSleepTimer.playerResumed(activity); }
                                 else if ("DetailsActivity".equals(screen)) CigramRateCard.detailsResumed(activity);
                             } catch (Throwable ignored) { }
                             try {
@@ -435,6 +435,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                         @Override
                         public void onActivityPaused(Activity activity) {
                             CigramTheme.onPaused(activity);   // v10.70: picture for the theme / rotation cross-fade
+                            try { if ("PlayerActivity".equals(activity.getClass().getSimpleName())) CigramSleepTimer.playerPaused(activity); } catch (Throwable ignored) { }
                             CigramTvMode.paused(activity);   // v10.66: TV only (stops that page's focus guard)
                         }
 
@@ -460,7 +461,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                         @Override
                         public void onActivityDestroyed(Activity activity) {
                             try {
-                                if ("PlayerActivity".equals(activity.getClass().getSimpleName())) CigramRateCard.playerClosed();
+                                if ("PlayerActivity".equals(activity.getClass().getSimpleName())) { CigramRateCard.playerClosed(); CigramSleepTimer.playerDestroyed(activity); }
                             } catch (Throwable ignored) { }
                             synchronized (MAIN_SETUP) {
                                 MAIN_SETUP.remove(activity);

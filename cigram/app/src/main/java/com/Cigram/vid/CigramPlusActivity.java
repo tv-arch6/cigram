@@ -241,9 +241,12 @@ public class CigramPlusActivity extends Activity {
                 {"قنوات HD و4K", "beIN SPORTS وغيرها بأعلى دقة"},
                 {"أولوية في الدعم", "نرد على رسالتك أولاً"},
                 {"أولوية في الطلبات", "طلبك لفيلم أو مسلسل يُنظر فيه أولاً"},
+                {"موقّت النوم", "يغلق المشغّل وحده بعد المدة التي تختارها"},
+                {"بطاقة العضوية", "بطاقتك بغلافك الشخصي ومدة اشتراكك"},
         };
-        int[] icons = {CigramPlusArt.NO_ADS, CigramPlusArt.QUALITY, CigramPlusArt.PIP, CigramPlusArt.TV, CigramPlusArt.SUPPORT, CigramPlusArt.BOLT};
-        for (int r = 0; r < 3; r++) {
+        int[] icons = {CigramPlusArt.NO_ADS, CigramPlusArt.QUALITY, CigramPlusArt.PIP, CigramPlusArt.TV, CigramPlusArt.SUPPORT, CigramPlusArt.BOLT,
+                CigramPlusArt.PIP, CigramPlusArt.QUALITY};
+        for (int r = 0; r < b.length / 2; r++) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
@@ -500,37 +503,44 @@ public class CigramPlusActivity extends Activity {
     private void renderState() {
         planHolder.removeAllViews();
         boolean plus = CigramPlus.isPlus(this);
-        if (plus) {
-            LinearLayout card = new LinearLayout(this);
-            card.setOrientation(LinearLayout.VERTICAL);
-            card.setBackground(CigramPlusArt.ring(this, 22, 0x1F22B573, 0x8822B573, 1.5f));
-            card.setPadding(dp(18), dp(16), dp(18), dp(16));
-            card.addView(CigramUI.label(this, "Plus مفعّل ✓", 18f, 0xFF3DDC97, true));
-            card.addView(CigramUI.label(this, CigramPlus.periodText(this), 14.5f, 0xFFFFFFFF, true), lp(6, 0));
-            card.addView(CigramUI.label(this, "متبقٍّ " + CigramPlus.daysLeft(this) + " يوم", 12.5f, 0xFF9FD8BF, false), lp(2, 0));
-            long from = CigramPlus.activatedAt(this), to = CigramPlus.until(this);
-            if (from > 0L && to > from) {
-                float f = Math.max(0f, Math.min(1f, (System.currentTimeMillis() - from) / (float) (to - from)));
-                int w = getResources().getDisplayMetrics().widthPixels - dp(32 + 36);
-                FrameLayout track = new FrameLayout(this);
-                track.setBackground(CigramPlusArt.ring(this, 4, 0x2222B573, 0, 0));
-                View fill = new View(this);
-                fill.setBackground(CigramPlusArt.ring(this, 4, 0xFF22B573, 0, 0));
-                track.addView(fill, new FrameLayout.LayoutParams(Math.max(dp(8), (int) (w * f)), dp(8), Gravity.RIGHT));
-                LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, dp(8));
-                tp.topMargin = dp(12);
-                card.addView(track, tp);
-            }
-            planHolder.addView(card);
-        } else if (CigramPlus.expiredAt(this) > 0L) {
-            TextView t = CigramUI.label(this, "انتهى اشتراك Plus في " + CigramPlus.formatDate(CigramPlus.expiredAt(this)) + "  ·  فعّل كوداً جديداً للتجديد",
-                    13.5f, 0xFFFF9A9A, true);
-            t.setPadding(dp(16), dp(14), dp(16), dp(14));
-            t.setBackground(CigramPlusArt.ring(this, 18, 0x22FF6B6B, 0x66FF6B6B, 1f));
-            planHolder.addView(t);
+        // the membership card: the account and the period live HERE, inside the Cigram Plus page
+        if (CigramUserData.isLoggedIn(this)) {
+            View card = CigramPlusCard.build(this);
+            planHolder.addView(card, new LinearLayout.LayoutParams(-1, -2));
+            if (card instanceof FrameLayout) CigramNewBadge.attachCorner((FrameLayout) card, "plus_card_2026");
         }
+        if (plus) planHolder.addView(sleepRow(), lp(12, 0));
         renderOffer();
         if (methodDetail != null && selected[0] >= 0) renderMethodDetail(selected[0]);     // the amount changes after the offer is used
+    }
+
+    /** «موقّت النوم»: the Plus service that closes the player after the chosen time. */
+    private View sleepRow() {
+        final LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(16), dp(14), dp(16), dp(14));
+        row.setBackground(CigramPlusArt.surface(this, 20));
+        row.setClickable(true);
+        row.setFocusable(true);
+        LinearLayout texts = new LinearLayout(this);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        texts.addView(CigramUI.label(this, "موقّت النوم", 15f, 0xFFFFFFFF, true));
+        final TextView sub = CigramUI.label(this, CigramSleepTimer.label(this), 12f, 0xFF8E8E94, false);
+        texts.addView(sub, lp(3, 0));
+        row.addView(new AdsIcons.Icon(this, AdsIcons.CLOCK, 0xFFFFFFFF), new LinearLayout.LayoutParams(dp(22), dp(22)));
+        LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        tl.setMarginStart(dp(12));
+        row.addView(texts, tl);
+        row.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                CigramSleepTimer.choose(CigramPlusActivity.this, new Runnable() {
+                    @Override public void run() { sub.setText(CigramSleepTimer.label(CigramPlusActivity.this)); }
+                });
+            }
+        });
+        CigramNewBadge.attach(row, "plus_sleep_timer_2026");
+        return row;
     }
 
     private void scrollToPay() {

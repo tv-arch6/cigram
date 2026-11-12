@@ -267,7 +267,7 @@ final class CigramAccountDash {
 
     private static String plusLabel(Context c) {
         try {
-            if (CigramPlus.isPlus(c)) return "مفعّل · " + CigramPlus.periodText(c);
+            if (CigramPlus.isPlus(c)) return "مفعّل · افتح بطاقتك";
             return CigramPlus.salesEnabled() ? "اشترك أو أدخل كود التفعيل" : "أدخل كود التفعيل";
         } catch (Throwable t) {
             return "مزايا المشتركين";
