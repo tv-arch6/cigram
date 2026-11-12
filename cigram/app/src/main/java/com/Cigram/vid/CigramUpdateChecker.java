@@ -114,7 +114,7 @@ public final class CigramUpdateChecker {
                             Activity a = activity;
                             if (a.isFinishing()) return;
                             if (Build.VERSION.SDK_INT >= 17 && a.isDestroyed()) return;
-                            show(a, manifest);
+                            openPage(a);
                         }
                     });
                 } catch (Throwable ignored) {
@@ -127,6 +127,14 @@ public final class CigramUpdateChecker {
     }
 
     // ------------------------------------------------------------------ decision
+
+    /** A release is waiting: the update page opens and starts by itself (the Play build keeps its dialog → Play). */
+    private static void openPage(Activity activity) {
+        if (!BuildConfig.SELF_UPDATE) { if (cached != null) show(activity, cached); return; }
+        // once a day at most: the page is opened for the viewer, it is not forced on every return to Home
+        if (cached != null && !isMandatory(activity, cached)) snooze(activity, cached.optInt("versionCode", 0));
+        manualCheck(activity);
+    }
 
     private static int installedCode(Context context) {
         try {
@@ -439,61 +447,34 @@ public final class CigramUpdateChecker {
      * checking -> (update available | you have the latest version | could not check).
      * An update found here is shown even if it was snoozed before.
      */
+    /** «التحقق من التحديثات» opens its own page (see {@link CigramUpdateActivity}). */
     public static void manualCheck(final Activity activity) {
         if (activity == null || activity.isFinishing()) return;
-        final CigramUI.Sheet loading = CigramUI.sheet(activity)
-                .logo()
-                .title("التحقق من التحديثات")
-                .spinner("جارٍ البحث عن آخر إصدار...")
-                .cancelable(true);
-        loading.show();
-        final Context app = activity.getApplicationContext() == null ? activity : activity.getApplicationContext();
-        IO.execute(new Runnable() {
-            @Override public void run() {
-                String body = null;
-                try { body = httpGet(BASE + "/update?t=" + System.currentTimeMillis()); } catch (Throwable ignored) { }
-                if (body == null) body = httpGet(BASE + "/update");
-                JSONObject parsed = null;
-                try { if (body != null) parsed = new JSONObject(body); } catch (Throwable ignored) { }
-                final JSONObject manifest = parsed;
-                final boolean failed = parsed == null;
-                MAIN.post(new Runnable() {
-                    @Override public void run() {
-                        loading.dismiss();
-                        if (activity.isFinishing()) return;
-                        if (failed) {
-                            CigramUI.sheet(activity)
-                                    .icon(CigramUI.ICON_WARN, CigramUI.AMBER)
-                                    .title("تعذر التحقق")
-                                    .message("تأكد من اتصالك بالإنترنت ثم حاول مرة أخرى.")
-                                    .primary("إعادة المحاولة", CigramUI.AMBER, new CigramUI.Click() {
-                                        @Override public boolean onClick(CigramUI.Sheet s) {
-                                            manualCheck(activity);
-                                            return false;
-                                        }
-                                    })
-                                    .secondary("إغلاق", null)
-                                    .show();
-                            return;
-                        }
-                        if (hasUpdate(app, manifest)) {
-                            cached = isMandatory(app, manifest) ? manifest : cached;
-                            showing = false;
-                            show(activity, manifest);
-                            return;
-                        }
-                        String name = installedName(app);
-                        CigramUI.sheet(activity)
-                                .icon(CigramUI.ICON_CHECK, CigramUI.GREEN)
-                                .title("أنت لديك آخر نسخة")
-                                .message(name.length() == 0 ? "تطبيقك محدّث بالكامل."
-                                        : "تطبيقك محدّث بالكامل (الإصدار " + name + ").")
-                                .primary("حسناً", CigramUI.GREEN, null)
-                                .show();
-                    }
-                });
-            }
-        });
+        try {
+            activity.startActivity(new Intent(activity, CigramUpdateActivity.class));
+        } catch (Throwable error) {
+            android.util.Log.w("CigramUpdate", "page failed", error);
+        }
+    }
+
+    // ---- what the page needs (same manifest, same rules as the automatic check) ----
+
+    /** The latest release as the server publishes it, or null when it cannot be read now. Blocking. */
+    static JSONObject fetchManifest() {
+        String body = null;
+        try { body = httpGet(BASE + "/update?t=" + System.currentTimeMillis()); } catch (Throwable ignored) { }
+        if (body == null) body = httpGet(BASE + "/update");
+        try { return body == null ? null : new JSONObject(body); } catch (Throwable ignored) { return null; }
+    }
+
+    static boolean hasUpdateFor(Context context, JSONObject m) { return hasUpdate(context, m); }
+
+    static String urlOf(JSONObject m) { return m == null ? "" : downloadUrl(m); }
+
+    /** Checks the downloaded package and opens Android's installer (no question asked by the app). */
+    static void installFromPage(Activity activity, android.app.DownloadManager dm, long id, String url, JSONObject m, int live) {
+        sendEvent(activity, "download", live);
+        installDownloaded(activity, dm, id, url, m, live);
     }
 
     // --------------------------------------------------------- download + install

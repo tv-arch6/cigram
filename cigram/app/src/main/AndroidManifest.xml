@@ -205,6 +205,12 @@
 		<activity
 			android:name=".CommunicationActivity"
 			android:theme="@style/CigramDarkTheme" />
+		<!-- «التحقق من التحديثات»: its own page, the update runs inside the app -->
+		<activity
+			android:name=".CigramUpdateActivity"
+			android:theme="@style/CigramDarkTheme"
+			android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
+			android:exported="false" />
 		<!-- Terms and Conditions page -->
 		<activity
 			android:name=".CigramTermsActivity"

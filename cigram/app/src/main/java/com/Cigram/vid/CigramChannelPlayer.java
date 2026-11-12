@@ -624,7 +624,7 @@ final class CigramChannelPlayer {
             boolean playing = player.isPlaying();
             if (playing != lastPlaying) {
                 lastPlaying = playing;
-                playIcon.set(playing ? CigramHubUi.PAUSE : CigramHubUi.PLAY, Color.WHITE);
+                playIcon.set(playing ? CigramHubUi.PAUSE : CigramHubUi.PLAY, 0xFF000000);
                 if (view != null) view.setKeepScreenOn(playing);
                 if (playing) scheduleHide();
                 report();
@@ -704,7 +704,7 @@ final class CigramChannelPlayer {
     private void bindChannel(CigramChannelStore.Ch ch) {
         title.setText(ch.name);
         logo.show(ch.logoKey(), ch.name, true);
-        playIcon.set(CigramHubUi.PAUSE, Color.WHITE);
+        playIcon.set(CigramHubUi.PAUSE, 0xFF000000);
     }
 
     private void setWaiting(boolean on, String text) {
