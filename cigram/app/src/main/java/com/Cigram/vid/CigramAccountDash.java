@@ -123,10 +123,6 @@ final class CigramAccountDash {
                         CigramPlusUI.openPage(a, CigramPlus.salesEnabled() && !CigramPlus.isPlus(a) ? "pay" : "code");
                     }
                 });
-        View switchRow = ensureRow(a, host, TAG_SWITCH, "تبديل", switchLabel(a), AdsIcons.SWITCH, 0,
-                new View.OnClickListener() {
-                    @Override public void onClick(View v) { showSwitchDialog(a); }
-                });
         // 18.2: same entry, new experience — Cigram Private Support (the private conversation with the developer)
         View adRequest = ensureRow(a, host, TAG_AD_REQUEST, "الدعم والتواصل", "أسعار Cigram Plus · المزايا · المشاكل",
                 AdsIcons.CHAT, 0, new View.OnClickListener() {
@@ -163,7 +159,6 @@ final class CigramAccountDash {
                 });
         setSubtitle(theme, themeLabel(a));
         setSubtitle(plus, plusLabel(a));
-        setSubtitle(switchRow, switchLabel(a));
         plus.setVisibility(logged ? View.VISIBLE : View.GONE);
         // the app-icon picker lives in Settings now (all customisation in one place)
         if (appIcon != null) { detach(appIcon); appIcon = null; }
@@ -201,7 +196,7 @@ final class CigramAccountDash {
         add(plusRows, plus, plusCode);
         ArrayList<View> experience = new ArrayList<View>();
         if (mine != null && !accountRows.contains(mine)) experience.add(mine);
-        add(experience, profiles, calendar, switchRow, theme, fonts, perf, widget);
+        add(experience, profiles, calendar, theme, fonts, perf, widget);
         ArrayList<View> support = new ArrayList<View>();
         add(support, adRequest, contact, update);
         ArrayList<View> info = new ArrayList<View>();
@@ -237,6 +232,8 @@ final class CigramAccountDash {
         // the old section titles ("الحساب" / "الدعم") are replaced by the ones above
         hideOldTitles(host);
 
+        View oldSwitch = host.findViewWithTag(TAG_SWITCH);
+        if (oldSwitch != null) detach(oldSwitch);
         // «جديد»: shown once per account on what this release added or changed
         CigramNewBadge.attach(adRequest, "support_chat_2026");
         CigramNewBadge.attach(contact, "send_request_2026");
@@ -282,63 +279,6 @@ final class CigramAccountDash {
         }
     }
 
-    // ================================================================== «تبديل» (phone / TV interface)
-
-    /** Current interface, as the subtitle of the «تبديل» row. */
-    static String switchLabel(Context c) {
-        int m = CigramTvMode.mode(c);
-        if (m == CigramTvMode.ON) return "الواجهة الحالية: Cigram TV";
-        if (m == CigramTvMode.OFF) return "الواجهة الحالية: الجوال";
-        return CigramTvMode.isTv(c) ? "تلقائي · Cigram TV" : "تلقائي · واجهة الجوال";
-    }
-
-    /**
-     * «تبديل»: switches between the phone interface and the Cigram TV edition. It is the app's existing TV-mode
-     * setting (CigramTvMode, also in Settings → «وضع التلفاز»); the app restarts on its Home so the chosen interface
-     * is built from scratch (the TV edition replaces the phone Home, see MainActivity / CigramTvActivity).
-     */
-    static void showSwitchDialog(final Activity a) {
-        final CigramPalette pal = CigramPalette.of(a);
-        final Dialog d = new Dialog(a);
-        d.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        LinearLayout box = new LinearLayout(a);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        box.setBackground(CigramPalette.round(a, pal.surface, pal.stroke, 22));
-        box.setPadding(dp(a, 8), dp(a, 18), dp(a, 8), dp(a, 10));
-        TextView head = CigramUI.label(a, "تبديل الواجهة", 18f, pal.text, true);
-        head.setGravity(Gravity.RIGHT);
-        head.setPadding(dp(a, 16), 0, dp(a, 16), dp(a, 2));
-        box.addView(head, new LinearLayout.LayoutParams(-1, -2));
-        TextView sub = CigramUI.label(a, "اختر الواجهة التي تناسب جهازك", 12.5f, pal.text3, false);
-        sub.setGravity(Gravity.RIGHT);
-        sub.setPadding(dp(a, 16), 0, dp(a, 16), dp(a, 10));
-        box.addView(sub, new LinearLayout.LayoutParams(-1, -2));
-        final int current = CigramTvMode.mode(a);
-        final int[] modes = {CigramTvMode.OFF, CigramTvMode.ON, CigramTvMode.AUTO};
-        final String[][] texts = {
-                {"واجهة الجوال", "اللمس والتمرير، للجوال والتابلت"},
-                {"Cigram TV", "واجهة التلفاز: جهاز التحكم والشاشة الكبيرة"},
-                {"تلقائي", "يكتشف Cigram نوع الجهاز بنفسه"}};
-        for (int i = 0; i < modes.length; i++) {
-            final int mode = modes[i];
-            box.addView(optionRow(a, pal, texts[i][0], texts[i][1], mode == current, new View.OnClickListener() {
-                @Override public void onClick(View v) {
-                    d.dismiss();
-                    if (mode == current) return;
-                    CigramTvMode.setMode(a, mode);
-                    restartOnHome(a);
-                }
-            }), new LinearLayout.LayoutParams(-1, dp(a, 62)));
-        }
-        d.setContentView(box);
-        if (d.getWindow() != null) {
-            d.getWindow().setBackgroundDrawable(new ColorDrawable(0));
-            d.getWindow().setLayout(Math.min(dp(a, 360), a.getResources().getDisplayMetrics().widthPixels - dp(a, 40)),
-                    ViewGroup.LayoutParams.WRAP_CONTENT);
-        }
-        d.show();
-    }
 
     /** Starts the app again on its Home in a fresh task (the interface is chosen when Home is created). */
     static void restartOnHome(Activity a) {

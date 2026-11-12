@@ -117,7 +117,7 @@ public class CigramUtil {
             _intent.putExtra("return-data", false);
             _activity.startActivityForResult(_intent, _requestCode);
         } catch (ActivityNotFoundException _e) {
-            Toast.makeText(_activity, "Your device doesn't support the crop action!", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(_activity, "Your device doesn't support the crop action!", android.widget.Toast.LENGTH_SHORT);
         }
     }
 
@@ -154,7 +154,7 @@ public class CigramUtil {
     }
 
     public static void showMessage(Context _context, String _s) {
-        Toast.makeText(_context, _s, Toast.LENGTH_SHORT).show();
+        CigramSilent.toast(_context, _s, android.widget.Toast.LENGTH_SHORT);
     }
     public static int getLocationX(View _view) {
         int _location[] = new int[2];

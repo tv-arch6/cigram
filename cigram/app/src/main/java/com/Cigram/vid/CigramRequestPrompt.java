@@ -217,7 +217,7 @@ public final class CigramRequestPrompt {
                             CigramRequests.add(a, kind[0], name, "");
                             CigramAnalytics.track(a, "request_from_search", "kind", kind[0]);
                         } catch (Throwable ignored) { }
-                        Toast.makeText(a, "تم إرسال طلبك ✓", Toast.LENGTH_SHORT).show();
+                        CigramSilent.toast(a, "تم إرسال طلبك ✓", android.widget.Toast.LENGTH_SHORT);
                         if (after != null) after.run();
                         return false;
                     }
@@ -264,7 +264,7 @@ public final class CigramRequestPrompt {
         try {
             a.startActivity(new Intent(a, Class.forName(a.getPackageName() + ".CommunicationActivity")));
         } catch (Throwable ignored) {
-            Toast.makeText(a, "افتح «طلباتي» من الحساب ← تواصل معنا", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(a, "افتح «طلباتي» من الحساب ← تواصل معنا", android.widget.Toast.LENGTH_SHORT);
         }
     }
 

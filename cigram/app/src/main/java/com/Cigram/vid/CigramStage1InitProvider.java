@@ -1503,7 +1503,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                             boolean hasCache = isValidCatalog(cached);
 
                             if (manual && hasCache) {
-                                Toast.makeText(activity, "تعذر التحديث", Toast.LENGTH_SHORT).show();
+                                CigramSilent.toast(activity, "تعذر التحديث", android.widget.Toast.LENGTH_SHORT);
                                 if (!isOnline(activity)) showOfflineBanner(activity);
                             } else if (hasCache) {
                                 if (!isOnline(activity)) showOfflineBanner(activity);
@@ -3098,11 +3098,9 @@ public final class CigramStage1InitProvider extends ContentProvider {
                             android.R.anim.fade_out
                     );
                 } catch (Throwable error) {
-                    Toast.makeText(
+                    CigramSilent.toast(
                             activity,
-                            "تعذر فتح القسم",
-                            Toast.LENGTH_SHORT
-                    ).show();
+                            "تعذر فتح القسم", android.widget.Toast.LENGTH_SHORT);
                 }
             }
         });
@@ -5174,13 +5172,13 @@ public final class CigramStage1InitProvider extends ContentProvider {
             }
         }
         if (video.length() == 0) {
-            Toast.makeText(activity, "رابط الفيديو غير متوفر", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(activity, "رابط الفيديو غير متوفر", android.widget.Toast.LENGTH_SHORT);
             return;
         }
         // 2026: a malformed link from the Admin app (no scheme, no host, "null", spaces ...) is explained here
         // instead of opening a player that can only fail
         if (CigramPlaybackError.validateUrl(video) != CigramPlaybackError.UNKNOWN) {
-            Toast.makeText(activity, CigramPlaybackError.message(CigramPlaybackError.INVALID_URL), Toast.LENGTH_LONG).show();
+            CigramSilent.toast(activity, CigramPlaybackError.message(CigramPlaybackError.INVALID_URL), android.widget.Toast.LENGTH_LONG);
             android.util.Log.w("CigramDetails", "invalid video link refused: " + video);
             return;
         }
@@ -5249,7 +5247,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             activity.startActivity(intent);
         } catch (Throwable error) {
             android.util.Log.w("CigramDetails", "player launch failed", error);
-            Toast.makeText(activity, "تعذر فتح المشغل", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(activity, "تعذر فتح المشغل", android.widget.Toast.LENGTH_SHORT);
         }
     }
 
@@ -5281,8 +5279,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             watchLater.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View view) {
                     if (!stage3WatchLaterAvailable(activity)) {
-                        Toast.makeText(activity, "سجّل دخولك لحفظ العناصر في المشاهدة لاحقًا",
-                                Toast.LENGTH_SHORT).show();
+                        CigramSilent.toast(activity, "سجّل دخولك لحفظ العناصر في المشاهدة لاحقًا", android.widget.Toast.LENGTH_SHORT);
                         try {
                             activity.startActivity(new android.content.Intent(activity, AccountActivity.class));
                         } catch (Throwable ignored) { }
@@ -5290,9 +5287,8 @@ public final class CigramStage1InitProvider extends ContentProvider {
                     }
                     boolean selected = toggleStage3WatchLater(activity, stage3DetailsItem(activity));
                     CigramAnalytics.track(activity, selected ? "watch_later_added" : "watch_later_removed");
-                    Toast.makeText(activity,
-                            selected ? "تمت الإضافة إلى المشاهدة لاحقًا" : "تمت الإزالة من المشاهدة لاحقًا",
-                            Toast.LENGTH_SHORT).show();
+                    CigramSilent.toast(activity,
+                            selected ? "تمت الإضافة إلى المشاهدة لاحقًا" : "تمت الإزالة من المشاهدة لاحقًا", android.widget.Toast.LENGTH_SHORT);
                     refreshStage3Details(activity);
                 }
             });
@@ -5310,9 +5306,8 @@ public final class CigramStage1InitProvider extends ContentProvider {
                         JSONObject current = stage3DetailsItem(activity);
                         boolean subscribed = toggleStage3Subscription(activity, current);
                         CigramAnalytics.track(activity, subscribed ? "subscribe_added" : "subscribe_removed");
-                        Toast.makeText(activity,
-                                subscribed ? "تم الاشتراك" : "تم إلغاء الاشتراك",
-                                Toast.LENGTH_SHORT).show();
+                        CigramSilent.toast(activity,
+                                subscribed ? "تم الاشتراك" : "تم إلغاء الاشتراك", android.widget.Toast.LENGTH_SHORT);
                         if (subscribed) {
                             stage3ForceSubscriptionNotificationsEnabled(activity, current);
                             stage6RequestNotificationPermissionIfNeeded(activity, true);
@@ -6111,11 +6106,9 @@ public final class CigramStage1InitProvider extends ContentProvider {
         final String email = stage3ReactionEmail(activity);
         final String token = stage3ReactionToken(activity);
         if (email.length() == 0 || token.length() == 0) {
-            Toast.makeText(
+            CigramSilent.toast(
                     activity,
-                    "سجّل الدخول بالبريد الإلكتروني حتى تتمكن من التفاعل",
-                    Toast.LENGTH_SHORT
-            ).show();
+                    "سجّل الدخول بالبريد الإلكتروني حتى تتمكن من التفاعل", android.widget.Toast.LENGTH_SHORT);
             return;
         }
 
@@ -6221,7 +6214,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                                     ? result.message
                                     : "تعذر حفظ التفاعل، تحقق من الإنترنت";
                         }
-                        Toast.makeText(activity, message, Toast.LENGTH_SHORT).show();
+                        CigramSilent.toast(activity, message, android.widget.Toast.LENGTH_SHORT);
                     }
                 });
             }
@@ -6363,8 +6356,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                         }
                     }).secondary("لاحقاً", null).show();
         } catch (Throwable error) {
-            Toast.makeText(activity, "انتهت جلسة الحساب، سجّل الدخول من جديد",
-                    Toast.LENGTH_LONG).show();
+            CigramSilent.toast(activity, "انتهت جلسة الحساب، سجّل الدخول من جديد", android.widget.Toast.LENGTH_LONG);
         }
     }
 
@@ -7949,7 +7941,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                 // catalog not loaded (or episode moved): use the link saved with the notification
                 String video = saved.optString("video", "");
                 if (video.length() == 0) {
-                    Toast.makeText(activity, "رابط الحلقة غير متوفر حالياً", Toast.LENGTH_SHORT).show();
+                    CigramSilent.toast(activity, "رابط الحلقة غير متوفر حالياً", android.widget.Toast.LENGTH_SHORT);
                     return;
                 }
                 episode = new JSONObject();
@@ -7983,7 +7975,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             openPlayerForTitleItem(activity, episode, parent, false);
         } catch (Throwable error) {
             android.util.Log.w("CigramStage6", "play episode failed", error);
-            Toast.makeText(activity, "تعذر تشغيل الحلقة", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(activity, "تعذر تشغيل الحلقة", android.widget.Toast.LENGTH_SHORT);
         }
     }
 
@@ -8490,7 +8482,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             activity.startActivity(intent);
         } catch (Throwable error) {
             android.util.Log.w("CigramStage6", "open title details failed", error);
-            Toast.makeText(activity, "تعذر فتح الصفحة", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(activity, "تعذر فتح الصفحة", android.widget.Toast.LENGTH_SHORT);
         }
     }
 
@@ -10104,7 +10096,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                 String message = groups == 0 ? "هذا المصدر لا يحتوي مسار صوت"
                         : "صوت هذا الفيديو بصيغة لا يدعمها جهازك (" + firstMime + ")";
                 CigramEmbedResolver.logNow("audio: " + message + " (nothing left to try)");
-                android.widget.Toast.makeText(activity, message, android.widget.Toast.LENGTH_LONG).show();
+                CigramSilent.toast(activity, message, android.widget.Toast.LENGTH_LONG);
             } catch (Throwable ignored) { }
         }
 
@@ -12784,13 +12776,13 @@ public final class CigramStage1InitProvider extends ContentProvider {
             MAIN.post(new Runnable() {
                 @Override public void run() {
                     if (isAlive(activity)) {
-                        Toast.makeText(activity, safeMessage, Toast.LENGTH_SHORT).show();
+                        CigramSilent.toast(activity, safeMessage, android.widget.Toast.LENGTH_SHORT);
                     }
                 }
             });
             return;
         }
-        Toast.makeText(activity, safeMessage, Toast.LENGTH_SHORT).show();
+        CigramSilent.toast(activity, safeMessage, android.widget.Toast.LENGTH_SHORT);
     }
 
     public static void detailsBlockFailed(Activity activity, String blockId, Throwable error) {

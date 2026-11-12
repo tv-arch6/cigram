@@ -953,7 +953,7 @@ final class CigramChannelHub implements CigramChannelStore.Listener, CigramChann
             wentFull = false;
             Log.w(TAG, "full screen failed", error);
             player.resume();
-            Toast.makeText(a, "تعذر فتح القناة", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(a, "تعذر فتح القناة", android.widget.Toast.LENGTH_SHORT);
         }
     }
 
@@ -1209,7 +1209,7 @@ final class CigramChannelHub implements CigramChannelStore.Listener, CigramChann
                     try {
                         if (h.ch == null) return;
                         if (!h.ch.available) {
-                            Toast.makeText(a, "القناة غير متوفرة حالياً", Toast.LENGTH_SHORT).show();
+                            CigramSilent.toast(a, "القناة غير متوفرة حالياً", android.widget.Toast.LENGTH_SHORT);
                             return;
                         }
                         choose(h.ch);
@@ -1224,7 +1224,7 @@ final class CigramChannelHub implements CigramChannelStore.Listener, CigramChann
                         if (h.ch == null) return false;
                         toggleFavourite(h.ch);
                         boolean fav = CigramChannelStore.isFav(a, h.ch.key);
-                        Toast.makeText(a, fav ? "أُضيفت إلى المفضلة" : "أُزيلت من المفضلة", Toast.LENGTH_SHORT).show();
+                        CigramSilent.toast(a, fav ? "أُضيفت إلى المفضلة" : "أُزيلت من المفضلة", android.widget.Toast.LENGTH_SHORT);
                         return true;
                     } catch (Throwable error) {
                         Log.w(TAG, "row long click failed", error);

@@ -112,9 +112,9 @@ public final class CigramPublicId {
         try {
             ClipboardManager cm = (ClipboardManager) c.getSystemService(Context.CLIPBOARD_SERVICE);
             cm.setPrimaryClip(ClipData.newPlainText("Cigram ID", id));
-            Toast.makeText(c, "تم نسخ المعرّف " + id, Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(c, "تم نسخ المعرّف " + id, android.widget.Toast.LENGTH_SHORT);
         } catch (Throwable t) {
-            Toast.makeText(c, "تعذّر النسخ", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(c, "تعذّر النسخ", android.widget.Toast.LENGTH_SHORT);
         }
     }
 

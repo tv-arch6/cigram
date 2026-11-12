@@ -236,13 +236,13 @@ public final class CigramReport {
         sheet.primary("إرسال البلاغ", CigramUI.RED, new CigramUI.Click() {
             @Override public boolean onClick(CigramUI.Sheet s) {
                 if (selected[0] < 0) {
-                    Toast.makeText(activity, "اختر نوع المشكلة أولاً", Toast.LENGTH_SHORT).show();
+                    CigramSilent.toast(activity, "اختر نوع المشكلة أولاً", android.widget.Toast.LENGTH_SHORT);
                     return true;
                 }
                 String issue = ISSUES[selected[0]][0];
                 String text = message.getText().toString().trim();
                 if ("other".equals(issue) && text.length() < 3) {
-                    Toast.makeText(activity, "اكتب وصفاً قصيراً للمشكلة", Toast.LENGTH_SHORT).show();
+                    CigramSilent.toast(activity, "اكتب وصفاً قصيراً للمشكلة", android.widget.Toast.LENGTH_SHORT);
                     message.requestFocus();
                     return true;
                 }
@@ -280,7 +280,7 @@ public final class CigramReport {
         final Context app = activity.getApplicationContext();
         String blocked = spamCheck(app, item, issue);
         if (blocked != null) {
-            Toast.makeText(activity, blocked, Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(activity, blocked, android.widget.Toast.LENGTH_SHORT);
             return;
         }
         try {
@@ -333,7 +333,7 @@ public final class CigramReport {
                 }
             });
         } catch (Throwable error) {
-            Toast.makeText(activity, "تعذر إنشاء البلاغ", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(activity, "تعذر إنشاء البلاغ", android.widget.Toast.LENGTH_SHORT);
         }
     }
 
@@ -390,7 +390,7 @@ public final class CigramReport {
             i.putExtra(android.content.Intent.EXTRA_TEXT, b.toString());
             activity.startActivity(android.content.Intent.createChooser(i, "إرسال البلاغ عبر البريد"));
         } catch (Throwable error) {
-            Toast.makeText(activity, "لا يوجد تطبيق بريد. راسلنا على " + SUPPORT_EMAIL, Toast.LENGTH_LONG).show();
+            CigramSilent.toast(activity, "لا يوجد تطبيق بريد. راسلنا على " + SUPPORT_EMAIL, android.widget.Toast.LENGTH_LONG);
         }
     }
 

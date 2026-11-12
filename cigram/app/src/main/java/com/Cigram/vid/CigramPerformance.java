@@ -167,7 +167,7 @@ final class CigramPerformance {
                         setForced(a, w - 1);
                         d.dismiss();
                         Profile p = get(a);
-                        android.widget.Toast.makeText(a, "محرك الأداء: " + p.name() + " — يُطبَّق بالكامل عند فتح التطبيق التالي", android.widget.Toast.LENGTH_LONG).show();
+                        CigramSilent.toast(a, "محرك الأداء: " + p.name() + " — يُطبَّق بالكامل عند فتح التطبيق التالي", android.widget.Toast.LENGTH_LONG);
                         if (after != null) after.run();
                     }
                 }).setNegativeButton("إغلاق", null).show();

@@ -549,11 +549,9 @@ public class ChannelsActivity extends AppCompatActivity {
 						card.setOnClickListener(new android.view.View.OnClickListener() {
 							@Override public void onClick(android.view.View v) {
 								if (!available) {
-									android.widget.Toast.makeText(
+									CigramSilent.toast(
 									ChannelsActivity.this,
-									"القناة غير متوفرة حالياً",
-									android.widget.Toast.LENGTH_SHORT
-									).show();
+									"القناة غير متوفرة حالياً", android.widget.Toast.LENGTH_SHORT);
 									return;
 								}
 								android.content.Intent live = new android.content.Intent(ChannelsActivity.this, LiveActivity.class);

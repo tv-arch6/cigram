@@ -336,7 +336,7 @@ public class CigramPlusCodeActivity extends Activity {
         try {
             startActivity(new Intent(this, Class.forName(getPackageName() + "." + simpleName)));
         } catch (Throwable t) {
-            android.widget.Toast.makeText(this, "تعذّر فتح الصفحة", android.widget.Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(this, "تعذّر فتح الصفحة", android.widget.Toast.LENGTH_SHORT);
         }
     }
 

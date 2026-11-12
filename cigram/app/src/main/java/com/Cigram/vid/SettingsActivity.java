@@ -1920,11 +1920,9 @@ public class SettingsActivity extends AppCompatActivity {
 							selectedBitmap
 							);
 							
-							android.widget.Toast.makeText(
+							CigramSilent.toast(
 							SettingsActivity.this,
-							"تم تحديث الصورة",
-							android.widget.Toast.LENGTH_SHORT
-							).show();
+							"تم تحديث الصورة", android.widget.Toast.LENGTH_SHORT);
 							
 						} catch (Exception error) {
 							android.util.Log.e(
@@ -1933,11 +1931,9 @@ public class SettingsActivity extends AppCompatActivity {
 							error
 							);
 							
-							android.widget.Toast.makeText(
+							CigramSilent.toast(
 							SettingsActivity.this,
-							"تعذر تحديث الصورة",
-							android.widget.Toast.LENGTH_SHORT
-							).show();
+							"تعذر تحديث الصورة", android.widget.Toast.LENGTH_SHORT);
 							
 						} finally {
 							try {
@@ -1989,11 +1985,9 @@ public class SettingsActivity extends AppCompatActivity {
 							error
 							);
 							
-							android.widget.Toast.makeText(
+							CigramSilent.toast(
 							SettingsActivity.this,
-							"تعذر فتح معرض الصور",
-							android.widget.Toast.LENGTH_SHORT
-							).show();
+							"تعذر فتح معرض الصور", android.widget.Toast.LENGTH_SHORT);
 						}
 					}
 				};

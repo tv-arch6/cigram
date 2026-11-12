@@ -352,7 +352,7 @@ public final class CigramSkipIntro {
         if (trusted && playing && !autoSkipped && autoSkipEnabled(activity) && pos >= introStart) {
             autoSkipped = true;
             skip();
-            try { Toast.makeText(activity, "تم تخطي المقدمة", Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) { }
+            try { CigramSilent.toast(activity, "تم تخطي المقدمة", android.widget.Toast.LENGTH_SHORT); } catch (Throwable ignored) { }
             return;
         }
         showSkip();

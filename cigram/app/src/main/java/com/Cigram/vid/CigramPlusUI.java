@@ -190,7 +190,7 @@ final class CigramPlusUI {
             }
             d.show();
         } catch (Throwable t) {
-            android.widget.Toast.makeText(a, feature + " ضمن اشتراك Plus", android.widget.Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(a, feature + " ضمن اشتراك Plus", android.widget.Toast.LENGTH_SHORT);
         }
     }
 

@@ -466,7 +466,7 @@ public final class CigramCastDetails {
         dlnaDev = d;
         CigramCastKeepAlive.start(appCtx, "", true);
         CigramAnalytics.track(appCtx, "cast_connected", "kind", "dlna");
-        if (appCtx != null) Toast.makeText(appCtx, "تم الاتصال بجهاز الاستقبال", Toast.LENGTH_SHORT).show();
+        if (appCtx != null) CigramSilent.toast(appCtx, "تم الاتصال بجهاز الاستقبال", android.widget.Toast.LENGTH_SHORT);
         refreshButton();
         Activity det = detailsRef.get();
         if (alive(det) && det == a) castCurrent(det);
@@ -493,7 +493,7 @@ public final class CigramCastDetails {
         if (dev == null) return;
         dlnaSkip = false;
         CigramCastKeepAlive.start(ctx, title, true);
-        Toast.makeText(ctx, "جارٍ التشغيل على التلفاز…", Toast.LENGTH_SHORT).show();
+        CigramSilent.toast(ctx, "جارٍ التشغيل على التلفاز…", android.widget.Toast.LENGTH_SHORT);
         final String adTag = tvAdTag(ctx);
         new Thread(new Runnable() {
             @Override public void run() {
@@ -570,7 +570,7 @@ public final class CigramCastDetails {
             UI.post(new Runnable() {
                 @Override public void run() {
                     if (gen != generation || ctx == null) return;
-                    Toast.makeText(ctx, why[1], Toast.LENGTH_LONG).show();
+                    CigramSilent.toast(ctx, why[1], android.widget.Toast.LENGTH_LONG);
                     CigramAnalytics.track(ctx, "cast_error", "reason", why[0], "ext", extOf(videoUrl), "kind", "dlna");
                 }
             });
@@ -618,7 +618,7 @@ public final class CigramCastDetails {
                 UI.post(new Runnable() {
                     @Override public void run() {
                         if (gen != generation) return;
-                        if (appCtx != null) Toast.makeText(appCtx, msg, Toast.LENGTH_SHORT).show();
+                        if (appCtx != null) CigramSilent.toast(appCtx, msg, android.widget.Toast.LENGTH_SHORT);
                         disconnectDlna(false);
                     }
                 });
@@ -643,7 +643,7 @@ public final class CigramCastDetails {
         UI.post(new Runnable() {
             @Override public void run() {
                 if (gen != generation) return;
-                if (appCtx != null) Toast.makeText(appCtx, msg, Toast.LENGTH_LONG).show();
+                if (appCtx != null) CigramSilent.toast(appCtx, msg, android.widget.Toast.LENGTH_LONG);
                 disconnectDlna(true);
             }
         });
@@ -695,7 +695,7 @@ public final class CigramCastDetails {
                 @Override public void run() {
                     sheet.dismiss();
                     try { CigramDlna.rescan(a); } catch (Throwable ignored) { }
-                    Toast.makeText(a, "جارٍ البحث… افتح القائمة مرة ثانية بعد 5 ثوانٍ", Toast.LENGTH_SHORT).show();
+                    CigramSilent.toast(a, "جارٍ البحث… افتح القائمة مرة ثانية بعد 5 ثوانٍ", android.widget.Toast.LENGTH_SHORT);
                 }
             }));
             sheet.icon(CigramUI.ICON_INFO, 0xFFE21B14)
@@ -735,11 +735,11 @@ public final class CigramCastDetails {
                 // visibility); starting it and catching "not found" works on every version
                 a.startActivity(i);
                 CigramAnalytics.track(a, "cast_mirroring_opened", "action", action);
-                Toast.makeText(a, "اختر التلفاز من القائمة، ثم ارجع وشغّل الفيديو", Toast.LENGTH_LONG).show();
+                CigramSilent.toast(a, "اختر التلفاز من القائمة، ثم ارجع وشغّل الفيديو", android.widget.Toast.LENGTH_LONG);
                 return;
             } catch (Throwable ignored) { }
         }
-        Toast.makeText(a, "افتح «عرض الشاشة» أو «Smart View» من الإعدادات السريعة للهاتف", Toast.LENGTH_LONG).show();
+        CigramSilent.toast(a, "افتح «عرض الشاشة» أو «Smart View» من الإعدادات السريعة للهاتف", android.widget.Toast.LENGTH_LONG);
     }
 
     private static View deviceRow(Activity a, String name, String kind, final Runnable onClick) {
@@ -813,7 +813,7 @@ public final class CigramCastDetails {
                     CigramCastKeepAlive.start(appCtx, "", false);
                     refreshButton();
                     CigramAnalytics.track(appCtx, "cast_connected", "kind", "chromecast");
-                    if (appCtx != null) Toast.makeText(appCtx, "تم الاتصال بجهاز الاستقبال", Toast.LENGTH_SHORT).show();
+                    if (appCtx != null) CigramSilent.toast(appCtx, "تم الاتصال بجهاز الاستقبال", android.widget.Toast.LENGTH_SHORT);
                     Activity d = detailsRef.get();
                     if (alive(d) && topRef.get() == d) castCurrent(d);
                 }
@@ -821,7 +821,7 @@ public final class CigramCastDetails {
                     CigramAnalytics.track(appCtx, "cast_failed", "kind", "chromecast", "code", String.valueOf(error));
                     refreshButton();
                     Context c = appCtx;
-                    if (c != null) Toast.makeText(c, "تعذر الاتصال بالتلفاز", Toast.LENGTH_SHORT).show();
+                    if (c != null) CigramSilent.toast(c, "تعذر الاتصال بالتلفاز", android.widget.Toast.LENGTH_SHORT);
                 }
                 @Override public void onSessionEnding(CastSession s) { }
                 @Override public void onSessionEnded(CastSession s, int error) {
@@ -948,7 +948,7 @@ public final class CigramCastDetails {
     private static void castCurrent(Activity a) {
         JSONObject[] t = target(a);
         if (t == null) {
-            Toast.makeText(a, "رابط الفيديو غير متوفر", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(a, "رابط الفيديو غير متوفر", android.widget.Toast.LENGTH_SHORT);
             return;
         }
         startWithAd(a, t[0], t[1]);
@@ -996,7 +996,7 @@ public final class CigramCastDetails {
     private static void sendToTv(Context app, JSONObject playable, JSONObject parent, String kind) {
         boolean started = play(app, playable, parent);
         CigramAnalytics.track(app, started ? "cast_started" : "cast_failed", "kind", kind);
-        if (!started) Toast.makeText(app, "تعذر التشغيل على التلفاز", Toast.LENGTH_SHORT).show();
+        if (!started) CigramSilent.toast(app, "تعذر التشغيل على التلفاز", android.widget.Toast.LENGTH_SHORT);
     }
 
     /** "قطع الاتصال" from the keep-alive notification. */
@@ -1089,7 +1089,7 @@ public final class CigramCastDetails {
             final MediaQueueItem mainItem = buildMainItem(info, series, seriesTitle, season, episode, sub, resume);
             final RemoteMediaClient fc = c;
 
-            Toast.makeText(ctx, "جارٍ التشغيل على التلفاز…", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(ctx, "جارٍ التشغيل على التلفاز…", android.widget.Toast.LENGTH_SHORT);
             final String adTag = tvAdTag(ctx);
             if (adTag.length() == 0) {
                 loadQueue(fc, null, mainItem);
@@ -1137,7 +1137,7 @@ public final class CigramCastDetails {
             c.queueLoad(arr, 0, MediaStatus.REPEAT_MODE_REPEAT_OFF, null);
         } catch (Throwable error) {
             Log.w(TAG, "loadQueue failed", error);
-            Toast.makeText(appCtx, "تعذر التشغيل على التلفاز", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(appCtx, "تعذر التشغيل على التلفاز", android.widget.Toast.LENGTH_SHORT);
         }
     }
 
@@ -1257,7 +1257,7 @@ public final class CigramCastDetails {
                     }
                 } else if (reason == MediaStatus.IDLE_REASON_FINISHED && mainSeen && !adActive) {
                     saveProgress(true);
-                    Toast.makeText(appCtx, "انتهى العرض وتم قطع البث", Toast.LENGTH_SHORT).show();
+                    CigramSilent.toast(appCtx, "انتهى العرض وتم قطع البث", android.widget.Toast.LENGTH_SHORT);
                     endCast();
                 }
             }
@@ -1311,7 +1311,7 @@ public final class CigramCastDetails {
         detachOverlay();
         mainRequested = false;
         final Context ctx = appCtx;
-        if (ctx != null) Toast.makeText(ctx, "التلفاز رفض هذا الفيديو. جارٍ فحص السبب…", Toast.LENGTH_SHORT).show();
+        if (ctx != null) CigramSilent.toast(ctx, "التلفاز رفض هذا الفيديو. جارٍ فحص السبب…", android.widget.Toast.LENGTH_SHORT);
         final int gen = generation;
         NET.execute(new Runnable() {
             @Override public void run() {
@@ -1319,7 +1319,7 @@ public final class CigramCastDetails {
                 UI.post(new Runnable() {
                     @Override public void run() {
                         if (gen != generation || ctx == null) return;
-                        Toast.makeText(ctx, why[1], Toast.LENGTH_LONG).show();
+                        CigramSilent.toast(ctx, why[1], android.widget.Toast.LENGTH_LONG);
                         CigramAnalytics.track(ctx, "cast_error", "reason", why[0], "ext", extOf(video),
                                 "kind", dlnaDev != null ? "dlna" : "chromecast");
                     }

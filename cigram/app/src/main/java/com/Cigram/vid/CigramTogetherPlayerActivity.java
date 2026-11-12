@@ -1879,7 +1879,7 @@ public class CigramTogetherPlayerActivity extends Activity implements CigramToge
         } catch (Throwable ignored) { }
     }
 
-    private void toast(String m) { Toast.makeText(this, m, Toast.LENGTH_SHORT).show(); }
+    private void toast(String m) { CigramSilent.toast(this, m, android.widget.Toast.LENGTH_SHORT); }
 
     // ------------------------------------------------------------------ أيقونة المحادثة (مرسومة، بيضاء، بلا خلفية)
 

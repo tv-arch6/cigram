@@ -668,5 +668,5 @@ public class CigramTogetherActivity extends Activity implements CigramTogetherSe
                 }).secondary("رجوع", null).show();
     }
 
-    private void toast(String m) { Toast.makeText(this, m, Toast.LENGTH_SHORT).show(); }
+    private void toast(String m) { CigramSilent.toast(this, m, android.widget.Toast.LENGTH_SHORT); }
 }

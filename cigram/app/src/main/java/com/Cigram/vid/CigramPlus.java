@@ -375,7 +375,7 @@ public final class CigramPlus {
         try {
             a.startActivity(new Intent(Intent.ACTION_VIEW, uri));
         } catch (Throwable t) {
-            android.widget.Toast.makeText(a, "تعذّر فتح واتساب", android.widget.Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(a, "تعذّر فتح واتساب", android.widget.Toast.LENGTH_SHORT);
         }
     }
 
@@ -391,7 +391,7 @@ public final class CigramPlus {
         try {
             a.startActivity(new Intent(Intent.ACTION_VIEW, uri));
         } catch (Throwable t) {
-            android.widget.Toast.makeText(a, "تعذّر فتح واتساب", android.widget.Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(a, "تعذّر فتح واتساب", android.widget.Toast.LENGTH_SHORT);
         }
     }
 

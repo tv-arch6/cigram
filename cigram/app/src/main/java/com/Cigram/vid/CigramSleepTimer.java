@@ -68,7 +68,7 @@ final class CigramSleepTimer {
             if (a == null || a.isFinishing() || a.isDestroyed()) return;
             try { sp(a).edit().putInt("minutes", 0).apply(); } catch (Throwable ignored) { }
             try {
-                android.widget.Toast.makeText(a.getApplicationContext(), "انتهى موقّت النوم · تصبح على خير", android.widget.Toast.LENGTH_LONG).show();
+                CigramSilent.toast(a.getApplicationContext(), "انتهى موقّت النوم · تصبح على خير", android.widget.Toast.LENGTH_LONG);
                 a.finish();
             } catch (Throwable ignored) { }
         }

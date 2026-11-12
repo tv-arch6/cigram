@@ -51,9 +51,6 @@ final class CigramTvPanels {
         g.tile(AdsIcons.CROWN, "Cigram Plus", CigramPlus.isPlus(a) ? "تفاصيل اشتراكك" : "اشترك أو أدخل كود التفعيل", new Runnable() {
             @Override public void run() { CigramPlusUI.openPage(a, CigramPlus.salesEnabled() && !CigramPlus.isPlus(a) ? "pay" : "code"); }
         });
-        g.tile(AdsIcons.SWITCH, "تبديل", CigramAccountDash.switchLabel(a), new Runnable() {
-            @Override public void run() { CigramAccountDash.showSwitchDialog(a); }
-        });
         g.tile(AdsIcons.CHAT, "الدعم والتواصل", "أسعار Plus والمزايا والمشاكل", open(a, AdsChatActivity.class));
         g.tile(AdsIcons.SEND, "أرسل طلبك أو مشكلتك", "اطلب عنواناً أو بلّغ عن مشكلة", open(a, CommunicationActivity.class));
         g.tile(AdsIcons.USER, logged ? "إدارة الحساب" : "تسجيل الدخول",
@@ -99,9 +96,6 @@ final class CigramTvPanels {
         g.tile(AdsIcons.SUN, "المظهر", CigramAccountDash.themeLabel(a), new Runnable() {
             @Override public void run() { CigramAccountDash.showThemeDialog(a); }
         });
-        g.tile(AdsIcons.SWITCH, "واجهة العرض", CigramAccountDash.switchLabel(a), new Runnable() {
-            @Override public void run() { CigramAccountDash.showSwitchDialog(a); }
-        });
         g.tile(AdsIcons.BELL, "الإشعارات", "الحلقات والعناوين الجديدة", new Runnable() {
             @Override public void run() {
                 if (CigramStage1InitProvider.areStage6SystemNotificationsEnabled(a)) {
@@ -113,7 +107,7 @@ final class CigramTvPanels {
         });
         g.tile(AdsIcons.SUBTITLES, "الترجمة والخطوط", "شكل وحجم خط الترجمة", new Runnable() {
             @Override public void run() {
-                try { CigramFonts.openPage(a); } catch (Throwable t) { Toast.makeText(a, "تعذّر فتح إعدادات الترجمة", Toast.LENGTH_SHORT).show(); }
+                try { CigramFonts.openPage(a); } catch (Throwable t) { CigramSilent.toast(a, "تعذّر فتح إعدادات الترجمة", android.widget.Toast.LENGTH_SHORT); }
             }
         });
         g.tile(AdsIcons.GEAR, "إعدادات متقدمة", "التخزين والحساب وخيارات أخرى", open(a, SettingsActivity.class));

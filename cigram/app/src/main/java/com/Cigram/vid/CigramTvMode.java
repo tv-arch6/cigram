@@ -44,13 +44,14 @@ public final class CigramTvMode {
 
     // ------------------------------------------------------------------ setting
 
+    /**
+     * The interface is chosen by the DEVICE, not by a switch: the app detects a television / large screen when it
+     * starts and draws the wide layout there (smaller tiles, side rail, remote focus) and the phone layout everywhere
+     * else. The old manual choice («واجهة الجوال / Cigram TV») is gone, so this is always {@link #AUTO}; a value
+     * saved by an older version is ignored.
+     */
     public static int mode(Context c) {
-        try {
-            int m = c.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_MODE, AUTO);
-            return m < AUTO || m > OFF ? AUTO : m;
-        } catch (Throwable ignored) {
-            return AUTO;
-        }
+        return AUTO;
     }
 
     public static void setMode(Context c, int mode) {

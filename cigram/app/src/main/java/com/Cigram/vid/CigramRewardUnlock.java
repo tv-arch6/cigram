@@ -421,7 +421,7 @@ public final class CigramRewardUnlock {
                                 closeHost(r);
                                 CigramAdManager.report(app, "reward_not_earned", PLACEMENT, "");
                                 try {
-                                    Toast.makeText(app, "يجب إكمال مشاهدة الإعلان للمتابعة", Toast.LENGTH_LONG).show();
+                                    CigramSilent.toast(app, "يجب إكمال مشاهدة الإعلان للمتابعة", android.widget.Toast.LENGTH_LONG);
                                 } catch (Throwable ignored) { }
                             }
                             preload(r.activity, false); // next one ready for the next episode

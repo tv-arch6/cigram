@@ -231,7 +231,7 @@ public final class CigramTogether {
             i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             a.startActivity(i);
         } catch (Throwable e) {
-            android.widget.Toast.makeText(a, "افتح صفحة الحساب وسجّل الدخول.", android.widget.Toast.LENGTH_LONG).show();
+            CigramSilent.toast(a, "افتح صفحة الحساب وسجّل الدخول.", android.widget.Toast.LENGTH_LONG);
         }
     }
 
@@ -243,7 +243,7 @@ public final class CigramTogether {
             a.startActivity(i);
         } catch (Throwable e) {
             android.util.Log.w("CigramTogether", "open hub failed", e);
-            android.widget.Toast.makeText(a, "تعذر فتح المشاهدة المشتركة.", android.widget.Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(a, "تعذر فتح المشاهدة المشتركة.", android.widget.Toast.LENGTH_SHORT);
         }
     }
 
@@ -255,7 +255,7 @@ public final class CigramTogether {
     public static void pickEpisode(final Activity a, JSONObject series, final EpisodeCb cb) {
         final JSONArray eps = CigramStage1InitProvider.castEpisodes(series);
         if (eps.length() == 0) {
-            android.widget.Toast.makeText(a, "لا توجد حلقات متاحة لهذا المسلسل.", android.widget.Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(a, "لا توجد حلقات متاحة لهذا المسلسل.", android.widget.Toast.LENGTH_SHORT);
             return;
         }
         final CigramUI.Sheet sheet = CigramUI.sheet(a).icon(CigramUI.ICON_FLAG, CigramUI.RED).title("اختر الحلقة");

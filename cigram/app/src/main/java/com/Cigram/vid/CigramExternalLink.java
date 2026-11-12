@@ -266,7 +266,7 @@ public final class CigramExternalLink {
                     if (!validUrl(url)) return;                    // re-checked at the tap: only https is ever opened
                     a.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
                 } catch (Throwable t) {
-                    android.widget.Toast.makeText(a, "تعذّر فتح الرابط", android.widget.Toast.LENGTH_SHORT).show();
+                    CigramSilent.toast(a, "تعذّر فتح الرابط", android.widget.Toast.LENGTH_SHORT);
                 }
             }
         });

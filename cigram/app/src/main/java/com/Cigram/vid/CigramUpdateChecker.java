@@ -729,7 +729,7 @@ public final class CigramUpdateChecker {
         try {
             activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
         } catch (Throwable error) {
-            Toast.makeText(activity, "تعذر فتح رابط التحديث", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(activity, "تعذر فتح رابط التحديث", android.widget.Toast.LENGTH_SHORT);
         }
     }
 

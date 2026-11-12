@@ -343,6 +343,6 @@ public class CigramCarouselWidget extends AppWidgetProvider {
                 return;
             }
         } catch (Throwable ignored) { }
-        Toast.makeText(a, "اضغط مطولاً على الشاشة الرئيسية ← ويدجت ← سيكرام", Toast.LENGTH_LONG).show();
+        CigramSilent.toast(a, "اضغط مطولاً على الشاشة الرئيسية ← ويدجت ← سيكرام", android.widget.Toast.LENGTH_LONG);
     }
 }

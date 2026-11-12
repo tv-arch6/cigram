@@ -284,20 +284,6 @@ public final class CigramSettings {
                     });
             notifSub[0] = (TextView) notifRow.getTag();
             app.addView(notifRow);
-            app.addView(divider(a));
-            // وضع التلفاز: اختيار مباشر بدل الضغط المتكرر
-            app.addView(choiceRow(a, CigramUI.ICON_IMAGE, "وضع التلفاز", "تلقائي يكتشف التلفاز بنفسه",
-                    new String[]{"تلقائي", "مفعّل دائماً", "متوقف"},
-                    new Getter() { public int get() {
-                        int m = CigramTvMode.mode(a);
-                        return m == CigramTvMode.ON ? 1 : m == CigramTvMode.OFF ? 2 : 0;
-                    } },
-                    new Setter() { public void set(int i) {
-                        int next = i == 1 ? CigramTvMode.ON : i == 2 ? CigramTvMode.OFF : CigramTvMode.AUTO;
-                        if (next == CigramTvMode.mode(a)) return;
-                        CigramTvMode.setMode(a, next);
-                        a.recreate();   // يُطبّق فوراً
-                    } }));
             // 2026: Cigram Plus customisation lives here (was on the account page): the launcher icon picker
             app.addView(divider(a));
             app.addView(row(a, CigramUI.ICON_IMAGE, CigramUI.TEAL, "أيقونة التطبيق",
@@ -335,7 +321,7 @@ public final class CigramSettings {
                         @Override public void onClick(View v) {
                             a.getSharedPreferences("cigram_search_recent", Context.MODE_PRIVATE).edit().clear().apply();
                             a.getSharedPreferences("cigram_search_filters", Context.MODE_PRIVATE).edit().clear().apply();
-                            Toast.makeText(a, "تم مسح سجل البحث والفلاتر", Toast.LENGTH_SHORT).show();
+                            CigramSilent.toast(a, "تم مسح سجل البحث والفلاتر", android.widget.Toast.LENGTH_SHORT);
                         }
                     }));
             store.addView(divider(a));
@@ -346,7 +332,7 @@ public final class CigramSettings {
                                     .remove("auto_next_episode").apply();
                             subs.edit().remove("subtitle_enabled").remove("subtitle_scale").apply();
                             CigramSkipIntro.setAutoSkip(a, false);
-                            Toast.makeText(a, "أُعيدت إعدادات المشغّل إلى الافتراضي", Toast.LENGTH_SHORT).show();
+                            CigramSilent.toast(a, "أُعيدت إعدادات المشغّل إلى الافتراضي", android.widget.Toast.LENGTH_SHORT);
                             a.recreate();
                         }
                     }));
@@ -589,7 +575,7 @@ public final class CigramSettings {
         try {
             ClipboardManager cm = (ClipboardManager) a.getSystemService(Context.CLIPBOARD_SERVICE);
             if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("Cigram", text));
-            Toast.makeText(a, done, Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(a, done, android.widget.Toast.LENGTH_SHORT);
         } catch (Throwable ignored) { }
     }
 
@@ -751,7 +737,7 @@ public final class CigramSettings {
                 for (String d : IMAGE_CACHES) delete(new java.io.File(a.getCacheDir(), d), false);
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        Toast.makeText(a, "تم مسح الصور المؤقتة", Toast.LENGTH_SHORT).show();
+                        CigramSilent.toast(a, "تم مسح الصور المؤقتة", android.widget.Toast.LENGTH_SHORT);
                         measureImageCache(a, out);
                     }
                 });
@@ -798,7 +784,7 @@ public final class CigramSettings {
                             i.putExtra(Intent.EXTRA_SUBJECT, "استفسار - تطبيق سيكرام");
                             a.startActivity(Intent.createChooser(i, "مراسلة الدعم"));
                         } catch (Throwable error) {
-                            Toast.makeText(a, "لا يوجد تطبيق بريد", Toast.LENGTH_SHORT).show();
+                            CigramSilent.toast(a, "لا يوجد تطبيق بريد", android.widget.Toast.LENGTH_SHORT);
                         }
                         return false;
                     }
@@ -810,7 +796,7 @@ public final class CigramSettings {
                             if (cm != null) {
                                 cm.setPrimaryClip(ClipData.newPlainText("Cigram support", CigramReport.SUPPORT_EMAIL));
                             }
-                            Toast.makeText(a, "تم نسخ البريد", Toast.LENGTH_SHORT).show();
+                            CigramSilent.toast(a, "تم نسخ البريد", android.widget.Toast.LENGTH_SHORT);
                         } catch (Throwable ignored) { }
                         return true;
                     }

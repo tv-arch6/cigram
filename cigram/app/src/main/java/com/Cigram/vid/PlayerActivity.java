@@ -640,7 +640,7 @@ public class PlayerActivity extends AppCompatActivity {
 				long cgSmartLast = cgSmartPrefs.getLong("said::" + cgSmart.reason, 0L);
 				if (System.currentTimeMillis() - cgSmartLast > 3600000L) {
 					cgSmartPrefs.edit().putLong("said::" + cgSmart.reason, System.currentTimeMillis()).apply();
-					android.widget.Toast.makeText(this, cgSmart.reason, android.widget.Toast.LENGTH_LONG).show();
+					CigramSilent.toast(this, cgSmart.reason, android.widget.Toast.LENGTH_LONG);
 				}
 			}
 		} catch (Throwable ignored) { }
@@ -826,7 +826,7 @@ public class PlayerActivity extends AppCompatActivity {
 					@Override public void onLoaded(com.Cigram.subhub.SubDocument doc) { }
 					@Override public void onFailed(String message) {
 						if (isFinishing() || isDestroyed()) return;
-						android.widget.Toast.makeText(PlayerActivity.this, message, android.widget.Toast.LENGTH_SHORT).show();
+						CigramSilent.toast(PlayerActivity.this, message, android.widget.Toast.LENGTH_SHORT);
 					}
 				});
 			}
@@ -2553,11 +2553,9 @@ public class PlayerActivity extends AppCompatActivity {
 			long startPosition
 			) {
 				if (video == null || video.trim().equals("")) {
-					android.widget.Toast.makeText(
+					CigramSilent.toast(
 					PlayerActivity.this,
-					"رابط الفيديو غير متوفر",
-					android.widget.Toast.LENGTH_SHORT
-					).show();
+					"رابط الفيديو غير متوفر", android.widget.Toast.LENGTH_SHORT);
 					
 					return;
 				}
@@ -2700,11 +2698,9 @@ public class PlayerActivity extends AppCompatActivity {
 					);
 					exoPlayer.prepare();
 				} catch (Throwable mediaError) {
-					android.widget.Toast.makeText(
+					CigramSilent.toast(
 					PlayerActivity.this,
-					"تعذر تجهيز الفيديو",
-					android.widget.Toast.LENGTH_SHORT
-					).show();
+					"تعذر تجهيز الفيديو", android.widget.Toast.LENGTH_SHORT);
 					return;
 				}
 				
@@ -2737,11 +2733,9 @@ public class PlayerActivity extends AppCompatActivity {
 							try {
 								exoView.setPlayer(exoPlayer);
 							} catch (Throwable attachError) {
-								android.widget.Toast.makeText(
+								CigramSilent.toast(
 								PlayerActivity.this,
-								"تعذر ربط واجهة المشغل",
-								android.widget.Toast.LENGTH_SHORT
-								).show();
+								"تعذر ربط واجهة المشغل", android.widget.Toast.LENGTH_SHORT);
 								return;
 							}
 							
@@ -2779,11 +2773,9 @@ public class PlayerActivity extends AppCompatActivity {
 						) {
 							// 19.2: the repair ladder takes a failed load from here (reopen / renew the link / lower the quality)
 							if (cgAutoRepair[0] != null && cgAutoRepair[0].onLoadFailed()) return;
-							android.widget.Toast.makeText(
+							CigramSilent.toast(
 							PlayerActivity.this,
-							"تعذر تشغيل الفيديو",
-							android.widget.Toast.LENGTH_SHORT
-							).show();
+							"تعذر تشغيل الفيديو", android.widget.Toast.LENGTH_SHORT);
 							return;
 						}
 						
@@ -2955,11 +2947,9 @@ public class PlayerActivity extends AppCompatActivity {
 				||
 				data.video.trim().equals("")
 				) {
-					android.widget.Toast.makeText(
+					CigramSilent.toast(
 					PlayerActivity.this,
-					"رابط الحلقة غير متوفر",
-					android.widget.Toast.LENGTH_SHORT
-					).show();
+					"رابط الحلقة غير متوفر", android.widget.Toast.LENGTH_SHORT);
 					
 					return;
 				}
@@ -4540,7 +4530,7 @@ public class PlayerActivity extends AppCompatActivity {
 										subtitlesEnabled[0]=true;
 										cgSubEngine[0].load(fileUrl);
 										if(subtitleView!=null)subtitleView.setVisibility(android.view.View.VISIBLE);
-										android.widget.Toast.makeText(PlayerActivity.this,"الترجمة: "+label,android.widget.Toast.LENGTH_LONG).show();
+										CigramSilent.toast(PlayerActivity.this,"الترجمة: "+label, android.widget.Toast.LENGTH_LONG);
 									}
 								});
 							}},120L);
@@ -4645,7 +4635,7 @@ public class PlayerActivity extends AppCompatActivity {
 							long d=exoPlayer.getDuration(),p=exoPlayer.getCurrentPosition();
 							float sp=Math.max(.25f,exoPlayer.getPlaybackParameters().speed);
 							wait=d>0L&&d!=com.google.android.exoplayer2.C.TIME_UNSET?(long)((d-p)/sp)-1500L:0L;
-							if(wait<=0L){cgSleepChoice[0]=0;android.widget.Toast.makeText(PlayerActivity.this,"مدة الفيديو غير معروفة بعد",android.widget.Toast.LENGTH_SHORT).show();return cgSleepLabels[0];}
+							if(wait<=0L){cgSleepChoice[0]=0;CigramSilent.toast(PlayerActivity.this,"مدة الفيديو غير معروفة بعد", android.widget.Toast.LENGTH_SHORT);return cgSleepLabels[0];}
 						}
 						if(wait>0L){
 							cgSleepAt[0]=android.os.SystemClock.elapsedRealtime()+wait;
@@ -4653,7 +4643,7 @@ public class PlayerActivity extends AppCompatActivity {
 									cgSleepAt[0]=0L;cgSleepChoice[0]=0;cgSleepTask[0]=null;
 									if(isFinishing()||isDestroyed())return;
 									try{exoPlayer.pause();}catch(Throwable ignored){}
-									android.widget.Toast.makeText(PlayerActivity.this,"تم إيقاف التشغيل بواسطة المؤقت",android.widget.Toast.LENGTH_LONG).show();
+									CigramSilent.toast(PlayerActivity.this,"تم إيقاف التشغيل بواسطة المؤقت", android.widget.Toast.LENGTH_LONG);
 								}};
 							uiHandler.postDelayed(cgSleepTask[0],wait);
 						}
@@ -5005,11 +4995,9 @@ public class PlayerActivity extends AppCompatActivity {
 			);
 			
 		} else {
-			android.widget.Toast.makeText(
+			CigramSilent.toast(
 			getApplicationContext(),
-			"رابط الفيديو فارغ",
-			android.widget.Toast.LENGTH_LONG
-			).show();
+			"رابط الفيديو فارغ", android.widget.Toast.LENGTH_LONG);
 		}
 		
 		// =====================================================
@@ -5474,11 +5462,9 @@ public class PlayerActivity extends AppCompatActivity {
 							
 							try {
 								
-								android.widget.Toast.makeText(
+								CigramSilent.toast(
 								PlayerActivity.this,
-								"تعذر تشغيل صورة داخل صورة",
-								android.widget.Toast.LENGTH_SHORT
-								).show();
+								"تعذر تشغيل صورة داخل صورة", android.widget.Toast.LENGTH_SHORT);
 								
 							} catch (Exception ignored) {
 							}
@@ -7217,11 +7203,9 @@ public class PlayerActivity extends AppCompatActivity {
 							
 							try {
 								
-								android.widget.Toast.makeText(
+								CigramSilent.toast(
 								PlayerActivity.this,
-								"تعذر فتح قائمة الحلقات",
-								android.widget.Toast.LENGTH_SHORT
-								).show();
+								"تعذر فتح قائمة الحلقات", android.widget.Toast.LENGTH_SHORT);
 								
 							} catch (Exception ignored) {
 							}
@@ -8850,11 +8834,9 @@ public class PlayerActivity extends AppCompatActivity {
 					} catch (Exception error) {
 						
 						try {
-							android.widget.Toast.makeText(
+							CigramSilent.toast(
 							PlayerActivity.this,
-							"تعذر إرسال الفيديو إلى التلفاز",
-							android.widget.Toast.LENGTH_SHORT
-							).show();
+							"تعذر إرسال الفيديو إلى التلفاز", android.widget.Toast.LENGTH_SHORT);
 						} catch (Exception ignored) {}
 					}
 				}

@@ -554,7 +554,7 @@ public class CigramPlusActivity extends Activity {
 
     private void contactOnWhatsApp() {
         if (selected[0] < 0) {
-            android.widget.Toast.makeText(this, "اختر طريقة الدفع أولاً (ماستر كارد / زين كاش / أسيا سيل)", android.widget.Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(this, "اختر طريقة الدفع أولاً (ماستر كارد / زين كاش / أسيا سيل)", android.widget.Toast.LENGTH_SHORT);
             methodsRow.animate().translationX(dp(8)).setDuration(60L).withEndAction(new Runnable() {
                 @Override public void run() { methodsRow.animate().translationX(0f).setDuration(120L).start(); }
             }).start();

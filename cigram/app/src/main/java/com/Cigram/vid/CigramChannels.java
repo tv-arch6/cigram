@@ -386,7 +386,7 @@ public final class CigramChannels {
 
     private static void open(Activity a, State st, Ch ch) {
         if (!ch.available) {
-            Toast.makeText(a, "القناة غير متوفرة حالياً", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(a, "القناة غير متوفرة حالياً", android.widget.Toast.LENGTH_SHORT);
             return;
         }
         pushRecent(a, ch);
@@ -426,7 +426,7 @@ public final class CigramChannels {
             }
         } catch (Throwable error) {
             Log.w(TAG, "open failed", error);
-            Toast.makeText(a, "تعذر فتح القناة", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(a, "تعذر فتح القناة", android.widget.Toast.LENGTH_SHORT);
         }
         updateBanner(a, st);
     }
@@ -904,7 +904,7 @@ public final class CigramChannels {
         tile.setOnLongClickListener(new View.OnLongClickListener() {
             @Override public boolean onLongClick(View v) {
                 toggleFav(a, ch);
-                Toast.makeText(a, isFav(a, ch) ? "أضيفت إلى المفضلة" : "أزيلت من المفضلة", Toast.LENGTH_SHORT).show();
+                CigramSilent.toast(a, isFav(a, ch) ? "أضيفت إلى المفضلة" : "أزيلت من المفضلة", android.widget.Toast.LENGTH_SHORT);
                 render(a, st);
                 return true;
             }

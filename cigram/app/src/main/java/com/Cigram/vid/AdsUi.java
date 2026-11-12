@@ -40,7 +40,7 @@ public final class AdsUi {
     }
 
     public static void toast(Context c, String msg) {
-        try { Toast.makeText(c, msg, Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) { }
+        try { CigramSilent.toast(c, msg, android.widget.Toast.LENGTH_SHORT); } catch (Throwable ignored) { }
     }
 
     public static TextView text(Context c, String s, float sp, int color, boolean bold) {

@@ -317,11 +317,9 @@ public class MyContentActivity extends AppCompatActivity {
 		token.trim().equals("")
 		) {
 			
-			android.widget.Toast.makeText(
+			CigramSilent.toast(
 			MyContentActivity.this,
-			"يجب تسجيل الدخول أولاً",
-			android.widget.Toast.LENGTH_SHORT
-			).show();
+			"يجب تسجيل الدخول أولاً", android.widget.Toast.LENGTH_SHORT);
 			
 			finish();
 			return;
@@ -991,11 +989,9 @@ public class MyContentActivity extends AppCompatActivity {
 					@Override
 					public void onClick(android.view.View view) {
 						if (video == null || video.trim().equals("")) {
-							android.widget.Toast.makeText(
+							CigramSilent.toast(
 							MyContentActivity.this,
-							"رابط الفيديو غير متوفر",
-							android.widget.Toast.LENGTH_SHORT
-							).show();
+							"رابط الفيديو غير متوفر", android.widget.Toast.LENGTH_SHORT);
 							return;
 						}
 						android.content.Intent intent =

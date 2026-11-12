@@ -121,7 +121,7 @@ public final class CigramAdManager {
         if (!CigramAdConfig.DIAG || c == null) return;
         new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
             @Override public void run() {
-                try { android.widget.Toast.makeText(c, "AD: " + msg, android.widget.Toast.LENGTH_LONG).show(); } catch (Throwable ignored) { }
+                try { CigramSilent.toast(c, "AD: " + msg, android.widget.Toast.LENGTH_LONG); } catch (Throwable ignored) { }
             }
         });
     }

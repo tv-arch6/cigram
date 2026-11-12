@@ -533,8 +533,7 @@ final class CigramTvRail {
                             a.startActivity(new Intent(a, cls));
                             a.overridePendingTransition(0, 0);
                         } catch (Throwable error) {
-                            android.widget.Toast.makeText(a, "تعذر فتح صفحة الاشعارات",
-                                    android.widget.Toast.LENGTH_SHORT).show();
+                            CigramSilent.toast(a, "تعذر فتح صفحة الاشعارات", android.widget.Toast.LENGTH_SHORT);
                         }
                     }
                 });

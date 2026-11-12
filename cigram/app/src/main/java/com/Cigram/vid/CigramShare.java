@@ -119,7 +119,7 @@ public final class CigramShare {
         final JSONObject item = currentItem(a);
         final String title = CigramLinks.titleOf(item);
         if (title.length() == 0) {
-            Toast.makeText(a, "لحظة، جارٍ تحميل البيانات…", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(a, "لحظة، جارٍ تحميل البيانات…", android.widget.Toast.LENGTH_SHORT);
             return;
         }
         CigramLinks.refresh(a);
@@ -137,7 +137,7 @@ public final class CigramShare {
                 try {
                     ClipboardManager cm = (ClipboardManager) a.getSystemService(Context.CLIPBOARD_SERVICE);
                     if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("Cigram", CigramLinks.titleLink(a, item)));
-                    Toast.makeText(a, "تم نسخ الرابط", Toast.LENGTH_SHORT).show();
+                    CigramSilent.toast(a, "تم نسخ الرابط", android.widget.Toast.LENGTH_SHORT);
                 } catch (Throwable ignored) { }
             }
         }), optionLp(a, true));
@@ -179,7 +179,7 @@ public final class CigramShare {
             a.startActivity(Intent.createChooser(s, "مشاركة عبر"));
             try { CigramAnalytics.track(a, "share_link"); } catch (Throwable ignored) { }
         } catch (Throwable error) {
-            Toast.makeText(a, "تعذرت المشاركة", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(a, "تعذرت المشاركة", android.widget.Toast.LENGTH_SHORT);
         }
     }
 

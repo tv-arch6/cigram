@@ -131,11 +131,9 @@ public final class CigramNotifyCenter {
                     activity.startActivity(intent);
                     activity.overridePendingTransition(0, 0);
                 } catch (Throwable error) {
-                    android.widget.Toast.makeText(
+                    CigramSilent.toast(
                             activity,
-                            "تعذر فتح صفحة الاشعارات او التنبيهات",
-                            android.widget.Toast.LENGTH_SHORT
-                    ).show();
+                            "تعذر فتح صفحة الاشعارات او التنبيهات", android.widget.Toast.LENGTH_SHORT);
                 }
             }
         });
@@ -227,11 +225,9 @@ public final class CigramNotifyCenter {
                         return true;
                     }
                     CigramStage1InitProvider.sendStage6TestNotification(activity);
-                    android.widget.Toast.makeText(
+                    CigramSilent.toast(
                             activity,
-                            "تم إرسال إشعار تجريبي",
-                            android.widget.Toast.LENGTH_SHORT
-                    ).show();
+                            "تم إرسال إشعار تجريبي", android.widget.Toast.LENGTH_SHORT);
                     return true;
                 }
             });

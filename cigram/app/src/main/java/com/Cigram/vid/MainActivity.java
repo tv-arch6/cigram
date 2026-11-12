@@ -178,13 +178,13 @@ public class MainActivity extends AppCompatActivity {
 		if (loading != null) page.removeView(loading);
 		
 		if (CigramStage1InitProvider.homeHasSections(this)) {
-			android.widget.Toast.makeText(this, "تعذر تحديث المحتوى؛ المعروض حاليًا باقٍ", android.widget.Toast.LENGTH_SHORT).show();
+			CigramSilent.toast(this, "تعذر تحديث المحتوى؛ المعروض حاليًا باقٍ", android.widget.Toast.LENGTH_SHORT);
 			return;
 		}
 		String saved = CigramCatalogPrefs.of(this).getString("json", "");
 		if (saved != null && !saved.trim().isEmpty()) {
 			_req_movies_request_listener.onResponse("movies", saved, new HashMap<String, Object>());
-			android.widget.Toast.makeText(this, "تعذر الاتصال؛ تم عرض آخر محتوى محفوظ", android.widget.Toast.LENGTH_SHORT).show();
+			CigramSilent.toast(this, "تعذر الاتصال؛ تم عرض آخر محتوى محفوظ", android.widget.Toast.LENGTH_SHORT);
 			return;
 		}
 		if (page.findViewWithTag("cigram_home_retry_box") != null) return;
@@ -734,9 +734,8 @@ public class MainActivity extends AppCompatActivity {
 								.setPositiveButton("حسنًا", null)
 								.show();
 					} catch (Throwable cgDialogError) {
-						android.widget.Toast.makeText(MainActivity.this,
-								cgTrace.length() > 120 ? cgTrace.substring(cgTrace.length() - 120) : cgTrace,
-								android.widget.Toast.LENGTH_LONG).show();
+						CigramSilent.toast(MainActivity.this,
+								cgTrace.length() > 120 ? cgTrace.substring(cgTrace.length() - 120) : cgTrace, android.widget.Toast.LENGTH_LONG);
 					}
 				}
 			};

@@ -399,7 +399,7 @@ public final class CigramVidWatchSheet {
             // fallback to broadcast
             broadcastPlay("solo");
         } catch (Throwable ex) {
-            Toast.makeText(activity, "خطأ: " + ex.getMessage(), Toast.LENGTH_LONG).show();
+            CigramSilent.toast(activity, "خطأ: " + ex.getMessage(), android.widget.Toast.LENGTH_LONG);
         }
     }
 
@@ -414,7 +414,7 @@ public final class CigramVidWatchSheet {
             intent.putExtra("vid_mode",        "together");
             activity.startActivity(intent);
         } catch (Throwable ex) {
-            Toast.makeText(activity, "خطأ: " + ex.getMessage(), Toast.LENGTH_LONG).show();
+            CigramSilent.toast(activity, "خطأ: " + ex.getMessage(), android.widget.Toast.LENGTH_LONG);
         }
     }
 
@@ -460,7 +460,7 @@ public final class CigramVidWatchSheet {
             activity.startActivityForResult(
                     Intent.createChooser(intent, "اختر ملف ترجمة .srt"), REQ_SRT);
         } catch (Throwable t) {
-            Toast.makeText(activity, "لا يمكن فتح منتقي الملفات", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(activity, "لا يمكن فتح منتقي الملفات", android.widget.Toast.LENGTH_SHORT);
         }
     }
 
@@ -481,7 +481,7 @@ public final class CigramVidWatchSheet {
             active.srtLbl.setText("📄  ترجمة: " + uri.getLastPathSegment());
             active.srtLbl.setTextColor(GREEN);
         } catch (Throwable t) {
-            Toast.makeText(ctx, "خطأ في تحميل الترجمة", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(ctx, "خطأ في تحميل الترجمة", android.widget.Toast.LENGTH_SHORT);
         }
     }
 

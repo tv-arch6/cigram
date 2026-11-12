@@ -229,7 +229,7 @@ final class CigramTerms {
             v = a == null ? null : a.getWindow().getDecorView().findViewWithTag(TAG_BOX);
         }
         try {
-            Toast.makeText(a, "يجب الموافقة على الشروط والأحكام قبل إنشاء الحساب", Toast.LENGTH_LONG).show();
+            CigramSilent.toast(a, "يجب الموافقة على الشروط والأحكام قبل إنشاء الحساب", android.widget.Toast.LENGTH_LONG);
             if (v != null) {
                 v.requestFocus();
                 v.animate().translationX(CigramUI.dp(a, 6)).setDuration(60).withEndAction(new Runnable() {

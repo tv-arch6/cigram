@@ -172,9 +172,9 @@ final class CigramAppIconUI {
                 if (!CigramAppIcon.canUse(a, t)) { showLocked(a); return; }
                 if (CigramAppIcon.apply(a, t.id)) {
                     CigramPlus.syncAppIcon(a, t.id);
-                    Toast.makeText(a, "تم تغيير الأيقونة ✓ (قد يتأخر ظهورها لثوانٍ حسب الشاشة الرئيسية)", Toast.LENGTH_LONG).show();
+                    CigramSilent.toast(a, "تم تغيير الأيقونة ✓ (قد يتأخر ظهورها لثوانٍ حسب الشاشة الرئيسية)", android.widget.Toast.LENGTH_LONG);
                 } else {
-                    Toast.makeText(a, "تعذّر تغيير الأيقونة على هذا الجهاز", Toast.LENGTH_SHORT).show();
+                    CigramSilent.toast(a, "تعذّر تغيير الأيقونة على هذا الجهاز", android.widget.Toast.LENGTH_SHORT);
                 }
                 picked[0] = CigramAppIcon.active(a);
                 render[0].run();
@@ -309,7 +309,7 @@ final class CigramAppIconUI {
             }
             d.show();
         } catch (Throwable t) {
-            Toast.makeText(a, "هذه الأيقونة حصرية لمشتركي Cigram Plus", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(a, "هذه الأيقونة حصرية لمشتركي Cigram Plus", android.widget.Toast.LENGTH_SHORT);
         }
     }
 }

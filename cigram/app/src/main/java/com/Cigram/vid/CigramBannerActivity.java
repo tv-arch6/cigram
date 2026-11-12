@@ -134,6 +134,6 @@ public class CigramBannerActivity extends Activity {
     }
 
     private void toast(String text) {
-        Toast.makeText(getApplicationContext(), text, Toast.LENGTH_LONG).show();
+        CigramSilent.toast(getApplicationContext(), text, android.widget.Toast.LENGTH_LONG);
     }
 }

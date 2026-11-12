@@ -747,12 +747,11 @@ public final class CigramVidResolver {
             intent.putExtra("mode",   "solo");
             activity.sendBroadcast(intent);
 
-            Toast.makeText(activity,
-                    "▶️  " + contentTitle + "\nجاري التشغيل من " + SOURCE_NAMES[selectedSource],
-                    Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(activity,
+                    "▶️  " + contentTitle + "\nجاري التشغيل من " + SOURCE_NAMES[selectedSource], android.widget.Toast.LENGTH_SHORT);
 
         } catch (Throwable t) {
-            Toast.makeText(activity, "تعذّر فتح المشغّل: " + t.getMessage(), Toast.LENGTH_LONG).show();
+            CigramSilent.toast(activity, "تعذّر فتح المشغّل: " + t.getMessage(), android.widget.Toast.LENGTH_LONG);
         }
     }
 
@@ -776,7 +775,7 @@ public final class CigramVidResolver {
             intent.putExtra("vid_mode", "together");
             activity.startActivity(intent);
         } catch (Throwable t) {
-            Toast.makeText(activity, "تعذّر فتح المشاهدة المشتركة: " + t.getMessage(), Toast.LENGTH_LONG).show();
+            CigramSilent.toast(activity, "تعذّر فتح المشاهدة المشتركة: " + t.getMessage(), android.widget.Toast.LENGTH_LONG);
         }
     }
 
@@ -814,7 +813,7 @@ public final class CigramVidResolver {
                     REQUEST_SRT);
             // The activity must call CigramVidResolver.onSubtitleResult(uri) in onActivityResult
         } catch (Throwable t) {
-            Toast.makeText(activity, "لا يمكن فتح منتقي الملفات", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(activity, "لا يمكن فتح منتقي الملفات", android.widget.Toast.LENGTH_SHORT);
         }
         pendingSubBtn = subBtn;
     }
@@ -848,7 +847,7 @@ public final class CigramVidResolver {
                 active.pendingSubBtn.setTextColor(0xFF4CAF50);
             }
         } catch (Throwable t) {
-            Toast.makeText(ctx, "خطأ في تحميل الترجمة", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(ctx, "خطأ في تحميل الترجمة", android.widget.Toast.LENGTH_SHORT);
         }
     }
 

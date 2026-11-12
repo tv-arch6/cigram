@@ -887,7 +887,7 @@ final class CigramLiveHub implements CigramChannelStore.Listener, CigramChannelP
         if (destroyed) return;
         try {
             if (!card.ch.available) {
-                Toast.makeText(a, "القناة غير متوفرة حالياً", Toast.LENGTH_SHORT).show();
+                CigramSilent.toast(a, "القناة غير متوفرة حالياً", android.widget.Toast.LENGTH_SHORT);
                 return;
             }
             choose(card.ch, true);
@@ -901,7 +901,7 @@ final class CigramLiveHub implements CigramChannelStore.Listener, CigramChannelP
         try {
             toggleFavourite(card.ch);
             boolean fav = CigramChannelStore.isFav(a, card.ch.key);
-            Toast.makeText(a, fav ? "أُضيفت إلى المفضلة" : "أُزيلت من المفضلة", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(a, fav ? "أُضيفت إلى المفضلة" : "أُزيلت من المفضلة", android.widget.Toast.LENGTH_SHORT);
         } catch (RuntimeException error) {
             Log.w(TAG, "favourite failed", error);
         }
@@ -1053,7 +1053,7 @@ final class CigramLiveHub implements CigramChannelStore.Listener, CigramChannelP
             wentFull = false;
             Log.w(TAG, "full screen failed", error);
             player.resume();
-            Toast.makeText(a, "تعذر فتح القناة", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(a, "تعذر فتح القناة", android.widget.Toast.LENGTH_SHORT);
         }
     }
 

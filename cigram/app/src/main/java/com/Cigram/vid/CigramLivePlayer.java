@@ -316,7 +316,7 @@ public final class CigramLivePlayer {
             bindTitle(s);
             String startUrl = e == null ? "" : urlOf(e);
             if (startUrl.length() == 0) {
-                Toast.makeText(a.getApplicationContext(), "رابط القناة غير موجود", Toast.LENGTH_LONG).show();
+                CigramSilent.toast(a.getApplicationContext(), "رابط القناة غير موجود", android.widget.Toast.LENGTH_LONG);
                 showError(s, "رابط القناة غير موجود");
             } else {
                 play(s, startUrl);
@@ -1673,7 +1673,7 @@ public final class CigramLivePlayer {
             s.a.enterPictureInPictureMode(p);
         } catch (Throwable error) {
             Log.w(TAG, "pip failed", error);
-            Toast.makeText(s.a, "النافذة العائمة غير مدعومة على هذا الجهاز", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(s.a, "النافذة العائمة غير مدعومة على هذا الجهاز", android.widget.Toast.LENGTH_SHORT);
         }
     }
 
@@ -1707,7 +1707,7 @@ public final class CigramLivePlayer {
             }
             @Override public void onSessionStartFailed(CastSession session, int error) {
                 s.wantCast = false;
-                if (!s.released) Toast.makeText(app, "تعذر الاتصال بالتلفاز", Toast.LENGTH_SHORT).show();
+                if (!s.released) CigramSilent.toast(app, "تعذر الاتصال بالتلفاز", android.widget.Toast.LENGTH_SHORT);
             }
             @Override public void onSessionEnding(CastSession session) { }
             @Override public void onSessionEnded(CastSession session, int error) {
@@ -1810,7 +1810,7 @@ public final class CigramLivePlayer {
                 @Override public void run() {
                     sheet.dismiss();
                     try { CigramDlna.rescan(a); } catch (Throwable ignored) { }
-                    Toast.makeText(a, "جارٍ البحث… افتح القائمة مرة ثانية بعد 5 ثوانٍ", Toast.LENGTH_SHORT).show();
+                    CigramSilent.toast(a, "جارٍ البحث… افتح القائمة مرة ثانية بعد 5 ثوانٍ", android.widget.Toast.LENGTH_SHORT);
                 }
             }));
             sheet.icon(CigramUI.ICON_INFO, RED)
@@ -1888,7 +1888,7 @@ public final class CigramLivePlayer {
                                 castStarted(s);
                             } else {
                                 s.dlna = null;
-                                Toast.makeText(app, "التلفاز رفض تشغيل هذه القناة، جرّب «عرض الشاشة»", Toast.LENGTH_LONG).show();
+                                CigramSilent.toast(app, "التلفاز رفض تشغيل هذه القناة، جرّب «عرض الشاشة»", android.widget.Toast.LENGTH_LONG);
                             }
                         }
                     });
@@ -1923,7 +1923,7 @@ public final class CigramLivePlayer {
             castStarted(s);
         } catch (Throwable error) {
             Log.w(TAG, "chromecast live failed", error);
-            Toast.makeText(app, "تعذر التشغيل على التلفاز", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(app, "تعذر التشغيل على التلفاز", android.widget.Toast.LENGTH_SHORT);
         }
     }
 

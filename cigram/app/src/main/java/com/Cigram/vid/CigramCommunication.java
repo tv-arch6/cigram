@@ -423,7 +423,7 @@ public final class CigramCommunication {
                 mail.setPackage(null);
                 a.startActivity(Intent.createChooser(mail, "مراسلة الدعم"));
             } catch (Exception noMailApp) {
-                Toast.makeText(a, "لا يوجد تطبيق بريد. راسلنا على " + CigramReport.SUPPORT_EMAIL, Toast.LENGTH_LONG).show();
+                CigramSilent.toast(a, "لا يوجد تطبيق بريد. راسلنا على " + CigramReport.SUPPORT_EMAIL, android.widget.Toast.LENGTH_LONG);
             }
         }
     }

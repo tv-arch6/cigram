@@ -110,7 +110,7 @@ public final class CigramEpisodeAds {
         if (!CigramAdConfig.DIAG || c == null) return;
         MAIN.post(new Runnable() {
             @Override public void run() {
-                try { android.widget.Toast.makeText(c.getApplicationContext(), "AD: " + msg, android.widget.Toast.LENGTH_LONG).show(); } catch (Throwable ignored) { }
+                try { CigramSilent.toast(c.getApplicationContext(), "AD: " + msg, android.widget.Toast.LENGTH_LONG); } catch (Throwable ignored) { }
             }
         });
     }

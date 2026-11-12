@@ -214,7 +214,7 @@ final class CigramProfiles {
     static void showPicker(final Activity a, final Runnable afterSwitch) {
         if (a == null || a.isFinishing()) return;
         if (!CigramUserData.isLoggedIn(a)) {
-            android.widget.Toast.makeText(a, "سجّل الدخول أولاً: الملفات الشخصية تُحفظ داخل حسابك.", android.widget.Toast.LENGTH_LONG).show();
+            CigramSilent.toast(a, "سجّل الدخول أولاً: الملفات الشخصية تُحفظ داخل حسابك.", android.widget.Toast.LENGTH_LONG);
             return;
         }
         final android.app.Dialog d = new android.app.Dialog(a);
@@ -254,7 +254,7 @@ final class CigramProfiles {
                     d.dismiss();
                     if (p.id.equals(activeId)) return;
                     setActive(a, p.id);
-                    android.widget.Toast.makeText(a, "تشاهد الآن باسم «" + p.name + "»", android.widget.Toast.LENGTH_SHORT).show();
+                    CigramSilent.toast(a, "تشاهد الآن باسم «" + p.name + "»", android.widget.Toast.LENGTH_SHORT);
                     if (afterSwitch != null) afterSwitch.run();
                 }
             }, p.isMain() ? null : new View.OnLongClickListener() {
@@ -344,7 +344,7 @@ final class CigramProfiles {
                     @Override public void onClick(android.content.DialogInterface d, int w) {
                         if (editing != null) { rename(a, editing.id, in.getText().toString()); return; }
                         String why = add(a, in.getText().toString());
-                        if (why.length() > 0) android.widget.Toast.makeText(a, why, android.widget.Toast.LENGTH_LONG).show();
+                        if (why.length() > 0) CigramSilent.toast(a, why, android.widget.Toast.LENGTH_LONG);
                         else showPicker(a, after);
                     }
                 }).setNegativeButton("إلغاء", null).show();

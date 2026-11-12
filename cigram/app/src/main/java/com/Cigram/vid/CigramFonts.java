@@ -206,7 +206,7 @@ public final class CigramFonts {
         try {
             if (sPicker == null) {
                 Activity a = sActivity.get();
-                if (a != null) Toast.makeText(a, "تعذّر فتح منتقي الملفات على هذا الجهاز", Toast.LENGTH_SHORT).show();
+                if (a != null) CigramSilent.toast(a, "تعذّر فتح منتقي الملفات على هذا الجهاز", android.widget.Toast.LENGTH_SHORT);
                 return;
             }
             Class<?> launcherCls = Class.forName("androidx.activity.result.ActivityResultLauncher");
@@ -218,7 +218,7 @@ public final class CigramFonts {
         } catch (Throwable error) {
             android.util.Log.w("CigramFonts", "launchPicker failed", error);
             Activity a = sActivity.get();
-            if (a != null) Toast.makeText(a, "تعذّر فتح منتقي الملفات", Toast.LENGTH_SHORT).show();
+            if (a != null) CigramSilent.toast(a, "تعذّر فتح منتقي الملفات", android.widget.Toast.LENGTH_SHORT);
         }
     }
 
@@ -262,7 +262,7 @@ public final class CigramFonts {
             File out = new File(subfontDir(activity), fileName);
             InputStream in = activity.getContentResolver().openInputStream(uri);
             if (in == null) {
-                Toast.makeText(activity, "تعذّر قراءة الملف", Toast.LENGTH_SHORT).show();
+                CigramSilent.toast(activity, "تعذّر قراءة الملف", android.widget.Toast.LENGTH_SHORT);
                 return;
             }
             OutputStream os = new FileOutputStream(out);
@@ -288,7 +288,7 @@ public final class CigramFonts {
                 // قد تُرجع بعض الأجهزة DEFAULT عند الفشل؛ نتحقق بالحجم كحد أدنى
                 if (out.length() < 1024) {
                     out.delete();
-                    Toast.makeText(activity, "الملف ليس خطاً صالحاً (TTF/OTF)", Toast.LENGTH_LONG).show();
+                    CigramSilent.toast(activity, "الملف ليس خطاً صالحاً (TTF/OTF)", android.widget.Toast.LENGTH_LONG);
                     return;
                 }
             }
@@ -296,11 +296,11 @@ public final class CigramFonts {
             registerCustom(activity, fileName, cleanName(display));
             prefs(activity).edit().putString(K_FONT, "custom:" + fileName).apply();
             uploadHook(activity, out, cleanName(display));
-            Toast.makeText(activity, "تمت إضافة الخط", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(activity, "تمت إضافة الخط", android.widget.Toast.LENGTH_SHORT);
             if (sRefresh != null) sRefresh.run();
         } catch (Throwable error) {
             android.util.Log.w("CigramFonts", "importFont failed", error);
-            Toast.makeText(activity, "تعذّر استيراد الخط", Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(activity, "تعذّر استيراد الخط", android.widget.Toast.LENGTH_SHORT);
         }
     }
 

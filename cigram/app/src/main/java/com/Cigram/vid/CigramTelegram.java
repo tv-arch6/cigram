@@ -39,7 +39,7 @@ final class CigramTelegram {
             web.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             c.startActivity(web);
         } catch (Throwable t) {
-            try { android.widget.Toast.makeText(c, "ثبّت تطبيق Telegram ثم ابحث عن @" + CHANNEL, android.widget.Toast.LENGTH_LONG).show(); } catch (Throwable ignored) { }
+            try { CigramSilent.toast(c, "ثبّت تطبيق Telegram ثم ابحث عن @" + CHANNEL, android.widget.Toast.LENGTH_LONG); } catch (Throwable ignored) { }
         }
     }
 }

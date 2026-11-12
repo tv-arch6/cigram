@@ -45,7 +45,7 @@ public final class CigramDeleteAccount {
         final SharedPreferences auth = activity.getSharedPreferences("auth_session", Context.MODE_PRIVATE);
         final String token = auth.getString("token", "") == null ? "" : auth.getString("token", "").trim();
         if (token.length() == 0) {
-            android.widget.Toast.makeText(activity, "سجّل الدخول أولاً", android.widget.Toast.LENGTH_SHORT).show();
+            CigramSilent.toast(activity, "سجّل الدخول أولاً", android.widget.Toast.LENGTH_SHORT);
             return;
         }
 

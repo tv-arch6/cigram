@@ -604,7 +604,7 @@ public final class CigramTvDetailsActivity extends Activity implements CigramTvH
             box.setContentDescription("شاهد الآن. اضغط مطولاً للمشاهدة من البداية");
             box.setOnLongClickListener(new View.OnLongClickListener() {
                 @Override public boolean onLongClick(View v) {
-                    Toast.makeText(CigramTvDetailsActivity.this, "التشغيل من البداية", Toast.LENGTH_SHORT).show();
+                    CigramSilent.toast(CigramTvDetailsActivity.this, "التشغيل من البداية", android.widget.Toast.LENGTH_SHORT);
                     play(true);
                     return true;
                 }
@@ -633,7 +633,7 @@ public final class CigramTvDetailsActivity extends Activity implements CigramTvH
         }
         boolean now = inList();
         if (listButton != null) listButton.setText(now ? "في قائمتي" : "إضافة إلى قائمتي");
-        Toast.makeText(this, now ? "أُضيف إلى قائمتي" : "أُزيل من قائمتي", Toast.LENGTH_SHORT).show();
+        CigramSilent.toast(this, now ? "أُضيف إلى قائمتي" : "أُزيل من قائمتي", android.widget.Toast.LENGTH_SHORT);
     }
 
     private boolean togetherAvailable() {
@@ -668,7 +668,7 @@ public final class CigramTvDetailsActivity extends Activity implements CigramTvH
         if (bad != CigramPlaybackError.UNKNOWN) {
             lastPlayAt = 0L;
             setReady("تعذّر", AMBER, CigramPlaybackError.message(bad), "", false);
-            Toast.makeText(this, CigramPlaybackError.message(bad), Toast.LENGTH_LONG).show();
+            CigramSilent.toast(this, CigramPlaybackError.message(bad), android.widget.Toast.LENGTH_LONG);
             return;
         }
         needsRefresh = true;

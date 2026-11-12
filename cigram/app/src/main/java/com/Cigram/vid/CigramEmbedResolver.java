@@ -1020,7 +1020,7 @@ public final class CigramEmbedResolver {
         if (c == null || now - lastNotice < 20000L) return;
         lastNotice = now;
         UI.post(new Runnable() { @Override public void run() {
-            try { android.widget.Toast.makeText(c, text, android.widget.Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) { }
+            try { CigramSilent.toast(c, text, android.widget.Toast.LENGTH_SHORT); } catch (Throwable ignored) { }
         } });
     }
     private static final HashSet<String> DIAGNOSED = new HashSet<String>();
