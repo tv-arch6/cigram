@@ -9,6 +9,7 @@ import { posterCard, factsHtml, playTarget as playTarget2, pimg } from './home-v
 import { sym } from './icons.js';
 import * as plus from './plus.js';
 import { accountBoxHtml } from './plus-view.js';
+import { badge as newBadge } from './newbadge.js';
 import { mountExternalLink } from './external-link.js';
 
 const BADGES = { new: 'جديد', exclusive: 'حصري', featured: 'مميز', trending: 'الأكثر مشاهدة' };
@@ -370,6 +371,12 @@ export function renderAccount(el, cat, ctx) {
       <h1 class="page-title">حسابي</h1>
       ${accountCardHtml(user, stats)}
       ${accountBoxHtml()}
+
+      <div class="ios-group acc-links">
+        <a class="ios-row" href="#/section/mylist"><div class="ios-col"><strong>قائمة المشاهدة${newBadge('watchlist_2026')}</strong><span>ما حفظته لتشاهده لاحقاً</span></div></a>
+        <a class="ios-row" href="#/support"><div class="ios-col"><strong>الدعم والتواصل${newBadge('support_chat_2026')}</strong><span>أسعار Cigram Plus · المزايا · المشاكل</span></div></a>
+        <a class="ios-row" href="#/requests"><div class="ios-col"><strong>أرسل طلبك أو مشكلتك${newBadge('send_request_2026')}</strong><span>اطلب فيلماً أو مسلسلاً أو قناة</span></div></a>
+      </div>
 
       <section class="panel">
         <h2>التشغيل</h2>

@@ -15,6 +15,8 @@ import { renderChannels } from './channels-view.js';
 import * as auth from './auth.js';
 import * as plus from './plus.js';
 import { renderPlus, schedulePromo } from './plus-view.js';
+import { renderRequests, renderSupport } from './pages.js';
+import * as requests from './requests.js';
 import './landing.js';
 
 const view = document.getElementById('view');
@@ -35,15 +37,15 @@ function parseHash() {
   return { name: parts[0] || 'home', params: parts.slice(1), query: new URLSearchParams(qs) };
 }
 
-const NAV_OF = { home: 'home', title: 'home', section: 'home', channels: 'channels', search: 'search', account: 'account', terms: 'account', plus: 'account' };
-const TITLES = { channels: 'القنوات', search: 'البحث', account: 'حسابي', terms: 'الشروط والخصوصية', plus: 'Cigram Plus' };
+const NAV_OF = { home: 'home', title: 'home', section: 'home', channels: 'channels', search: 'search', account: 'account', terms: 'account', plus: 'account', requests: 'account', support: 'account' };
+const TITLES = { channels: 'القنوات', search: 'البحث', account: 'حسابي', terms: 'الشروط والخصوصية', plus: 'Cigram Plus', requests: 'أرسل طلبك أو مشكلتك', support: 'الدعم والتواصل' };
 // v2: صفحات تبقى حيّة عند التنقل (مثل صفحات التطبيق): الرجوع إليها فوري وبنفس مكان التمرير، بلا إعادة رسم.
 const KEEP = new Set(['home', 'search']);
 const kept = new Map();   // name -> { el, result, sig, y, hash }
 let tempEl = null;
 let currentNav = '';
 // صفحات لا تحتاج كتالوج الأفلام: تفتح حتى لو تأخر تحميله أو فشل
-const STANDALONE = new Set(['channels', 'terms', 'plus']);
+const STANDALONE = new Set(['channels', 'terms', 'plus', 'requests', 'support']);
 
 /** الوعاء الذي تُرسم فيه صفحة: صفحات KEEP لها وعاؤها الدائم، والباقي وعاء مؤقت واحد. */
 function pageEl(name) {
@@ -127,6 +129,8 @@ function route({ keepScroll = false, force = false } = {}) {
     case 'account': result = renderAccount(el, cat, ctx); revealInstall(); break;
     case 'terms': result = renderTerms(el, ctx); break;
     case 'plus': result = renderPlus(el, ctx); break;
+    case 'requests': result = renderRequests(el, cat, ctx); break;
+    case 'support': result = renderSupport(el, ctx); break;
     case 'watch': result = renderWatch(el, cat, ctx); break;
     default:
       el.innerHTML = `<div class="empty"><h2>الصفحة غير موجودة</h2><p>الرابط غير صحيح.</p><a class="btn btn-primary" href="#/">العودة للرئيسية</a></div>`;

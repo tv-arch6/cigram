@@ -303,7 +303,7 @@ export function renderHome(el, cat) {
       <div class="hrow-head"><h2>تابع المشاهدة</h2></div>
       <div class="hrow-wrap"><div class="track">${cont.map(({ entry, item }) => resumeCard(entry, item)).join('')}</div></div>
     </section>`);
-  if (mylist.length) rows.push(() => rowHtml({ id: 'mylist', name: 'قائمتي', style: 'row', items: mylist }));
+  if (mylist.length) rows.push(() => rowHtml({ id: 'mylist', name: 'قائمة المشاهدة', style: 'row', items: mylist }));
   for (const s of cat.sections()) {
     let style = layout.styleFor(s.adminId || s.id, s.name) || layout.normStyle(s.style) || 'row';
     const name = layout.titleFor(s.adminId || s.id, s.name) || s.name;
@@ -350,7 +350,7 @@ export function renderSection(el, cat, ctx) {
   const id = ctx.params[0] || '';
   let name = '';
   let items = [];
-  if (id === 'mylist') { name = 'قائمتي'; items = store.getList().map((x) => cat.get(x)).filter(Boolean); }
+  if (id === 'mylist') { name = 'قائمة المشاهدة'; items = store.getList().map((x) => cat.get(x)).filter(Boolean); }
   else if (id === 'continue') { name = 'تابع المشاهدة'; items = continueList(cat).map((x) => x.item); }
   else {
     const s = cat.sections().find((x) => x.id === id);

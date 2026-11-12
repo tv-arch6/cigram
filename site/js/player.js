@@ -34,7 +34,14 @@ export function isEmbedUrl(url) {
   } catch { return false; }
 }
 
-function prefs() { try { return JSON.parse(localStorage.getItem(PREFS) || '{}') || {}; } catch { return {}; } }
+function prefs() {
+  let p = {};
+  try { p = JSON.parse(localStorage.getItem(PREFS) || '{}') || {}; } catch { p = {}; }
+  // حجب إعلانات مواقع التضمين (vidbolt وأمثاله) مفعّل من الأساس: الإطار معزول فلا نوافذ منبثقة ولا تحويل للصفحة.
+  // يتوقف فقط إذا أطفأه المشاهد بنفسه لموقع يرفض العمل داخل العزل.
+  if (p.embedShield === undefined) p.embedShield = true;
+  return p;
+}
 function setPref(k, v) { const p = prefs(); p[k] = v; try { localStorage.setItem(PREFS, JSON.stringify(p)); } catch { /* ignore */ } }
 
 /** «4K»، «2K»، «1080p» … (العرض يساعد مع الأفلام العريضة مثل 3840×1608) */

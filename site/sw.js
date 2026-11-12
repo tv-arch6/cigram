@@ -1,7 +1,7 @@
 // يخزن هيكل الموقع ليفتح بسرعة وبدون إنترنت. لا يخزن الفيديو.
 // كل الملفات تُطلب من الشبكة أولاً، فأي تحديث تنشره للموقع يصل للمستخدم مباشرة،
 // والنسخة المحفوظة تُستخدم فقط عند انقطاع الإنترنت.
-const VERSION = 'v13';
+const VERSION = 'v14';
 const SHELL = `shell-${VERSION}`;
 const DATA = 'data-v1';
 const PLUS_HOST = 'cigram-plus-api.wwq-mixtv.workers.dev';
@@ -13,6 +13,7 @@ const FILES = [
   'js/app.js', 'js/config.js', 'js/util.js', 'js/store.js', 'js/catalog.js', 'js/cigram.js', 'js/views.js', 'js/player.js',
   'js/subtitles.js', 'js/subtitle-core.js', 'js/subtitle-view.js', 'js/auth.js', 'js/auth-view.js', 'js/terms.js', 'js/landing.js',
   'js/plus.js', 'js/plus-view.js', 'js/stream.js', 'js/external-link.js', 'js/player-extras.js', 'js/channel-store.js', 'js/channel-ui.js', 'js/channels-view.js', 'js/live-player.js',
+  'js/pages.js', 'js/requests.js', 'js/support.js', 'js/ads.js', 'js/newbadge.js',
   'icons/verified.png', 'icons/channels/bein-sports-3.png', 'icons/channels/alsharqiya.png',
   'fonts/mohanad.woff',
   'manifest.webmanifest', 'icons/logo-96.png', 'icons/favicon-64.png', 'icons/icon-192.png', 'icons/app-icon.png',

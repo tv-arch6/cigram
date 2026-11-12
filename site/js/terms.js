@@ -10,7 +10,7 @@ function contactLine() {
   const email = String(CONFIG.contactEmail || '').trim();
   return email
     ? `راسلنا على <a href="mailto:${esc(email)}" dir="ltr">${esc(email)}</a>.`
-    : 'تواصل معنا من قسم «المساعدة والدعم» في تطبيق سيكرام.';
+    : 'تواصل معنا من «الدعم والتواصل» في حسابك.';
 }
 
 export function renderTerms(el, ctx) {
