@@ -77,99 +77,94 @@ public class HomeActivity extends Activity {
     private void build() {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
-        scroll.setBackgroundColor(0xFF0B0F14);
+        scroll.setBackgroundColor(Ui.PAGE);
+        scroll.setVerticalScrollBarEnabled(false);
 
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
-        int pad = Ui.dp(this, 20);
-        col.setPadding(pad, Ui.dp(this, 32), pad, pad);
+        int pad = Ui.dp(this, 16);
+        col.setPadding(pad, Ui.dp(this, 56), pad, Ui.dp(this, 28));
         scroll.addView(col, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        TextView title = Ui.text(this, "مشغل سيكرام", 26f, 0xFFFFFFFF, true);
+        // ---- large title
+        TextView title = Ui.text(this, "مشغّل سيكرام", 34f, Ui.INK, true);
+        title.setPadding(Ui.dp(this, 4), 0, Ui.dp(this, 4), 0);
         col.addView(title);
-        TextView sub = Ui.text(this, "شغّل روابط الفيديو المباشرة (MP4 / HLS / DASH) وملفات الفيديو على جهازك.", 14f, 0xB3FFFFFF, false);
-        col.addView(sub, lp(0, 6, 0, 0));
+        TextView sub = Ui.text(this, "روابط MP4 و HLS و DASH وملفات الفيديو على جهازك", 14f, Ui.INK2, false);
+        sub.setPadding(Ui.dp(this, 4), 0, Ui.dp(this, 4), 0);
+        col.addView(sub, lp(0, 4, 0, 0));
 
-        // ---- play a link
-        col.addView(section("تشغيل رابط"), lp(0, 24, 0, 8));
+        // ---- play a link: one field with the actions inside the same card
+        LinearLayout link = Ui.group(this);
+        link.setPadding(Ui.dp(this, 14), Ui.dp(this, 14), Ui.dp(this, 14), Ui.dp(this, 14));
         input = new EditText(this);
-        input.setHint("https://…");
-        input.setHintTextColor(0x66FFFFFF);
-        input.setTextColor(0xFFFFFFFF);
+        input.setHint("الصق رابط الفيديو هنا");
+        input.setHintTextColor(Ui.INK3);
+        input.setTextColor(Ui.INK);
+        input.setTextSize(15f);
         input.setSingleLine(true);
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        input.setBackground(Ui.pill(this, 0x22FFFFFF, 12));
+        input.setBackground(Ui.pill(this, 0xFF2C2C2E, 12));
         input.setPadding(Ui.dp(this, 14), Ui.dp(this, 12), Ui.dp(this, 14), Ui.dp(this, 12));
         input.setMinHeight(Ui.dp(this, 48));
-        col.addView(input);
-
+        link.addView(input);
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        TextView paste = Ui.button(this, "لصق", 0x33FFFFFF, 0xFFFFFFFF);
-        paste.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { pasteLink(); }
-        });
-        TextView play = Ui.button(this, "تشغيل", 0xFFFFB300, 0xFF0B0F14);
+        TextView play = Ui.button(this, "تشغيل", 0xFFFFFFFF, 0xFF000000);
         play.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { playTyped(); }
         });
-        LinearLayout.LayoutParams half = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        half.topMargin = Ui.dp(this, 10);
-        half.rightMargin = Ui.dp(this, 6);
-        half.leftMargin = Ui.dp(this, 6);
-        row.addView(paste, half);
-        row.addView(play, half);
-        col.addView(row);
+        TextView paste = Ui.button(this, "لصق", 0xFF2C2C2E, Ui.INK);
+        paste.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { pasteLink(); }
+        });
+        LinearLayout.LayoutParams wide = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 2f);
+        wide.topMargin = Ui.dp(this, 12);
+        LinearLayout.LayoutParams narrow = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        narrow.topMargin = Ui.dp(this, 12);
+        narrow.setMarginStart(Ui.dp(this, 10));
+        row.addView(play, wide);
+        row.addView(paste, narrow);
+        link.addView(row);
+        col.addView(link, lp(0, 22, 0, 0));
 
-        TextView file = Ui.button(this, "فتح فيديو من الجهاز", 0x33FFFFFF, 0xFFFFFFFF);
-        file.setOnClickListener(new View.OnClickListener() {
+        // ---- the device
+        LinearLayout device = Ui.group(this);
+        Ui.row(this, device, Ui.Glyph.FOLDER, "فتح فيديو من الجهاز", "من الملفات أو المعرض", new View.OnClickListener() {
             @Override public void onClick(View v) { pickFile(); }
         });
-        col.addView(file, lp(0, 10, 0, 0));
+        col.addView(device, lp(0, 16, 0, 0));
 
         // ---- continue watching
-        col.addView(section("متابعة المشاهدة"), lp(0, 28, 0, 8));
-        recentBox = new LinearLayout(this);
-        recentBox.setOrientation(LinearLayout.VERTICAL);
+        col.addView(Ui.caption(this, "متابعة المشاهدة"), lp(0, 26, 0, 8));
+        recentBox = Ui.group(this);
         col.addView(recentBox);
 
-        // ---- Cigram app (optional)
-        col.addView(section("تطبيق سيكرام"), lp(0, 28, 0, 8));
+        // ---- Cigram app (optional) + privacy
+        col.addView(Ui.caption(this, "عام"), lp(0, 26, 0, 8));
+        LinearLayout general = Ui.group(this);
         boolean installed = isMainAppInstalled();
-        TextView info = Ui.text(this, installed
-                ? "تطبيق سيكرام مثبّت. الأفلام والمسلسلات المدعومة تُفتح هنا تلقائياً من داخل التطبيق."
-                : "هذا المشغل يعمل بشكل مستقل. إن ثبّتّ تطبيق سيكرام فسيتمكن من فتح المحتوى هنا مباشرة.",
-                14f, 0xB3FFFFFF, false);
-        col.addView(info);
-        if (installed) {
-            TextView open = Ui.button(this, "فتح تطبيق سيكرام", 0x33FFFFFF, 0xFFFFFFFF);
-            open.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View v) { openMainApp(); }
-            });
-            col.addView(open, lp(0, 10, 0, 0));
-        }
-
-        // ---- privacy / about
-        col.addView(section("الخصوصية"), lp(0, 28, 0, 8));
-        TextView privacy = Ui.button(this, "الخصوصية والإعلانات", 0x33FFFFFF, 0xFFFFFFFF);
-        privacy.setOnClickListener(new View.OnClickListener() {
+        Ui.row(this, general, Ui.Glyph.APP, "تطبيق سيكرام",
+                installed ? "مثبّت · يفتح أفلامه ومسلسلاته هنا تلقائياً" : "المشغّل يعمل وحده، ومع سيكرام عند تثبيته",
+                installed ? new View.OnClickListener() {
+                    @Override public void onClick(View v) { openMainApp(); }
+                } : null);
+        Ui.row(this, general, Ui.Glyph.SHIELD, "الخصوصية والإعلانات", "الموافقة، البيانات، وإعلانات Google", new View.OnClickListener() {
             @Override public void onClick(View v) { startActivity(new Intent(HomeActivity.this, PrivacyActivity.class)); }
         });
-        col.addView(privacy);
+        col.addView(general);
 
         TextView notice = Ui.text(this,
                 "يشغّل هذا التطبيق الروابط والملفات التي تقدّمها أنت أو التطبيقات التي تفتحها. "
-                        + "أنت المسؤول عن امتلاك حق مشاهدة المحتوى. لا يتجاوز المشغل أي حماية (DRM) أو قيود وصول.",
-                12f, 0x80FFFFFF, false);
-        col.addView(notice, lp(0, 20, 0, 0));
-        TextView version = Ui.text(this, "الإصدار " + versionName(), 12f, 0x80FFFFFF, false);
-        col.addView(version, lp(0, 8, 0, 0));
+                        + "أنت المسؤول عن امتلاك حق مشاهدة المحتوى. لا يتجاوز المشغّل أي حماية (DRM) أو قيود وصول.",
+                12f, Ui.INK3, false);
+        notice.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), 0);
+        col.addView(notice, lp(0, 18, 0, 0));
+        TextView version = Ui.text(this, "الإصدار " + versionName(), 12f, Ui.INK3, false);
+        version.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), 0);
+        col.addView(version, lp(0, 6, 0, 0));
 
         setContentView(scroll);
-    }
-
-    private TextView section(String s) {
-        return Ui.text(this, s, 16f, 0xFFFFB300, true);
     }
 
     private LinearLayout.LayoutParams lp(int l, int t, int r, int b) {
@@ -244,32 +239,22 @@ public class HomeActivity extends Activity {
         recentBox.removeAllViews();
         List<ResumeStore.Entry> items = ResumeStore.list(this, 10);
         if (items.isEmpty()) {
-            recentBox.addView(Ui.text(this, "لا توجد عناصر بعد. ستظهر هنا الفيديوهات التي توقفت في منتصفها.", 14f, 0x80FFFFFF, false));
+            Ui.row(this, recentBox, Ui.Glyph.CLOCK, "لا شيء بعد", "تظهر هنا الفيديوهات التي توقفت في منتصفها", null);
             return;
         }
         for (final ResumeStore.Entry e : items) {
-            LinearLayout item = new LinearLayout(this);
-            item.setOrientation(LinearLayout.VERTICAL);
-            item.setBackground(Ui.pill(this, 0x22FFFFFF, 12));
-            item.setPadding(Ui.dp(this, 14), Ui.dp(this, 10), Ui.dp(this, 14), Ui.dp(this, 10));
-            item.setMinimumHeight(Ui.dp(this, 56));
-            item.setClickable(true);
             String name = e.title.length() > 0 ? e.title : e.url;
-            TextView t = Ui.text(this, name, 15f, 0xFFFFFFFF, true);
-            t.setMaxLines(1);
-            t.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            item.addView(t);
-            item.addView(Ui.text(this, Ui.time(e.position) + (e.duration > 0 ? " / " + Ui.time(e.duration) : ""), 12f, 0xB3FFFFFF, false));
-            item.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View v) {
-                    Intent i = new Intent(HomeActivity.this, PlayActivity.class);
-                    i.putExtra("url", e.url);
-                    i.putExtra("title", e.title);
-                    i.putExtra("resume_ms", e.position);
-                    i.putExtra("watch_now", true);
-                    startActivity(i);
-                }
-            });
+            View item = Ui.row(this, recentBox, Ui.Glyph.PLAY, name,
+                    Ui.time(e.position) + (e.duration > 0 ? " / " + Ui.time(e.duration) : ""), new View.OnClickListener() {
+                        @Override public void onClick(View v) {
+                            Intent i = new Intent(HomeActivity.this, PlayActivity.class);
+                            i.putExtra("url", e.url);
+                            i.putExtra("title", e.title);
+                            i.putExtra("resume_ms", e.position);
+                            i.putExtra("watch_now", true);
+                            startActivity(i);
+                        }
+                    });
             item.setOnLongClickListener(new View.OnLongClickListener() {
                 @Override public boolean onLongClick(View v) {
                     new AlertDialog.Builder(HomeActivity.this)
@@ -285,7 +270,6 @@ public class HomeActivity extends Activity {
                     return true;
                 }
             });
-            recentBox.addView(item, lp(0, 0, 0, 8));
         }
     }
 

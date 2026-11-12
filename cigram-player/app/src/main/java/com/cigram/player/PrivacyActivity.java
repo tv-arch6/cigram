@@ -30,7 +30,7 @@ public class PrivacyActivity extends Activity {
         super.onCreate(savedInstanceState);
 
         ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(0xFF0B0F14);
+        scroll.setBackgroundColor(0xFF000000);
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         int pad = Ui.dp(this, 20);
@@ -83,7 +83,7 @@ public class PrivacyActivity extends Activity {
 
         col.addView(head("سياسة الخصوصية"));
         if (AppConfig.PRIVACY_POLICY_URL.length() > 0) {
-            TextView link0 = Ui.button(this, "فتح سياسة الخصوصية", 0xFFFFB300, 0xFF0B0F14);
+            TextView link0 = Ui.button(this, "فتح سياسة الخصوصية", 0xFFFFFFFF, 0xFF000000);
             link0.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View v) {
                     try {
@@ -141,7 +141,7 @@ public class PrivacyActivity extends Activity {
     }
 
     private TextView head(String s) {
-        TextView t = Ui.text(this, s, 16f, 0xFFFFB300, true);
+        TextView t = Ui.text(this, s, 16f, 0xFFFFFFFF, true);
         t.setPadding(0, Ui.dp(this, 22), 0, Ui.dp(this, 6));
         return t;
     }

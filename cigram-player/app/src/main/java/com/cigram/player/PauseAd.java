@@ -57,7 +57,7 @@ final class PauseAd extends LinearLayout {
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(VERTICAL);
         col.setPadding(Ui.dp(a, 10), 0, Ui.dp(a, 6), 0);
-        TextView tag = Ui.text(a, "إعلان", 10f, 0xFFFFB300, true);
+        TextView tag = Ui.text(a, "إعلان", 10f, 0xFFFFFFFF, true);
         col.addView(tag);
         if (ad.title.length() > 0) {
             TextView t = Ui.text(a, ad.title, 14f, 0xFFFFFFFF, true);
@@ -72,7 +72,7 @@ final class PauseAd extends LinearLayout {
         if (ad.clickable()) {
             TextView cta = Ui.text(a, ad.cta.length() > 0 ? ad.cta : "اعرف المزيد", 12f, 0xFF0B2530, true);
             cta.setPadding(Ui.dp(a, 14), Ui.dp(a, 6), Ui.dp(a, 14), Ui.dp(a, 6));
-            cta.setBackground(Ui.pill(a, 0xFFFFB300, 14));
+            cta.setBackground(Ui.pill(a, 0xFFFFFFFF, 14));
             LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             cl.topMargin = Ui.dp(a, 6);

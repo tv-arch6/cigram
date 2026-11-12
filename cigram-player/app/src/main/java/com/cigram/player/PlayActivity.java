@@ -304,7 +304,8 @@ public class PlayActivity extends Activity {
         topBar.setOrientation(LinearLayout.HORIZONTAL);
         topBar.setGravity(Gravity.CENTER_VERTICAL);
         topBar.setPadding(Ui.dp(this, 8), Ui.dp(this, 8), Ui.dp(this, 8), Ui.dp(this, 8));
-        topBar.setBackgroundColor(0x66000000);
+        topBar.setBackground(new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0xB3000000, 0x00000000}));
         topBar.setVisibility(View.GONE);
 
         topBar.addView(barButton("✕", "إغلاق", new View.OnClickListener() {
@@ -317,7 +318,7 @@ public class PlayActivity extends Activity {
         tl.leftMargin = Ui.dp(this, 8);
         tl.rightMargin = Ui.dp(this, 8);
         topBar.addView(titleView, tl);
-        nextTopBtn = barButton("⏭", "الحلقة التالية", new View.OnClickListener() {
+        nextTopBtn = barButton("▸▸", "الحلقة التالية", new View.OnClickListener() {
             @Override public void onClick(View v) {
                 Episodes.Ep n = episodes.next(epIndex);
                 if (n != null) playEpisode(n, true);
@@ -333,7 +334,7 @@ public class PlayActivity extends Activity {
         }));
         root.addView(topBar, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP));
 
-        skipIntroBtn = Ui.button(this, "تخطي المقدمة", 0xE6FFFFFF, 0xFF0B0F14);
+        skipIntroBtn = Ui.button(this, "تخطي المقدمة", 0xE6FFFFFF, 0xFF000000);
         skipIntroBtn.setVisibility(View.GONE);
         skipIntroBtn.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
@@ -362,7 +363,7 @@ public class PlayActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER);
-        TextView now = Ui.button(this, "تشغيل الآن", 0xFFFFB300, 0xFF0B0F14);
+        TextView now = Ui.button(this, "تشغيل الآن", 0xFFFFFFFF, 0xFF000000);
         now.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
                 Episodes.Ep n = autoNextEp;
@@ -383,10 +384,20 @@ public class PlayActivity extends Activity {
     }
 
     private TextView barButton(String glyph, String description, View.OnClickListener l) {
-        TextView t = Ui.text(this, glyph, 18f, 0xFFFFFFFF, true);
+        // an iOS glass disc: translucent white with a white hairline, the glyph in white
+        TextView t = Ui.text(this, glyph, glyph.length() > 1 ? 13f : 17f, 0xFFFFFFFF, true);
         t.setGravity(Gravity.CENTER);
-        t.setMinWidth(Ui.dp(this, 48));
-        t.setMinHeight(Ui.dp(this, 48));
+        t.setMinWidth(Ui.dp(this, 44));
+        t.setMinHeight(Ui.dp(this, 44));
+        android.graphics.drawable.GradientDrawable glass = new android.graphics.drawable.GradientDrawable();
+        glass.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        glass.setColor(0x38FFFFFF);
+        glass.setStroke(Math.max(1, Ui.dp(this, 1)), 0x4DFFFFFF);
+        t.setBackground(glass);
+        LinearLayout.LayoutParams gl = new LinearLayout.LayoutParams(Ui.dp(this, 44), Ui.dp(this, 44));
+        gl.leftMargin = Ui.dp(this, 4);
+        gl.rightMargin = Ui.dp(this, 4);
+        t.setLayoutParams(gl);
         t.setContentDescription(description);
         t.setOnClickListener(l);
         return t;

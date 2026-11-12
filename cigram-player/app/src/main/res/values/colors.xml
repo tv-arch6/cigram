@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="cp_bg">#0B0F14</color>
-    <color name="cp_amber">#FFB300</color>
-    <color name="ic_launcher_background">#0B0F14</color>
+    <!-- iOS black-and-white identity, shared with the Cigram app, the Admin app and the web site -->
+    <color name="cp_bg">#000000</color>
+    <color name="cp_amber">#FFFFFF</color>
+    <color name="ic_launcher_background">#000000</color>
 </resources>
