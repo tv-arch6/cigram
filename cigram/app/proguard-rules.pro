@@ -82,7 +82,7 @@
     @com.google.gson.annotations.SerializedName <fields>;
 }
 
-# Sketchware network layer (callbacks are interfaces implemented by Activities)
+# Network layer (callbacks are interfaces implemented by Activities)
 -keep class com.Cigram.vid.RequestNetwork { *; }
 -keep class com.Cigram.vid.RequestNetwork$* { *; }
 -keepclassmembers class com.Cigram.vid.RequestNetworkController { *; }

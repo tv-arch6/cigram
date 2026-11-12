@@ -100,7 +100,7 @@ import java.util.WeakHashMap;
  *  - Channel switching (previous / next / channel list) without leaving the player
  *  - Auto reconnect when the stream drops
  *
- * LiveActivity's Sketchware block only calls {@link #attach(Activity)}.
+ * LiveActivity only calls {@link #attach(Activity)}.
  */
 public final class CigramLivePlayer {
 
@@ -432,8 +432,7 @@ public final class CigramLivePlayer {
                 .setMediaSourceFactory(CigramStreams.sourceFactory(a))
                 .build();
         s.view.setPlayer(s.player);
-        // v10.34: NO Player.Listener. Sketchware's D8 build crashes inside ExoPlayer's ListenerSet
-        // with listener default methods (same rule as the movie player): the state is polled.
+        // NO Player.Listener (same rule as the movie player): the state is polled.
         UI.postDelayed(s.watch, 250L);
 
         s.stage.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {

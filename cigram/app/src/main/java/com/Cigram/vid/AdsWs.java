@@ -19,7 +19,7 @@ import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
 /**
- * عميل WebSocket (RFC 6455) خفيف فوق SSLSocket — بلا أي مكتبة خارجية (OkHttp قد لا تكون ضمن مشروع Sketchware).
+ * عميل WebSocket (RFC 6455) خفيف فوق SSLSocket — بلا أي مكتبة خارجية.
  * - مصادقة عبر ترويسة Authorization في المصافحة (لا يوضع الرمز في الرابط حتى لا يظهر في السجلات).
  * - يتحقق من اسم الخادم (Hostname verification) يدوياً لأن SSLSocket لا يفعل ذلك وحده.
  * - إعادة اتصال تلقائية بتأخير متزايد، ونبض كل 25 ثانية ("ping" نصي يردّ عليه Cloudflare دون إيقاظ الكائن).

@@ -13,7 +13,7 @@
 * الحكم النهائي بالآخر (§15.13).
 
 ## 15.2 خريطة المعمارية (مُستخلصة من الكود، مو من الافتراض)
-**التطبيق الرئيسي `com.Cigram.vid`** — 247 ملف Java، تصميم Sketchware-style فيه شاشات كبيرة.
+**التطبيق الرئيسي `com.Cigram.vid`** — 247 ملف Java، فيه شاشات كبيرة.
 * نقطة البدء: `CigramStage1InitProvider` (ContentProvider يشغّل التهيئة بالـ process) ← `CigramStability.init` (ذاكرة + سجل الانهيار + **التشخيص الجديد**) ← `MainActivity`.
 * المشغّل: `PlayerActivity` (ExoPlayer 2.19.1) + `CigramSeekGuard` (ينتظر قطع HLS) + `CigramAutoRepair/RepairPlan` (مراقب + سلّم إصلاح) + `CigramEmbedResolver` (WebView لاستخراج رابط البث من صفحات التضمين) + `CigramAudioTap` (قياس الصوت للمزامنة).
 * الترجمة: `com.Cigram.subhub` (مشترك مع الإدارة بنفس الكود) + `CigramSubtitleFinder`.

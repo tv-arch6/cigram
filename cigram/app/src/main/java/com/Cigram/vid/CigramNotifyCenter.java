@@ -36,7 +36,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Cigram Stage 6 bridge for the REAL Sketchware notifications.xml page.
+ * Cigram Stage 6 bridge for the notifications.xml page.
  *
  * Important:
  * - No fake/programmatic notifications page is created here.
@@ -47,7 +47,7 @@ import java.util.concurrent.Executors;
  * - Only runtime notification ROWS are created inside linear_notifications_list.
  * - The red unread dot is an overlay on the existing bell ImageView, not a new page.
  */
-public final class CigramSketchwareNotifications {
+public final class CigramNotifyCenter {
     static void trimMemory(int severity) { CigramStability.shrink(IMAGE_CACHE, severity); }
 
 
@@ -60,7 +60,7 @@ public final class CigramSketchwareNotifications {
     private static final String PREF_SUBSCRIPTIONS = "cigram_series_subscriptions";
     private static final String KEY_ITEMS = "items_json";
     private static final String OLD_DYNAMIC_BODY_TAG =
-            "cigram_stage6_sketchware_notifications_body";
+            "cigram_stage6_notifications_body";
 
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final ExecutorService IMAGE_IO = CigramPool.fixed(3, "notif-img");
@@ -88,10 +88,10 @@ public final class CigramSketchwareNotifications {
     private static WeakReference<Activity> LAST_MAIN_ACTIVITY =
             new WeakReference<Activity>(null);
 
-    private CigramSketchwareNotifications() {
+    private CigramNotifyCenter() {
     }
 
-    /** Bind the EXISTING Sketchware bell ImageView (id: ball). */
+    /** Bind the existing bell ImageView (id: ball). */
     public static void bindHomeBell(final Activity activity) {
         if (activity == null || activity.isFinishing()) return;
         if (!"MainActivity".equals(activity.getClass().getSimpleName())) return;
@@ -207,7 +207,7 @@ public final class CigramSketchwareNotifications {
         final TextView title = asTextView(findByIdName(
                 activity, "textview_my_content_title"));
         if (title != null) {
-            // Preserve the exact title text the user set in Sketchware.
+            // Preserve the exact title text already set in the layout.
             title.setTextColor(Color.WHITE);
             title.setTextDirection(View.TEXT_DIRECTION_RTL);
             title.setTypeface(loadSima(activity), Typeface.NORMAL);

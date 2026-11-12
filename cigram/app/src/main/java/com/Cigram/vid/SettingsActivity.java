@@ -127,7 +127,7 @@ public class SettingsActivity extends AppCompatActivity {
 					
 					if (!editAuth.getBoolean("logged_in", false)
 					|| editToken.isEmpty()) {
-						SketchwareUtil.showMessage(
+						CigramUtil.showMessage(
 						getApplicationContext(),
 						"سجّل الدخول أولاً"
 						);
@@ -458,7 +458,7 @@ public class SettingsActivity extends AppCompatActivity {
 							
 							if (newName.length() < 2
 							|| newName.length() > 60) {
-								SketchwareUtil.showMessage(
+								CigramUtil.showMessage(
 								getApplicationContext(),
 								"الاسم يجب أن يكون من 2 إلى 60 حرفاً"
 								);
@@ -473,7 +473,7 @@ public class SettingsActivity extends AppCompatActivity {
 							)
 							|| !editToken.equals(currentToken)) {
 								editDialog.dismiss();
-								SketchwareUtil.showMessage(
+								CigramUtil.showMessage(
 								getApplicationContext(),
 								"تغيّرت جلسة الحساب؛ افتح الصفحة مجددًا"
 								);
@@ -661,7 +661,7 @@ public class SettingsActivity extends AppCompatActivity {
 													
 													editDialog.dismiss();
 													
-													SketchwareUtil.showMessage(
+													CigramUtil.showMessage(
 													getApplicationContext(),
 													"تم تحديث الحساب"
 													);
@@ -685,7 +685,7 @@ public class SettingsActivity extends AppCompatActivity {
 													editDialog.setCancelable(true);
 													saveBtn.setText("حفظ");
 													
-													SketchwareUtil.showMessage(
+													CigramUtil.showMessage(
 													getApplicationContext(),
 													message
 													);
@@ -709,7 +709,7 @@ public class SettingsActivity extends AppCompatActivity {
 												newName,
 												newGender)) {
 													editDialog.dismiss();
-													SketchwareUtil.showMessage(
+													CigramUtil.showMessage(
 													getApplicationContext(),
 													"تم حفظ التعديل على جهازك وسيُرسل عند توفر الاتصال"
 													);
@@ -731,7 +731,7 @@ public class SettingsActivity extends AppCompatActivity {
 												editDialog.setCancelable(true);
 												saveBtn.setText("حفظ");
 												
-												SketchwareUtil.showMessage(
+												CigramUtil.showMessage(
 												getApplicationContext(),
 												"تعذر الاتصال بالخادم أو قراءة استجابته"
 												);
@@ -787,7 +787,7 @@ public class SettingsActivity extends AppCompatActivity {
 				final String token = savedToken == null ? "" : savedToken.trim();
 				
 				if (token.isEmpty()) {
-					SketchwareUtil.showMessage(
+					CigramUtil.showMessage(
 					getApplicationContext(),
 					"أنت غير مسجل دخول"
 					);
@@ -1092,7 +1092,7 @@ public class SettingsActivity extends AppCompatActivity {
 												auth.edit().clear().apply();
 												logoutDialog.dismiss();
 												
-												SketchwareUtil.showMessage(
+												CigramUtil.showMessage(
 												getApplicationContext(),
 												"تم تسجيل الخروج"
 												);
@@ -1116,7 +1116,7 @@ public class SettingsActivity extends AppCompatActivity {
 												cancelBtn.setEnabled(true);
 												logoutBtn.setText("تسجيل الخروج");
 												
-												SketchwareUtil.showMessage(
+												CigramUtil.showMessage(
 												getApplicationContext(),
 												finalMessage
 												);
@@ -1143,7 +1143,7 @@ public class SettingsActivity extends AppCompatActivity {
 											cancelBtn.setEnabled(true);
 											logoutBtn.setText("تسجيل الخروج");
 											
-											SketchwareUtil.showMessage(
+											CigramUtil.showMessage(
 											getApplicationContext(),
 											"تعذر الاتصال بالخادم"
 											);

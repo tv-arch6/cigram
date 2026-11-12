@@ -127,7 +127,7 @@ public class AccountActivity extends AppCompatActivity {
 				.getText().toString();
 				
 				if (loginEmail.isEmpty() || loginPassword.isEmpty()) {
-					SketchwareUtil.showMessage(
+					CigramUtil.showMessage(
 					getApplicationContext(),
 					"أدخل البريد الإلكتروني وكلمة المرور"
 					);
@@ -136,7 +136,7 @@ public class AccountActivity extends AppCompatActivity {
 				
 				if (!android.util.Patterns.EMAIL_ADDRESS
 				.matcher(loginEmail).matches()) {
-					SketchwareUtil.showMessage(
+					CigramUtil.showMessage(
 					getApplicationContext(),
 					"البريد الإلكتروني غير صحيح"
 					);
@@ -175,7 +175,7 @@ public class AccountActivity extends AppCompatActivity {
 				
 				if (regName.isEmpty() || regEmail.isEmpty() ||
 				regPassword.isEmpty() || regConfirm.isEmpty()) {
-					SketchwareUtil.showMessage(
+					CigramUtil.showMessage(
 					getApplicationContext(),
 					"يرجى ملء جميع الحقول"
 					);
@@ -184,7 +184,7 @@ public class AccountActivity extends AppCompatActivity {
 				
 				if (!android.util.Patterns.EMAIL_ADDRESS
 				.matcher(regEmail).matches()) {
-					SketchwareUtil.showMessage(
+					CigramUtil.showMessage(
 					getApplicationContext(),
 					"البريد الإلكتروني غير صحيح"
 					);
@@ -192,7 +192,7 @@ public class AccountActivity extends AppCompatActivity {
 				}
 				
 				if (regPassword.length() < 8) {
-					SketchwareUtil.showMessage(
+					CigramUtil.showMessage(
 					getApplicationContext(),
 					"كلمة المرور يجب ألا تقل عن 8 أحرف"
 					);
@@ -200,7 +200,7 @@ public class AccountActivity extends AppCompatActivity {
 				}
 				
 				if (!regPassword.equals(regConfirm)) {
-					SketchwareUtil.showMessage(
+					CigramUtil.showMessage(
 					getApplicationContext(),
 					"كلمتا المرور غير متطابقتين"
 					);
@@ -376,7 +376,7 @@ public class AccountActivity extends AppCompatActivity {
 					new org.json.JSONObject(_response);
 					
 					if (!root.optBoolean("success", false)) {
-						SketchwareUtil.showMessage(
+						CigramUtil.showMessage(
 						getApplicationContext(),
 						root.optString("message", "تعذر إنشاء الحساب")
 						);
@@ -389,7 +389,7 @@ public class AccountActivity extends AppCompatActivity {
 					CigramTerms.learn(getApplicationContext(), user, token);   // 19.2: the account's consent is remembered for good
 					
 					if (token.isEmpty() || user == null) {
-						SketchwareUtil.showMessage(
+						CigramUtil.showMessage(
 						getApplicationContext(),
 						"استجابة إنشاء الحساب ناقصة"
 						);
@@ -420,7 +420,7 @@ public class AccountActivity extends AppCompatActivity {
 					
 					CigramSession.commit(getApplicationContext(), user.optString("email", ""));
 					
-					SketchwareUtil.showMessage(
+					CigramUtil.showMessage(
 					getApplicationContext(),
 					root.optString("message", "تم إنشاء الحساب بنجاح")
 					);
@@ -428,7 +428,7 @@ public class AccountActivity extends AppCompatActivity {
 					recreate();
 					
 				} catch (Exception error) {
-					SketchwareUtil.showMessage(
+					CigramUtil.showMessage(
 					getApplicationContext(),
 					"خطأ في قراءة استجابة الخادم"
 					);
@@ -439,7 +439,7 @@ public class AccountActivity extends AppCompatActivity {
 			public void onErrorResponse(String _param1, String _param2) {
 				final String _tag = _param1;
 				final String _message = _param2;
-				SketchwareUtil.showMessage(
+				CigramUtil.showMessage(
 				getApplicationContext(),
 				"تعذر الاتصال بالخادم، حاول مرة ثانية"
 				);
@@ -457,7 +457,7 @@ public class AccountActivity extends AppCompatActivity {
 					new org.json.JSONObject(_response);
 					
 					if (!root.optBoolean("success", false)) {
-						SketchwareUtil.showMessage(
+						CigramUtil.showMessage(
 						getApplicationContext(),
 						root.optString(
 						"message",
@@ -473,7 +473,7 @@ public class AccountActivity extends AppCompatActivity {
 					CigramTerms.learn(getApplicationContext(), user, token);   // 19.2: the account's consent is remembered for good
 					
 					if (token.isEmpty() || user == null) {
-						SketchwareUtil.showMessage(
+						CigramUtil.showMessage(
 						getApplicationContext(),
 						"استجابة تسجيل الدخول ناقصة"
 						);
@@ -511,7 +511,7 @@ public class AccountActivity extends AppCompatActivity {
 					
 					CigramSession.commit(getApplicationContext(), userEmail);
 					
-					SketchwareUtil.showMessage(
+					CigramUtil.showMessage(
 					getApplicationContext(),
 					root.optString(
 					"message",
@@ -522,7 +522,7 @@ public class AccountActivity extends AppCompatActivity {
 					recreate();
 					
 				} catch (Exception error) {
-					SketchwareUtil.showMessage(
+					CigramUtil.showMessage(
 					getApplicationContext(),
 					"تعذر قراءة استجابة الخادم"
 					);
@@ -533,7 +533,7 @@ public class AccountActivity extends AppCompatActivity {
 			public void onErrorResponse(String _param1, String _param2) {
 				final String _tag = _param1;
 				final String _message = _param2;
-				SketchwareUtil.showMessage(
+				CigramUtil.showMessage(
 				getApplicationContext(),
 				"تعذر الاتصال بالخادم، حاول مرة ثانية"
 				);
@@ -746,7 +746,7 @@ public class AccountActivity extends AppCompatActivity {
 				holder[0]=popup(panel,anchor,-1,height,android.view.Gravity.BOTTOM);
 			}
 		}
-		// This source can be emitted inside Sketchware network listeners, where `this`
+		// This block also runs inside network listeners, where `this`
 		// is the listener itself rather than the Activity.  The application context is
 		// available from both scopes.
 		final CigramGlass cgGlass = new CigramGlass(getApplicationContext());

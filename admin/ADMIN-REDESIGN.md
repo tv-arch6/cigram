@@ -9,7 +9,7 @@
 One palette in `CgCfg` (ink-blue night, one indigo accent), flat rounded cards: `CgUi.bg()` rounds every corner and drops neutral borders; `NxUi` gradients / dashed borders / tinted borders are flat now. Every older screen inherits it.
 
 ## Removed (replaced by the home + sections)
-MainActivity (Sketchware home), NxHome, NxClassicActivity, CxHomeActivity, CgHubActivity, CgDash, OpsHubActivity, AdHubActivity, AdHooks, CgHooks, AddMovieActivity, AddchannelActivity, CarouselActivity and their layouts (main / add_movie / addchannel / carousel).
+MainActivity, NxHome, NxClassicActivity, CxHomeActivity, CgHubActivity, CgDash, OpsHubActivity, AdHubActivity, AdHooks, CgHooks, AddMovieActivity, AddchannelActivity, CarouselActivity and their layouts (main / add_movie / addchannel / carousel).
 "Add movie / series / channel" now has ONE entry each (the Nx wizards); the classic Cx screens stay reachable from inside them.
 
 ## Kept as leaf pages (restyled by the shared design layer)
@@ -78,7 +78,7 @@ All add / edit / upload / ads / ops / update screens.
 
 ## v3.2 — audit & stability fixes
 - Manifest: added FOREGROUND_SERVICE, FOREGROUND_SERVICE_DATA_SYNC, POST_NOTIFICATIONS, WAKE_LOCK, ACCESS_WIFI_STATE, RECORD_AUDIO (upload service / notifications / voice notes no longer silently denied on Android 13/14); allowBackup=false (the admin token is no longer exposed to backups); removed the dangling DebugActivity entry.
-- SketchApplication: global uncaught-exception handler — a failure on a worker thread is logged instead of killing the app.
+- AdminApplication: global uncaught-exception handler — a failure on a worker thread is logged instead of killing the app.
 - CgHttp.bg(): every background task is wrapped in try/catch(Throwable).
 - RequestNetworkController: removed trust-all TLS / always-true hostname verifier (admin token could be intercepted).
 - SeriesImportActivity: uses CgCfg.API / CgCfg.TOKEN (single source of truth, no duplicated secret).

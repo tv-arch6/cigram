@@ -340,7 +340,7 @@ public class SearchXmlActivity extends AppCompatActivity {
 				holder[0]=popup(panel,anchor,-1,height,android.view.Gravity.BOTTOM);
 			}
 		}
-		// This source can be emitted inside Sketchware network listeners, where `this`
+		// This block also runs inside network listeners, where `this`
 		// is the listener itself rather than the Activity.  The application context is
 		// available from both scopes.
 		final CigramGlass cgGlass = new CigramGlass(getApplicationContext());
@@ -530,7 +530,7 @@ public class SearchXmlActivity extends AppCompatActivity {
 			}
 		}
 		final CigramCatalog cgCatalog=new CigramCatalog();
-		// Dependency-free image loader for Sketchware.  It uses Android's own APIs,
+		// Dependency-free image loader.  It uses Android's own APIs,
 		// keeps a small memory cache, and persists downloaded images in the app cache
 		// so channel preloading is available when the Channels screen is opened.
 		class CigramImage {

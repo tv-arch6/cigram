@@ -114,7 +114,7 @@ on a background thread with a saved snapshot, and a debug-only watchdog now repo
   and — **debuggable builds only** — log-only StrictMode plus a main-thread watchdog (> 700 ms). No dialogs, nothing in release builds.
 - Existing and kept: incremental page building, view reuse, debounced search, `onDestroyed` clean-up, `CigramStability` memory trimming.
 - Emulator evidence is in §11 (one run each, a CPU-starved software emulator: indicative only).
-- **Not done:** moving every remaining main-thread read in the 14,000-line init provider and the Sketchware-generated activities; no RecyclerView migration (the
+- **Not done:** moving every remaining main-thread read in the 14,000-line init provider and the large generated activities; no RecyclerView migration (the
   channel pages already build incrementally; the Home is a hand-built layout whose ids and handlers must stay).
 
 ## 6. Admin app (2.0.1)

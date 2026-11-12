@@ -321,7 +321,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                         }
 
                         // Runs right after DetailsActivity.onCreate() returns. If the real bind
-                        // has not happened yet (Sketchware delayed initializeLogic), hide the
+                        // has not happened yet (delayed initializeLogic), hide the
                         // raw details.xml sample content; the real bind fills it in later.
                         public void onActivityPostCreated(Activity activity, Bundle state) {
                             if (Build.VERSION.SDK_INT >= 29 && activity != null
@@ -489,7 +489,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                             synchronized (DETAILS_FLIGHTS) { DETAILS_FLIGHTS.remove(activity); }
                             CigramTheme.onDestroyed(activity);
                             CigramChannels.onDestroyed(activity);
-                            CigramSketchwareNotifications.onDestroyed(activity);
+                            CigramNotifyCenter.onDestroyed(activity);
                         }
                     }
             );
@@ -619,7 +619,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
         if (!isAlive(activity)) return;
         final Runnable[] steps = new Runnable[]{
                 new Runnable() { public void run() { CigramBottomNav.bind(activity); } },
-                new Runnable() { public void run() { CigramSketchwareNotifications.bindHomeBell(activity); } },
+                new Runnable() { public void run() { CigramNotifyCenter.bindHomeBell(activity); } },
                 new Runnable() { public void run() { refreshOfflineBanner(activity); } },
                 new Runnable() { public void run() { maybeRefreshCatalogOnResume(activity); } },
         };
@@ -652,7 +652,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                     } },
                     new Runnable() { public void run() { maybeRefreshCatalogOnResume(activity); } },
                     new Runnable() { public void run() { refreshOfflineBanner(activity); } },
-                    new Runnable() { public void run() { CigramSketchwareNotifications.bindHomeBell(activity); } },
+                    new Runnable() { public void run() { CigramNotifyCenter.bindHomeBell(activity); } },
                     new Runnable() { public void run() { CigramCastHome.bind(activity); } },
                     new Runnable() { public void run() { CigramBottomNav.bind(activity); } },
                     new Runnable() { public void run() { stage6HandleMainOpen(activity); } },
@@ -672,7 +672,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                 }, i == 0 ? 0L : 40L * i);
             }
         } else if ("NotificationsActivity".equals(name)) {
-            CigramSketchwareNotifications.bindNotificationsPage(activity);
+            CigramNotifyCenter.bindNotificationsPage(activity);
         } else if ("SearchXmlActivity".equals(name)) {
             // nothing is loaded, fetched or injected when Search opens: the page draws itself from its saved state (CigramSearchCache)
             CigramBottomNav.bind(activity);
@@ -3903,7 +3903,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             refreshStage3Details(activity);
             setupDetails(activity);
         } finally {
-            // Sketchware's own click block (DetailsActivity$3) can be attached after us when
+            // The page's own click block (DetailsActivity$3) can be attached after us when
             // its initializeLogic() is delayed; it crashes on a missing "video" extra.
             // Re-assert our handler now and shortly after, whatever happened above.
             bindWatchNowSafely(activity);
@@ -3980,7 +3980,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
         }
     }
 
-    // Keeps the Intent extras Sketchware's generated code reads ("video", "subtitle")
+    // Keeps the Intent extras the page code reads ("video", "subtitle")
     // non-null and up to date with what the catalog resolved.
     private static void syncDetailsIntentExtras(Activity activity, JSONObject item) {
         if (activity == null || activity.getIntent() == null) return;
@@ -7721,7 +7721,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             prefs.edit().putBoolean(stage6UnreadStorageKey(context), false).apply();
         } catch (Throwable ignored) { android.util.Log.w("CigramInjected", "markStage6NotificationsRead", ignored); }
         try {
-            CigramSketchwareNotifications.notifyUnreadChanged();
+            CigramNotifyCenter.notifyUnreadChanged();
         } catch (Throwable ignored) { android.util.Log.w("CigramInjected", "markStage6NotificationsRead", ignored); }
     }
 
@@ -7732,7 +7732,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             prefs.edit().putBoolean(stage6UnreadStorageKey(context), true).apply();
         } catch (Throwable ignored) { android.util.Log.w("CigramInjected", "stage6MarkUnread", ignored); }
         try {
-            CigramSketchwareNotifications.notifyUnreadChanged();
+            CigramNotifyCenter.notifyUnreadChanged();
         } catch (Throwable ignored) { android.util.Log.w("CigramInjected", "stage6MarkUnread", ignored); }
     }
 
@@ -12014,7 +12014,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             android.content.Intent intent = new android.content.Intent(activity, detailsClass);
             intent.putExtra("id", id);
             intent.putExtra("type", type);
-            // Sketchware's own "watch" block reads these extras; never leave them null.
+            // The page's own "watch" block reads these extras; never leave them null.
             intent.putExtra("video", jsonText(safe, "video", "link", "video_url", "movie_url"));
             intent.putExtra("subtitle", jsonText(safe, "subtitle", "subtitle_url"));
 

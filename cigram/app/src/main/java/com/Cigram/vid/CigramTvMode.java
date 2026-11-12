@@ -30,7 +30,7 @@ public final class CigramTvMode {
     /** عرض الشاشة بالـ dp بعد التكبير على التلفاز (≈ جوال كبير بالعرض). كبّره لواجهة أصغر، صغّره لواجهة أكبر. */
     private static final float TARGET_WIDTH_DP = 960f;   // v10.67: Android TV's standard (was 720)
 
-    /** الشاشات التي كانت «Portrait» في إعدادات Sketchware (قفل الطول يُطبَّق الآن من هنا على غير التلفاز). */
+    /** الشاشات التي كانت «Portrait» في إعدادات المشروع (قفل الطول يُطبَّق الآن من هنا على غير التلفاز). */
     private static final String[] PHONE_PORTRAIT = {
             "MainActivity", "DetailsActivity", "SettingsActivity", "AdsActivity",
             "MyContentActivity", "SectionActivity", "NotificationsActivity"

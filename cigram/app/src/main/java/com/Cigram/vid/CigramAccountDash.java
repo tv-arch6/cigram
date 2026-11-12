@@ -28,7 +28,7 @@ import java.util.ArrayList;
 /**
  * CIGRAM ID — the signed-in Account page as a personal dashboard.
  *
- * The page keeps every view, id and click listener it always had (the Sketchware logic is wired to them). This class
+ * The page keeps every view, id and click listener it always had (the page logic is wired to them). This class
  * only decides how they are grouped and drawn:
  *
  *   حسابي              تعديل الملف الشخصي · الإعدادات

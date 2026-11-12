@@ -33,8 +33,7 @@ import com.google.android.exoplayer2.ui.PlayerView;
  * screen player) and released whenever the page is not on screen, so it never holds a hardware
  * decoder that the movie player may need.
  *
- * Like the full screen player it has NO Player.Listener (Sketchware's D8 build crashes inside
- * ExoPlayer's ListenerSet): the state is polled twice a second.
+ * Like the full screen player it has NO Player.Listener: the state is polled twice a second.
  */
 final class CigramChannelPlayer {
 

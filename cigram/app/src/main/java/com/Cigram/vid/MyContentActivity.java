@@ -287,7 +287,7 @@ public class MyContentActivity extends AppCompatActivity {
 				holder[0]=popup(panel,anchor,-1,height,android.view.Gravity.BOTTOM);
 			}
 		}
-		// This source can be emitted inside Sketchware network listeners, where `this`
+		// This block also runs inside network listeners, where `this`
 		// is the listener itself rather than the Activity.  The application context is
 		// available from both scopes.
 		final CigramGlass cgGlass = new CigramGlass(getApplicationContext());

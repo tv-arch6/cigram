@@ -1097,7 +1097,7 @@ public class CigramTogetherPlayerActivity extends Activity implements CigramToge
                         .build();
                 applyQuality();
                 player.setVideoSurfaceView(surface);
-                // لا Player.Listener مخصص (D8 في Sketchware ينهار داخل ListenerSet): المتابعة عبر pollPlayer()
+                // لا Player.Listener مخصص (نفس قاعدة مشغّل الأفلام): المتابعة عبر pollPlayer()
                 lastPolledState = -1;
                 main.removeCallbacks(pollPlayer);
                 main.postDelayed(pollPlayer, 250L);

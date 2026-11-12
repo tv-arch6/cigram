@@ -61,7 +61,7 @@
 
 ## 3. الملفات
 **جديدة:** `CigramSectionStore`, `CigramRankView`, `CigramTopBar`, `CigramNav`, `CigramSearchCache` + اختبارات `CigramSectionStoreTest`, `CigramSearchCacheTest`, `BuiltInSectionsTest`, `SectionPageUiTest`, `SearchPageUiTest`, `HomeSectionsUiTest`, `BackNavigationUiTest`.
-**معدّلة:** `MainActivity`, `main.xml`, `CigramStage1InitProvider`, `SectionActivity` (إعادة كتابة), `SearchXmlActivity`, `CigramTabRefresh`, `CigramOrder` (+ `claimed(JSONObject)`), `CigramDesign` (−`styleHomeHeaders`), وربط الرجوع في: `AdsActivity`, `AdsChatActivity`, `ChannelsActivity`, `CigramCommunication`, `CigramDiscoverActivity`, `CigramLivePlayer`, `CigramPageKit`, `CigramPlusActivity`, `CigramPlusCodeActivity`, `CigramSettings`, `CigramSketchwareNotifications`, `MyAdsActivity`, `MyContentActivity`.
+**معدّلة:** `MainActivity`, `main.xml`, `CigramStage1InitProvider`, `SectionActivity` (إعادة كتابة), `SearchXmlActivity`, `CigramTabRefresh`, `CigramOrder` (+ `claimed(JSONObject)`), `CigramDesign` (−`styleHomeHeaders`), وربط الرجوع في: `AdsActivity`, `AdsChatActivity`, `ChannelsActivity`, `CigramCommunication`, `CigramDiscoverActivity`, `CigramLivePlayer`, `CigramPageKit`, `CigramPlusActivity`, `CigramPlusCodeActivity`, `CigramSettings`, `CigramNotifyCenter`, `MyAdsActivity`, `MyContentActivity`.
 **محذوفة:** `HomePrep`, `HomePrepVersionTest`, `section.xml`.
 الصافي: **كود التطبيق +2,329 / −8,552 سطر** (أغلبها حذف كود ميّت وكودين متنافسين)، **اختبارات +1,019 / −25**.
 

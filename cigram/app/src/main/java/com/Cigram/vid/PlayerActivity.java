@@ -337,11 +337,11 @@ public class PlayerActivity extends AppCompatActivity {
 				return holder[0];
 			}
 		}
-		// This source can be emitted inside Sketchware network listeners, where `this`
+		// This block also runs inside network listeners, where `this`
 		// is the listener itself rather than the Activity.  The application context is
 		// available from both scopes.
 		final CigramGlass cgGlass = new CigramGlass(getApplicationContext());
-		// Dependency-free image loader for Sketchware.  It uses Android's own APIs,
+		// Dependency-free image loader.  It uses Android's own APIs,
 		// keeps a small memory cache, and persists downloaded images in the app cache
 		// so channel preloading is available when the Channels screen is opened.
 		class CigramImage {
@@ -3253,7 +3253,7 @@ public class PlayerActivity extends AppCompatActivity {
 		
 		// =====================================================
 		// AUTO-HIDE FORWARD HOLDER
-		// Fixes Sketchware/Java local-variable scope issue.
+		// Holder object: the runnable below needs a mutable reference.
 		// =====================================================
 		
 		final java.lang.Runnable[] hideControlsHolder =
@@ -4971,9 +4971,7 @@ public class PlayerActivity extends AppCompatActivity {
 		// NO CUSTOM Player.Listener
 		// =====================================================
 		//
-		// مهم في Sketchware:
-		// لا نضيف Player.Listener مخصص هنا.
-		// بعض بيئات D8/Desugar قد تتعثر مع default callback methods.
+		// لا نضيف Player.Listener مخصص هنا (قرار تصميم: مصدر واحد للحالة).
 		// متابعة الحالة تتم من updateProgress بالـ Handler فقط.
 		
 		// =====================================================
@@ -5073,9 +5071,8 @@ public class PlayerActivity extends AppCompatActivity {
 		}
 		);
 		
-		// The episode cover must not register Player.Listener here.  Sketchware's D8
-		// build has previously crashed inside ExoPlayer ListenerSet when a new episode
-		// is selected.  A lightweight Handler poll keeps the transition visual while
+		// The episode cover does not register a Player.Listener (one source of state for the
+		// whole player).  A lightweight Handler poll keeps the transition visual while
 		// leaving ExoPlayer's listener set untouched.
 		// v5.29: no poster + play cover between episodes: the next episode starts playing at once.
 		if(false&&getIntent().getBooleanExtra("episode_transition",false)) {
@@ -9455,40 +9452,6 @@ public class PlayerActivity extends AppCompatActivity {
 			} catch (Exception ignored) {}
 		}
 		
-		/* v10.68: disabled - this leftover template block referenced a non-existent view named root (build error)
-// كود إضافة WebView (مشغل VidBolt) داخل onCreate في Sketchware Pro
-// ملاحظة: تأكد من أن 'root' هو اسم الحاوية (ViewGroup) الأساسية للنشاط الخاص بك.
-
-try {
-    // 1. إنشاء المشغل
-    android.webkit.WebView vidboltView = new android.webkit.WebView(this);
-
-    // 2. إعدادات المشغل (ضرورية لتشغيل الفيديو والـ iframes)
-    vidboltView.getSettings().setJavaScriptEnabled(true);
-    vidboltView.getSettings().setDomStorageEnabled(true);
-    vidboltView.getSettings().setMediaPlaybackRequiresUserGesture(false); // للسماح بالتشغيل التلقائي
-
-    // 3. ضبط أبعاد المشغل ليملأ الحاوية
-    vidboltView.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
-            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-            android.view.ViewGroup.LayoutParams.MATCH_PARENT));
-
-    // 4. إضافة المشغل إلى الحاوية الأساسية للنشاط (استبدل 'root' باسم الحاوية في نشاطك إذا كان مختلفاً)
-    root.addView(vidboltView);
-
-    // 5. تحميل كود الـ Iframe الخاص بـ VidBolt
-    // يمكنك استبدال الرابط بمتغير ديناميكي حسب الفيلم المختار
-    String iframeHtml = "<iframe id=\"vidbolt-player\" " +
-                        "src=\"https://vidbolt.pro/movie/1007757\" " +
-                        "width=\"100%\" height=\"100%\" frameborder=\"0\" " +
-                        "allowfullscreen allow=\"autoplay; encrypted-media; picture-in-picture\"></iframe>";
-
-    vidboltView.loadDataWithBaseURL("https://vidbolt.pro", iframeHtml, "text/html", "utf-8", null);
-
-} catch (Exception e) {
-    android.util.Log.e("CigramVid", "خطأ في تحميل مشغل VidBolt", e);
-}
-*/
 		
 	}
 	

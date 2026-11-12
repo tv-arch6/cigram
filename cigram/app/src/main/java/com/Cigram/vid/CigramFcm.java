@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * FCM client (v10.67).
- * Firebase is initialized from code (no google-services plugin in Sketchware) and the phone listens on:
+ * Firebase is initialized from code (no google-services plugin needed) and the phone listens on:
  *   "cigram_all"  -> every phone: admin messages, update notices, new episodes
  *   "new_titles"  -> phones with «أفلام ومسلسلات جديدة» switched on (default on)
  *   "ep_<series>" -> one topic per followed series: its new episodes (only the followers get them)

@@ -4,7 +4,7 @@ public final class CigramAdminAuthProvider extends android.content.ContentProvid
 
     /*
      * CIGRAM ADMIN AUTH BRIDGE
-     * Keeps existing Sketchware RequestNetwork code untouched.
+     * Keeps the existing RequestNetwork code untouched.
      * It injects the same admin token used by the existing protected admin routes
      * into every RequestNetwork instance after an Activity is created/resumed.
      */
@@ -135,7 +135,7 @@ public final class CigramAdminAuthProvider extends android.content.ContentProvid
             java.util.HashMap<String, java.lang.Object> headers =
                 new java.util.HashMap<String, java.lang.Object>();
 
-            /* Preserve any headers already set by Sketchware. */
+            /* Preserve any headers already set by the caller. */
             java.lang.Class<?> scan = requestObject.getClass();
             while (scan != null && scan != java.lang.Object.class) {
                 java.lang.reflect.Field[] fields;

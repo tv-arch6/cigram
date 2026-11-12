@@ -154,7 +154,7 @@ public class ChannelsActivity extends AppCompatActivity {
 			catch (Throwable cgHubError) { cgChannelsHub = false; }
 		}
 		if (!cgChannelsHub) {
-			// CIGRAM — ChannelsActivity: RTL + Sketchware channels + Admin channels.
+			// CIGRAM — ChannelsActivity: RTL + built-in channels + Admin channels.
 			// Keeps the original XML channels, aligns every row from the far right,
 			// then merges channels created from the Admin app into their matching sections.
 			try {

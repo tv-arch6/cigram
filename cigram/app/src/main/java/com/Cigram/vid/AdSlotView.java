@@ -25,7 +25,7 @@ import java.util.Set;
  * مساحة إعلانية داخل التطبيق: "hero" (بانر دوّار)، "inline" (بطاقة ضمن القوائم)، "sticky" (شريط سفلي قابل للإغلاق)، "sponsor" (شارة رعاية).
  * (splash وpopup في AdsOverlay.)
  *
- * الاستخدام من أي شاشة (Sketchware → Add source directly):
+ * الاستخدام من أي شاشة:
  *     AdSlotView.install(this, linearHome, "hero", 0);          // أعلى الصفحة الرئيسية (index 0)
  *     AdSlotView.install(this, linearHome, "sponsor", 3);
  *     AdSlotView.installSticky(this, 56);                       // شريط سفلي فوق شريط التنقل (56dp هامش سفلي)

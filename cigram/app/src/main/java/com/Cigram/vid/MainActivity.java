@@ -520,7 +520,7 @@ public class MainActivity extends AppCompatActivity {
 			}
 		}
 		
-		// Dependency-free image loader for Sketchware.  It uses Android's own APIs,
+		// Dependency-free image loader.  It uses Android's own APIs,
 		// keeps a small memory cache, and persists downloaded images in the app cache
 		// so channel preloading is available when the Channels screen is opened.
 		class CigramImage {
@@ -1359,7 +1359,7 @@ public class MainActivity extends AppCompatActivity {
 											if (
 											downloadUrl.isEmpty()
 											) {
-												SketchwareUtil
+												CigramUtil
 												.showMessage(
 												getApplicationContext(),
 												"رابط التحديث غير متوفر"
@@ -1386,7 +1386,7 @@ public class MainActivity extends AppCompatActivity {
 											} catch (
 											Exception error
 											) {
-												SketchwareUtil
+												CigramUtil
 												.showMessage(
 												getApplicationContext(),
 												"تعذر فتح رابط التحديث"

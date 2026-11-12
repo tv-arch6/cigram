@@ -32,7 +32,7 @@ import android.widget.Toast;
  * Player values are the same preferences the player reads (cigram_player_prefs /
  * subtitle_settings), so a change here applies to the next video.
  *
- * The old Sketchware views stay in the layout (hidden) because their logic (edit profile,
+ * The old views stay in the layout (hidden) because their logic (edit profile,
  * logout, photo picker) is wired to them; the new rows call that same logic.
  */
 public final class CigramSettings {

@@ -3,7 +3,7 @@ package com.my.newproject;
 import android.app.Application;
 import android.util.Log;
 
-public class SketchApplication extends Application {
+public class AdminApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();

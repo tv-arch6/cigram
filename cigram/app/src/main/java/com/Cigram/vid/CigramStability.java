@@ -109,7 +109,7 @@ final class CigramStability {
         try { AdsMedia.trimMemory(s); } catch (Throwable ignored) { }
         try { CigramChannels.trimMemory(s); } catch (Throwable ignored) { }
         try { CigramLogos.trim(s); } catch (Throwable ignored) { }
-        try { CigramSketchwareNotifications.trimMemory(s); } catch (Throwable ignored) { }
+        try { CigramNotifyCenter.trimMemory(s); } catch (Throwable ignored) { }
         if (s >= 3) {
             try { CigramImdbIcon.trim(); } catch (Throwable ignored) { }
         }

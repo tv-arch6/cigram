@@ -92,7 +92,7 @@ final class CigramTabRefresh {
             @Override public void run() {
                 try {
                     if (!activity.isFinishing() && !activity.isDestroyed()) {
-                        CigramSketchwareNotifications.bindHomeBell(activity);
+                        CigramNotifyCenter.bindHomeBell(activity);
                     }
                 } catch (Throwable ignored) { }
             }
