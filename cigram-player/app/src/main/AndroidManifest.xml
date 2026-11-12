@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- No storage, no install-packages, no foreground service, no location, no contacts. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Google AdMob reads the advertising ID (Android 13+ requires this permission; declare "uses advertising ID" in Play Console) -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
+
+    <!-- Package visibility (Android 11+): the optional Cigram app, to show/open a shortcut when it is installed -->
+    <queries>
+        <package android:name="com.Cigram.vid" />
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:enableOnBackInvokedCallback="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+
+        <!-- AdMob App ID of THIS app (res/values/admob.xml; Google test ID until replaced - see ADMOB-SETUP.md) -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="@string/admob_app_id" />
+
+        <!-- The SDK is started by the app itself after consent, on a background thread (AdMobAds), not by this provider at process start -->
+        <provider
+            android:name="com.google.android.gms.ads.MobileAdsInitProvider"
+            android:authorities="com.cigram.player.mobileadsinitprovider"
+            tools:node="remove" />
+
+        <!-- Launcher: standalone home (play a link, open a file, continue watching, privacy) -->
+        <activity
+            android:name=".HomeActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".PrivacyActivity"
+            android:exported="false" />
+
+        <!--
+          Player. Every entry point is untrusted input (see PlayerIntent):
+            1) Cigram app:           action com.cigram.player.action.PLAY + extras
+            2) other apps / browser: VIEW video/* and HLS/DASH mime types, http(s) links ending in .mp4/.m3u8/.mpd/.mkv/.webm,
+                                     content:// from file managers, and SEND text/plain (shared link)
+            3) deep link:            cigram-player://play?url=...
+        -->
+        <activity
+            android:name=".PlayActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|keyboard|layoutDirection|uiMode"
+            android:exported="true"
+            android:resizeableActivity="true"
+            android:screenOrientation="fullUser"
+            android:supportsPictureInPicture="true"
+            android:theme="@style/AppTheme.Player">
+
+            <intent-filter>
+                <action android:name="com.cigram.player.action.PLAY" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:host="play" android:scheme="cigram-player" />
+            </intent-filter>
+
+            <!-- video files / streams by mime type -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:mimeType="video/*" />
+                <data android:mimeType="application/vnd.apple.mpegurl" />
+                <data android:mimeType="application/x-mpegurl" />
+                <data android:mimeType="application/dash+xml" />
+            </intent-filter>
+
+            <!-- plain web links to video files / playlists -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="*" />
+                <data android:pathPattern=".*\\.m3u8" />
+                <data android:pathPattern=".*\\.mpd" />
+                <data android:pathPattern=".*\\.mp4" />
+                <data android:pathPattern=".*\\.mkv" />
+                <data android:pathPattern=".*\\.webm" />
+            </intent-filter>
+
+            <!-- "Share" a link to the player -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

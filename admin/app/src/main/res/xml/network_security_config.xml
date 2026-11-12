@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 18.2: the app's own back-ends and the metadata / subtitle providers are HTTPS only (a plain-http downgrade is refused by
+     the platform). Everything else keeps the previous behaviour (cleartext allowed) because IPTV / stream sources
+     configured by the owner are plain http:// hosts. Only system certificate authorities are trusted. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">workers.dev</domain>
+        <domain includeSubdomains="true">r2.dev</domain>
+        <domain includeSubdomains="true">themoviedb.org</domain>
+        <domain includeSubdomains="true">tmdb.org</domain>
+        <domain includeSubdomains="true">opensubtitles.com</domain>
+        <domain includeSubdomains="true">subdl.com</domain>
+    </domain-config>
+</network-security-config>

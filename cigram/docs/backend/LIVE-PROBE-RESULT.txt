@@ -1,0 +1,11 @@
+Live probe of the PATCHED cigram-admin-api code against the REAL provider servers
+Run: 2026-11-08T22:45:21Z, Node v22.23.4, NODE_USE_ENV_PROXY=1. Keys used: the literal string 'not-a-real-key' (no valid credential exists in this environment).
+What this proves: paths, headers, User-Agent, error handling and the public translation catalogue. What it does NOT prove: a successful authenticated search / download / translation.
+
+  == REAL SERVERS, no valid credentials ==
+  translation options (public endpoint)          200 {"provider":"opensubtitles_ai","apis":[{"name":"aws","label":"Amazon Translate","price":0.0054,"pricing":"Pay-per-character","reliability":"high","speed":"fast","supports_ar":true},{"name":"deepl2","label":"DeepL2","price":0.0009,"pricing":"Pay-per-character","reliability":"high","speed":"fast","supports_ar":false},{"name":"gemi
+  verify opensubtitles, rejected key             200 {"provider":"opensubtitles","ok":false,"detail":"OpenSubtitles 403: You cannot consume this service","state":"error"}
+  verify opensubtitles, no key                   200 {"provider":"opensubtitles","state":"not_configured","detail":"المفتاح غير مضبوط في Cloudflare."}
+  verify subdl, rejected key                     200 {"provider":"subdl","ok":false,"detail":"not_authorized","state":"error"}
+  verify tmdb, rejected key                      200 {"provider":"tmdb","ok":false,"detail":"مفتاح TMDB غير صحيح أو غير مخوّل للوصول إلى API.","state":"error"}
+  verify opensubtitles_ai, rejected key          200 {"provider":"opensubtitles_ai","ok":false,"detail":"تعذر تسجيل الدخول إلى OpenSubtitles (403).","state":"error"}

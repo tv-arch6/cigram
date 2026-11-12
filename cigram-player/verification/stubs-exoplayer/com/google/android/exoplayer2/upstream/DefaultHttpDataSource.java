@@ -1,0 +1,2 @@
+package com.google.android.exoplayer2.upstream;
+public class DefaultHttpDataSource { public static final class Factory implements DataSource.Factory { public Factory setUserAgent(String s){return this;} public Factory setAllowCrossProtocolRedirects(boolean b){return this;} public Factory setConnectTimeoutMs(int i){return this;} public Factory setReadTimeoutMs(int i){return this;} public Factory setDefaultRequestProperties(java.util.Map<String,String> m){return this;} } }

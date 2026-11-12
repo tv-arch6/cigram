@@ -1,0 +1,2 @@
+package com.google.android.exoplayer2.util;
+public final class MimeTypes { public static final String APPLICATION_M3U8="application/x-mpegURL", APPLICATION_MPD="application/dash+xml", APPLICATION_SS="application/vnd.ms-sstr+xml", APPLICATION_RTSP="application/x-rtsp", VIDEO_MP4="video/mp4", VIDEO_MATROSKA="video/x-matroska", VIDEO_WEBM="video/webm", VIDEO_MP2T="video/mp2t", VIDEO_FLV="video/x-flv", TEXT_VTT="text/vtt", TEXT_SSA="text/x-ssa", APPLICATION_TTML="application/ttml+xml", APPLICATION_SUBRIP="application/x-subrip"; }

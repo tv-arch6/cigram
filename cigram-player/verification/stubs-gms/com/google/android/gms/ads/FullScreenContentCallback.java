@@ -1,0 +1,1 @@
+package com.google.android.gms.ads; public class FullScreenContentCallback { public void onAdShowedFullScreenContent(){} public void onAdDismissedFullScreenContent(){} public void onAdFailedToShowFullScreenContent(AdError e){} }

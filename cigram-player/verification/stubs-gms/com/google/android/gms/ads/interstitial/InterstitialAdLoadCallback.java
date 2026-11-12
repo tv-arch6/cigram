@@ -1,0 +1,1 @@
+package com.google.android.gms.ads.interstitial; import com.google.android.gms.ads.*; public abstract class InterstitialAdLoadCallback { public void onAdLoaded(InterstitialAd a){} public void onAdFailedToLoad(LoadAdError e){} }

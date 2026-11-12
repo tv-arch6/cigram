@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Video links are supplied by the user / other apps and many providers still serve plain http, so cleartext is
+  allowed for them. Everything that belongs to Cigram (the ads worker on workers.dev) is HTTPS-only.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">workers.dev</domain>
+    </domain-config>
+</network-security-config>

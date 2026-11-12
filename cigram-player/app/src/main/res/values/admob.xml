@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ============================  ADMOB IDs OF THE CIGRAM PLAYER APP  ============================
+  The values below are GOOGLE'S OFFICIAL TEST IDs. They show "Test Ad" and earn NOTHING.
+  To earn, create the app in AdMob and replace the 3 values (details: ADMOB-SETUP.md):
+     AdMob console -> Apps -> Add app -> Android -> "Cigram Player" (package com.cigram.player)
+       -> App ID                      (looks like ca-app-pub-XXXXXXXXXXXXXXXX~NNNNNNNNNN)
+       -> Ad unit "App open"          (looks like ca-app-pub-XXXXXXXXXXXXXXXX/NNNNNNNNNN)
+       -> Ad unit "Interstitial"      (same shape)
+  Use the SAME AdMob account as the main Cigram app and the earnings land in the same account.
+  Never click your own real ads (AdMob bans accounts for invalid traffic) - keep the test IDs while you test.
+-->
+<resources>
+    <string name="admob_app_id" translatable="false">ca-app-pub-3940256099942544~3347511713</string>
+    <string name="admob_app_open_unit" translatable="false">ca-app-pub-3940256099942544/9257395921</string>
+    <string name="admob_interstitial_unit" translatable="false">ca-app-pub-3940256099942544/1033173712</string>
+</resources>

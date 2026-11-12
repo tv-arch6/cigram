@@ -1,0 +1,21 @@
+PLAYER permissions: ['android.permission.INTERNET', 'android.permission.ACCESS_NETWORK_STATE', 'com.google.android.gms.permission.AD_ID']
+  restricted/unnecessary permissions present: none
+  allowBackup: false | enableOnBackInvokedCallback: true | debuggable: None
+  meta-data: [('com.google.android.gms.ads.APPLICATION_ID', '@string/admob_app_id')]
+  provider com.google.android.gms.ads.MobileAdsInitProvider: exported=None intent-filter=False -> OK (removed by merger: tools:node=remove)
+  activity .HomeActivity: exported=true intent-filter=True -> OK 
+  activity .PrivacyActivity: exported=false intent-filter=False -> OK 
+  activity .PlayActivity: exported=true intent-filter=True -> OK 
+  gradle compileSdk = 36
+  gradle targetSdk = 36
+  gradle minSdk = 24
+  gradle versionCode = 1
+  gradle versionName = "1.0.0"
+  gradle applicationId = "com.cigram.player"
+  gradle deps: ['com.google.android.exoplayer:exoplayer:2.19.1', 'com.google.android.gms:play-services-ads:23.4.0', 'com.google.android.ump:user-messaging-platform:3.1.0']
+  signing passwords hardcoded: False
+  admob.xml uses Google TEST ids: True
+  AppConfig: {'ADMOB_ENABLED': 'true', 'OWN_ADS_ENABLED': 'false'}
+MAIN queries packages: ['com.cigram.player']
+MAIN base manifest INSTALL_PACKAGES: False
+MAIN CigramAdConfig ADMOB_ENABLED: false
