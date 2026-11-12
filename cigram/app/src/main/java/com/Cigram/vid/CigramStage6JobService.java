@@ -10,6 +10,8 @@ public final class CigramStage6JobService extends android.app.job.JobService {
     public boolean onStartJob(final android.app.job.JobParameters params) {
         // v10.62: request statuses ride on the same periodic job (own thread, never blocks the job)
         try { CigramRequests.refreshQuietly(this); } catch (Throwable ignored) { }
+        // a channel the viewer reported: read the catalogue again so «تم تفعيل القناة» arrives while the app is closed
+        try { if (CigramChannelReports.pending(this)) CigramChannelStore.refresh(this, true); } catch (Throwable ignored) { }
         try {
             CigramStage1InitProvider.runStage6ScheduledCheck(
                     this,

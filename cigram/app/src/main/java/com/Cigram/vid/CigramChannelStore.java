@@ -399,6 +399,7 @@ final class CigramChannelStore {
                 catalog.byKey.put(ch.key, ch);
             }
         }
+        CigramChannelReports.check(app, catalog);   // a reported channel that got a new link = «تم تفعيل القناة»
         return catalog;
     }
 

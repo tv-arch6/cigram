@@ -85,6 +85,7 @@ final class CigramChannelPlayer {
     private final TextView status;
     private final LinearLayout errorBox;
     private final TextView errorText;
+    private TextView reportBtn;
 
     private CigramChannelStore.Ch channel;
     private String playingUrl = "";
@@ -120,8 +121,14 @@ final class CigramChannelPlayer {
         empty = new LinearLayout(a);
         empty.setOrientation(LinearLayout.VERTICAL);
         empty.setGravity(Gravity.CENTER);
-        CigramHubUi.Icon tv = new CigramHubUi.Icon(a, CigramHubUi.TV, light ? 0xFFE21B14 : 0xFF3F5E6C);
-        empty.addView(tv, new LinearLayout.LayoutParams(dp(52), dp(52)));
+        // the app's own mark, white and see-through (ink on the light page), instead of a television glyph
+        android.widget.ImageView mark = new android.widget.ImageView(a);
+        mark.setImageResource(R.drawable.cigram_mark);
+        mark.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        mark.setColorFilter(light ? 0xFF111418 : 0xFFFFFFFF, android.graphics.PorterDuff.Mode.SRC_IN);
+        mark.setAlpha(0.72f);
+        mark.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        empty.addView(mark, new LinearLayout.LayoutParams(dp(58), dp(58)));
         TextView t1 = CigramUI.label(a, "اختر قناة لبدء المشاهدة", 15f, light ? 0xFF111418 : 0xFFDCE6EA, true);
         t1.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams l1 = new LinearLayout.LayoutParams(-2, -2);
@@ -193,7 +200,11 @@ final class CigramChannelPlayer {
         LinearLayout pill = new LinearLayout(a);
         pill.setOrientation(LinearLayout.HORIZONTAL);
         pill.setGravity(Gravity.CENTER_VERTICAL);
-        pill.setBackground(CigramUI.round(0x80000000, 11, a));
+        GradientDrawable pillBg = new GradientDrawable();      // iOS glass capsule
+        pillBg.setColor(0x47FFFFFF);
+        pillBg.setCornerRadius(dp(12));
+        pillBg.setStroke(Math.max(1, dp(1)), 0x40FFFFFF);
+        pill.setBackground(pillBg);
         pill.setPadding(dp(8), dp(3), dp(9), dp(3));
         View dot = new View(a);
         GradientDrawable dotBg = new GradientDrawable();
@@ -218,23 +229,23 @@ final class CigramChannelPlayer {
         centre.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         centre.setGravity(Gravity.CENTER);
         CigramHubUi.Icon nextIcon = new CigramHubUi.Icon(a, CigramHubUi.NEXT, Color.WHITE);
-        nextBtn = circleButton(nextIcon, 40, 20, 0x59000000, "القناة التالية", new View.OnClickListener() {
+        nextBtn = circleButton(nextIcon, 42, 19, 0x38FFFFFF, "القناة التالية", new View.OnClickListener() {
             @Override public void onClick(View v) { keepControls(); host.onStep(1); }
         });
-        playIcon = new CigramHubUi.Icon(a, CigramHubUi.PAUSE, Color.WHITE);
-        View playBtn = circleButton(playIcon, 56, 26, 0x73000000, "تشغيل / إيقاف", new View.OnClickListener() {
+        playIcon = new CigramHubUi.Icon(a, CigramHubUi.PAUSE, 0xFF000000);
+        View playBtn = circleButton(playIcon, 58, 24, 0xFFFFFFFF, "تشغيل / إيقاف", new View.OnClickListener() {
             @Override public void onClick(View v) { togglePlay(); }
         });
         CigramHubUi.Icon prevIcon = new CigramHubUi.Icon(a, CigramHubUi.PREV, Color.WHITE);
-        prevBtn = circleButton(prevIcon, 40, 20, 0x59000000, "القناة السابقة", new View.OnClickListener() {
+        prevBtn = circleButton(prevIcon, 42, 19, 0x38FFFFFF, "القناة السابقة", new View.OnClickListener() {
             @Override public void onClick(View v) { keepControls(); host.onStep(-1); }
         });
-        centre.addView(nextBtn, new LinearLayout.LayoutParams(dp(40), dp(40)));
-        LinearLayout.LayoutParams pl = new LinearLayout.LayoutParams(dp(56), dp(56));
+        centre.addView(nextBtn, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        LinearLayout.LayoutParams pl = new LinearLayout.LayoutParams(dp(58), dp(58));
         pl.leftMargin = dp(22);
         pl.rightMargin = dp(22);
         centre.addView(playBtn, pl);
-        centre.addView(prevBtn, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        centre.addView(prevBtn, new LinearLayout.LayoutParams(dp(42), dp(42)));
         controls.addView(centre, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
 
         // bottom left: sound + full screen
@@ -242,6 +253,11 @@ final class CigramChannelPlayer {
         bottom.setOrientation(LinearLayout.HORIZONTAL);
         bottom.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         bottom.setGravity(Gravity.CENTER_VERTICAL);
+        GradientDrawable bottomBg = new GradientDrawable();    // one glass capsule for sound + full screen
+        bottomBg.setColor(0x38FFFFFF);
+        bottomBg.setCornerRadius(dp(21));
+        bottomBg.setStroke(Math.max(1, dp(1)), 0x40FFFFFF);
+        bottom.setBackground(bottomBg);
         muteIcon = new CigramHubUi.Icon(a, CigramHubUi.SPEAKER, Color.WHITE);
         muteIcon.setShadow(true);
         View muteBtn = tapTarget(muteIcon, 22, "الصوت", new View.OnClickListener() {
@@ -266,23 +282,53 @@ final class CigramChannelPlayer {
         errorBox.setOrientation(LinearLayout.VERTICAL);
         errorBox.setGravity(Gravity.CENTER);
         errorBox.setPadding(dp(18), dp(12), dp(18), dp(12));
-        errorBox.setBackground(CigramUI.round(0xCC000000, 14, a));
-        errorText = CigramUI.label(a, "", 13f, 0xFFE8EEF1, false);
+        GradientDrawable errorBg = new GradientDrawable();
+        errorBg.setColor(0xE6000000);
+        errorBg.setCornerRadius(dp(20));
+        errorBg.setStroke(Math.max(1, dp(1)), 0x40FFFFFF);
+        errorBox.setBackground(errorBg);
+        errorText = CigramUI.label(a, "", 13.5f, 0xFFFFFFFF, false);
         errorText.setGravity(Gravity.CENTER);
+        errorText.setLineSpacing(0f, 1.25f);
         errorBox.addView(errorText, new LinearLayout.LayoutParams(-2, -2));
-        TextView retry = CigramUI.label(a, "إعادة المحاولة", 13f, Color.WHITE, true);
+        LinearLayout errorActions = new LinearLayout(a);
+        errorActions.setOrientation(LinearLayout.HORIZONTAL);
+        errorActions.setGravity(Gravity.CENTER);
+        TextView retry = CigramUI.label(a, "إعادة المحاولة", 13f, 0xFF000000, true);
         retry.setGravity(Gravity.CENTER);
-        retry.setBackground(CigramUI.round(RED, 14, a));
-        retry.setPadding(dp(18), dp(7), dp(18), dp(7));
+        retry.setBackground(CigramUI.round(0xFFFFFFFF, 16, a));
+        retry.setPadding(dp(16), dp(8), dp(16), dp(8));
         retry.setClickable(true);
         retry.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
                 if (channel != null) play(channel);
             }
         });
+        reportBtn = CigramUI.label(a, "بلّغ المدير", 13f, 0xFFFFFFFF, true);
+        reportBtn.setGravity(Gravity.CENTER);
+        GradientDrawable reportBg = new GradientDrawable();
+        reportBg.setColor(0x1FFFFFFF);
+        reportBg.setCornerRadius(dp(16));
+        reportBg.setStroke(Math.max(1, dp(1)), 0x80FFFFFF);
+        reportBtn.setBackground(reportBg);
+        reportBtn.setPadding(dp(16), dp(8), dp(16), dp(8));
+        reportBtn.setClickable(true);
+        reportBtn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                if (channel == null) return;
+                CigramChannelReports.report(a, channel);
+                reportBtn.setText("تم إبلاغ المدير");
+                reportBtn.setEnabled(false);
+                reportBtn.setAlpha(0.6f);
+            }
+        });
+        LinearLayout.LayoutParams rb = new LinearLayout.LayoutParams(-2, -2);
+        rb.rightMargin = dp(8);
+        errorActions.addView(reportBtn, rb);
+        errorActions.addView(retry, new LinearLayout.LayoutParams(-2, -2));
         LinearLayout.LayoutParams lr = new LinearLayout.LayoutParams(-2, -2);
-        lr.topMargin = dp(10);
-        errorBox.addView(retry, lr);
+        lr.topMargin = dp(12);
+        errorBox.addView(errorActions, lr);
         errorBox.setVisibility(View.GONE);
         FrameLayout.LayoutParams el = new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER);
         el.leftMargin = dp(24);
@@ -356,7 +402,7 @@ final class CigramChannelPlayer {
         if (!ch.available || ch.url.length() == 0) {
             releasePlayer();
             setWaiting(false, "");
-            showError("القناة غير متوفرة حالياً");
+            channelDown();
             showControls(false);
             return;
         }
@@ -364,7 +410,7 @@ final class CigramChannelPlayer {
             ensurePlayer();
         } catch (Throwable error) {
             Log.w(TAG, "player build failed", error);
-            showError("تعذر تشغيل القناة");
+            channelDown();
             return;
         }
         retries = 0;
@@ -489,7 +535,7 @@ final class CigramChannelPlayer {
             Log.w(TAG, "play failed", error);
             if (!nextType()) {
                 setWaiting(false, "");
-                showError("تعذر تشغيل القناة");
+                channelDown();
             }
         }
     }
@@ -504,20 +550,22 @@ final class CigramChannelPlayer {
         return true;
     }
 
-    /** Reconnects up to 4 times (2s, 4s, 6s, 8s), then shows the error with a retry button. */
+    /**
+     * The phone is online and the channel still fails: there is nothing to wait for. One quick reconnect, then the
+     * viewer is told the truth at once — his internet is fine, the channel is paused — with «بلّغ المدير».
+     * The phone is offline: no message at all; the player keeps trying quietly until the connection is back.
+     */
     private void retry() {
         if (destroyed || player == null) return;
-        if (retries >= 4) {
+        boolean online = CigramChannelReports.online(a);
+        if (online && retries >= 1) {
             setWaiting(false, "");
-            // 2026: the real reason (offline / server / expired link / unsupported ...), not a generic sentence
-            int kind = lastError == null ? CigramPlaybackError.UNKNOWN
-                    : CigramPlaybackError.classify(view == null ? null : view.getContext(), lastError);
-            showError(kind == CigramPlaybackError.UNKNOWN ? "تعذر تشغيل القناة حالياً"
-                    : CigramPlaybackError.message(kind));
+            channelDown();
             return;
         }
+        if (!online && retries >= 3) retries = 2;       // offline: stay in the quiet loop
         retries++;
-        setWaiting(true, "جارٍ إعادة الاتصال… (" + retries + ")");
+        setWaiting(true, online ? "جارٍ التحميل…" : "بانتظار عودة الاتصال…");
         final int attempt = retries;
         UI.postDelayed(new Runnable() {
             @Override public void run() {
@@ -528,7 +576,7 @@ final class CigramChannelPlayer {
                     player.play();
                 } catch (Throwable ignored) { }
             }
-        }, 2000L * attempt);
+        }, online ? 1200L : 3000L);
     }
 
     /** Twice a second: what a Player.Listener would report (state, playing, error). */
@@ -666,7 +714,20 @@ final class CigramChannelPlayer {
         report();
     }
 
+    /** Online, and the channel does not answer: say so and offer to tell the admin. */
+    private void channelDown() {
+        showError("الإنترنت لديك سليم\nلكن هذه القناة متوقفة مؤقتاً");
+        if (reportBtn != null && channel != null) {
+            boolean sent = CigramChannelReports.reported(a, channel.key);
+            reportBtn.setVisibility(View.VISIBLE);
+            reportBtn.setText(sent ? "تم إبلاغ المدير" : "بلّغ المدير");
+            reportBtn.setEnabled(!sent);
+            reportBtn.setAlpha(sent ? 0.6f : 1f);
+        }
+    }
+
     private void showError(String text) {
+        if (reportBtn != null) reportBtn.setVisibility(View.GONE);
         errorText.setText(text);
         errorBox.setVisibility(View.VISIBLE);
         showControls(false);
@@ -690,7 +751,16 @@ final class CigramChannelPlayer {
         GradientDrawable g = new GradientDrawable();
         g.setShape(GradientDrawable.OVAL);
         g.setColor(color);
+        if (color != 0xFFFFFFFF) g.setStroke(Math.max(1, dp(1)), 0x4DFFFFFF);    // glass buttons carry a white hairline
         f.setBackground(g);
+        f.setOnTouchListener(new View.OnTouchListener() {
+            @Override public boolean onTouch(View v, android.view.MotionEvent e) {
+                int act = e.getActionMasked();
+                if (act == android.view.MotionEvent.ACTION_DOWN) v.animate().scaleX(0.9f).scaleY(0.9f).setDuration(70).start();
+                else if (act == android.view.MotionEvent.ACTION_UP || act == android.view.MotionEvent.ACTION_CANCEL) v.animate().scaleX(1f).scaleY(1f).setDuration(150).start();
+                return false;
+            }
+        });
         f.setContentDescription(description);
         f.setClickable(true);
         f.setOnClickListener(click);

@@ -380,6 +380,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                         @Override
                         public void onActivityResumed(final Activity activity) {
                             try { CigramTheme.onResumed(activity); } catch (Throwable ignored) { }   // v10.70
+                            CigramChannelReports.resumed(activity);
                             try {
                                 String screen = activity.getClass().getSimpleName();
                                 if ("PlayerActivity".equals(screen)) { CigramRateCard.playerOpened(); CigramSleepTimer.playerResumed(activity); }
@@ -435,6 +436,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
                         @Override
                         public void onActivityPaused(Activity activity) {
                             CigramTheme.onPaused(activity);   // v10.70: picture for the theme / rotation cross-fade
+                            CigramChannelReports.paused(activity);
                             try { if ("PlayerActivity".equals(activity.getClass().getSimpleName())) CigramSleepTimer.playerPaused(activity); } catch (Throwable ignored) { }
                             CigramTvMode.paused(activity);   // v10.66: TV only (stops that page's focus guard)
                         }

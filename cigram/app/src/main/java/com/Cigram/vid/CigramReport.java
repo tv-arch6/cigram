@@ -457,6 +457,30 @@ public final class CigramReport {
 
     // ----------------------------------------------------------- network/queue
 
+    /**
+     * Sends a ready report to the Admin inbox from any page (a paused channel, for one): the common fields are
+     * added here, and a report that cannot leave now waits in the same queue as the others.
+     */
+    static void submit(Context context, final JSONObject report) {
+        if (context == null || report == null) return;
+        final Context app = context.getApplicationContext();
+        try {
+            String uid = CigramUserData.authUserId(app);
+            if (uid.length() > 0) report.put("user_id", uid);
+            report.put("app_version", appVersion(app));
+            report.put("client_id", clientId(app));
+            report.put("device", cut(android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL, 80));
+            report.put("android", android.os.Build.VERSION.RELEASE);
+            if (CigramUserData.isLoggedIn(app)) report.put("user_email", CigramUserData.email(app));
+        } catch (Throwable ignored) { }
+        CigramSync.runIO(new Runnable() {
+            @Override public void run() {
+                if (send(app, report)) flushQueue(app);
+                else enqueue(app, report);
+            }
+        });
+    }
+
     private static boolean send(Context c, JSONObject report) {
         String body = CigramSync.post(CigramSync.API_BASE + "/report",
                 CigramUserData.token(c), report.toString());
