@@ -182,6 +182,8 @@ public final class CigramRequests {
                 body.put("note", o.optString("note"));
                 body.put("client_id", CigramApi.clientId(app));
                 body.put("app_version", CigramApi.appVersion(app));
+                // the admin reads «يريد #اسم_المستخدم فيلم»: the display name only (no e-mail, no id)
+                try { if (token.length() > 0) body.put("user_name", CigramUserData.displayName(app)); } catch (Throwable ignored) { }
                 JSONObject res = CigramApi.post("/requests", body, token);
                 if (res == null) return;                          // offline: try again later
                 if (res.optInt("_http", 0) == 401 && token.length() > 0) {

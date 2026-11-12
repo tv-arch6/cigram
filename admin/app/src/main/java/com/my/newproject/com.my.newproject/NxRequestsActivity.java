@@ -256,7 +256,17 @@ public class NxRequestsActivity extends CxBase {
                         });
             }
         });
-        actions.addView(added, new LinearLayout.LayoutParams(0, NxUi.WRAP, 1f));
+        TextView copyTop = NxUi.secondary(this, "انسخ الاسم");
+        copyTop.setTextSize(13.5f);
+        copyTop.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                copyName(g.optString("title"));
+                if ("pending".equals(g.optString("status", "pending"))) titleStatus(g, "in_progress", null);
+            }
+        });
+        actions.addView(copyTop, new LinearLayout.LayoutParams(0, NxUi.WRAP, 0.8f));
+        actions.addView(added, CgUi.lpWeight(this, 1f, 8, 0, 0, 0));
         TextView more = NxUi.secondary(this, "حالة أخرى");
         more.setTextSize(13.5f);
         more.setOnClickListener(new View.OnClickListener() {
@@ -279,6 +289,15 @@ public class NxRequestsActivity extends CxBase {
         actions.addView(more, CgUi.lpWeight(this, 0.8f, 8, 0, 0, 0));
         card.addView(actions, NxUi.lp(this, NxUi.MATCH, NxUi.WRAP, 0, 12, 0, 0));
         return card;
+    }
+
+    /** «انسخ الاسم»: the title goes to the clipboard, ready to paste into the add form or a search. */
+    private void copyName(String title) {
+        try {
+            android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (cm != null) cm.setPrimaryClip(android.content.ClipData.newPlainText("Cigram", title));
+            snack("نُسخ الاسم: " + title, CxUi.GOOD);
+        } catch (Throwable ignored) { }
     }
 
     private void titleStatus(final JSONObject g, final String status, final String note) {
@@ -347,7 +366,9 @@ public class NxRequestsActivity extends CxBase {
         t.setMaxLines(1);
         t.setEllipsize(TextUtils.TruncateAt.END);
         col.addView(t);
-        String meta = r.optString("kind_text") + " • " + r.optString("ago");
+        String who = r.optString("user_tag", "");
+        col.addView(NxUi.text(this, "يريد " + (who.length() > 0 ? who + " " : "") + r.optString("kind_text"), 12, NxUi.TEXT, false));
+        String meta = r.optString("ago");
         if (r.optInt("same_title") > 1) meta += " • " + r.optInt("same_title") + " طلبوه";
         if (r.optString("app_version").length() > 0) meta += " • v" + r.optString("app_version");
         col.addView(NxUi.text(this, meta, 11, NxUi.SUB, false));
@@ -363,7 +384,23 @@ public class NxRequestsActivity extends CxBase {
         LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(0, NxUi.WRAP, 1f);
         cl.setMargins(dp(10), 0, dp(8), 0);
         row.addView(col, cl);
-        row.addView(NxUi.pill(this, r.optString("status_text"), statusColor(r.optString("status"))), new LinearLayout.LayoutParams(NxUi.WRAP, NxUi.WRAP));
+        LinearLayout side = CgUi.vbox(this);
+        side.setGravity(Gravity.CENTER);
+        side.addView(NxUi.pill(this, r.optString("status_text"), statusColor(r.optString("status"))), new LinearLayout.LayoutParams(NxUi.WRAP, NxUi.WRAP));
+        TextView copy = NxUi.secondary(this, "انسخ الاسم");
+        copy.setTextSize(12f);
+        copy.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                copyName(r.optString("title"));
+                // copying the name = the admin took the request: the viewer gets «المدير وافق، سيتم إضافته قريبًا، اصبر»
+                if ("pending".equals(r.optString("status"))) oneStatus(r, "in_progress", null);
+            }
+        });
+        LinearLayout.LayoutParams cpl = new LinearLayout.LayoutParams(NxUi.WRAP, NxUi.WRAP);
+        cpl.setMargins(0, dp(6), 0, 0);
+        side.addView(copy, cpl);
+        row.addView(side, new LinearLayout.LayoutParams(NxUi.WRAP, NxUi.WRAP));
         row.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {

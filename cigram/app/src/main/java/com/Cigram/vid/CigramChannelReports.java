@@ -120,10 +120,43 @@ final class CigramChannelReports {
             r.put("source", "channel_report");
             r.put("timestamp", System.currentTimeMillis());
             CigramReport.submit(app, r);
+            postToAdmin(app, ch);
         } catch (Throwable error) {
             android.util.Log.w("CigramChannelReports", "report failed", error);
         }
         snack(a, "وصل بلاغك للمدير · سنخبرك عند تفعيل القناة", null, null);
+    }
+
+    private static final String ADMIN_API = "https://cigram-admin-api.wwq-mixtv.workers.dev/channel-reports";
+
+    /**
+     * The Admin app's «قنوات تحتاج رابطاً» list reads its reports from the admin worker (POST /channel-reports):
+     * channel key + name + the failed link, and the anonymous install id so one phone counts once. Best effort.
+     */
+    private static void postToAdmin(final Context app, final CigramChannelStore.Ch ch) {
+        CigramSync.runIO(new Runnable() {
+            @Override public void run() {
+                java.net.HttpURLConnection c = null;
+                try {
+                    JSONObject b = new JSONObject();
+                    b.put("key", ch.key).put("name", ch.name).put("url", ch.url).put("section", ch.section);
+                    b.put("client_id", CigramApi.clientId(app)).put("app_version", CigramApi.appVersion(app));
+                    if (CigramUserData.isLoggedIn(app)) b.put("user_name", CigramUserData.displayName(app));
+                    c = (java.net.HttpURLConnection) new java.net.URL(ADMIN_API).openConnection();
+                    c.setRequestMethod("POST");
+                    c.setConnectTimeout(10000);
+                    c.setReadTimeout(10000);
+                    c.setDoOutput(true);
+                    c.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                    java.io.OutputStream out = c.getOutputStream();
+                    try { out.write(b.toString().getBytes("UTF-8")); } finally { out.close(); }
+                    c.getResponseCode();
+                } catch (Throwable ignored) {
+                } finally {
+                    if (c != null) c.disconnect();
+                }
+            }
+        });
     }
 
     // ------------------------------------------------------------------ the catalogue changed

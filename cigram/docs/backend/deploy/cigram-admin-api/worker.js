@@ -9188,16 +9188,34 @@ async function reqTgSend(env, text, opts) {
   const chat = reqTgChatOf(env, cfg);
   if (!reqTgToken(env) || !chat.chat_id) return { ok: false, description: "not_configured" };
   if (!(opts && opts.skipBudget) && !(await reqTgReserve(env))) return { ok: false, description: "hourly_limit" };
-  return reqTgCall(env, "sendMessage", {
+  const payload = {
     chat_id: chat.chat_id,
     text,
     parse_mode: "HTML",
     link_preview_options: { is_disabled: true },
-  });
+  };
+  if (opts && opts.reply_markup) payload.reply_markup = opts.reply_markup;
+  return reqTgCall(env, "sendMessage", payload);
 }
 
+/** "#اسم_المستخدم" from the record (name the app sent, else a short account tag); "" for a guest. */
+function reqUserTag(r) {
+  const raw = reqClean(r.user_name || r.name || "", 40).replace(/[\s#<>&]+/g, "_").replace(/^_+|_+$/g, "");
+  if (raw) return "#" + raw;
+  const id = cleanString(r.user_id);
+  return id ? "#مستخدم_" + id.slice(-5) : "";
+}
+
+/** «يريد #اسم_المستخدم فيلم»: the title sits in <code>, so one tap on it in Telegram copies the name. */
 function reqTgLineOf(r) {
-  return reqKindIcon(r.kind) + " <b>" + reqEsc(r.title) + "</b> — " + reqKindText(r.kind);
+  const who = reqUserTag(r);
+  return reqKindIcon(r.kind) + " يريد " + (who ? reqEsc(who) + " " : "") + reqKindText(r.kind) + "\n<code>" + reqEsc(r.title) + "</code>";
+}
+
+/** The «انسخ الاسم» button under a single request (Bot API copy_text). */
+function reqTgCopyMarkup(r) {
+  const title = reqClean(r.title, 120);
+  return title ? { inline_keyboard: [[{ text: "انسخ الاسم", copy_text: { text: title } }]] } : undefined;
 }
 
 function reqTgMessages(events) {
@@ -9206,10 +9224,12 @@ function reqTgMessages(events) {
   const out = [];
   if (fresh.length === 1) {
     const r = fresh[0].record;
-    const lines = ["🆕 طلب جديد على سيكرام", reqTgLineOf(r)];
+    const lines = [reqTgLineOf(r)];
     if (cleanString(r.note)) lines.push("📝 " + reqEsc(reqClean(r.note, 200)));
     if (fresh[0].count > 1) lines.push("👥 " + reqCountText(fresh[0].count) + " على هذا العنوان");
-    out.push(lines.join("\n"));
+    const msg = new String(lines.join("\n"));
+    msg.reply_markup = reqTgCopyMarkup(r);       // «انسخ الاسم»
+    out.push(msg);
   } else if (fresh.length > 1) {
     const lines = ["📥 " + fresh.length + " طلبات جديدة على سيكرام:"];
     for (const e of fresh.slice(0, 15)) {
@@ -9342,7 +9362,7 @@ async function reqBridgeScan(env, now, minGapMs) {
   const events = out.result || [];
   let sent = 0;
   for (const text of reqTgMessages(events)) {
-    const res = await reqTgSend(env, text);
+    const res = await reqTgSend(env, String(text), text && text.reply_markup ? { reply_markup: text.reply_markup } : undefined);
     if (res.ok) sent++;
     else if (res.description !== "not_configured" && res.description !== "hourly_limit") {
       updLog("requests_telegram_failed", { reason: String(res.description || res.http || "") });
@@ -9439,6 +9459,7 @@ async function handleRequestsList(request, env, url) {
         admin_note: reqClean(r.admin_note, 300),
         app_version: reqClean(r.app_version, 24),
         logged_in: Boolean(r.user_id),
+        user_tag: reqUserTag(r),
         created_at: r.created_at ? new Date(Number(r.created_at)).toISOString() : "",
         ago: reqAgo(r.created_at, now),
         same_title: groups.has(key) ? groups.get(key).count : 0,
@@ -9633,6 +9654,115 @@ const REQUESTS_ROUTES = (() => {
     "GET /admin/requests/telegram": A(handleRequestsTelegramStatus),
     "POST /admin/requests/telegram/link": A(handleRequestsTelegramLink),
     "POST /admin/requests/telegram/test": A(handleRequestsTelegramTest),
+  };
+})();
+
+// =============================================================================
+// CHANNEL REPORTS (v11) — «بلّغ المدير»: a channel that does not play
+// =============================================================================
+//   POST /channel-reports                 public. { key, name, url, section?, client_id?, app_version?, user_name? }
+//                                         One record per channel (reports of the same channel are counted, not piled up).
+//   GET  /admin/channel-reports           admin. The open reports, most reported first.
+//   POST /admin/channel-reports/resolve   admin. { key } after the link was replaced («استبدل برابط» → حفظ).
+// The viewer's phone needs nothing back: it sees the new link in the channels catalogue and says «تم تفعيل القناة».
+// Storage: one small JSON object in the admin bucket (CH_REPORTS_NAME), capped at CH_REPORTS_MAX channels.
+
+const CH_REPORTS_NAME = "channel_reports.json";
+const CH_REPORTS_MAX = 200;
+
+function chReportKey(v) {
+  return cleanString(v).toLowerCase().slice(0, 120);
+}
+
+async function handleChannelReportPublic(request, env) {
+  const input = await readRequestData(request);
+  const key = chReportKey(input.key || input.content_id || input.name);
+  const name = reqClean(input.name || input.title || input.channel_name, 120);
+  const url = cleanString(input.url || input.channel_url).slice(0, 600);
+  if (!key || !name) throw new AdminError("bad_channel", "اسم القناة ناقص.", 400);
+  const now = Date.now();
+  const client = cleanString(input.client_id).slice(0, 64);
+  let isNew = false;
+  await mutateJson(adminBucket(env), adminKey(env, CH_REPORTS_NAME), { version: 1, items: {} }, (doc) => {
+    if (!doc.items || typeof doc.items !== "object" || Array.isArray(doc.items)) doc.items = {};
+    let it = doc.items[key];
+    if (!it || it.resolved_at) {
+      isNew = true;
+      it = { key, name, url, section: reqClean(input.section || input.channel_section, 60), count: 0, first_at: now, clients: [] };
+    }
+    if (client && !it.clients.includes(client)) {
+      if (it.clients.length < 50) it.clients.push(client);
+      it.count = (Number(it.count) || 0) + 1;
+    } else if (!client) {
+      it.count = (Number(it.count) || 0) + 1;
+    }
+    it.name = name;
+    if (url) it.url = url;
+    it.last_at = now;
+    it.last_user = reqClean(input.user_name, 40);
+    it.app_version = reqClean(input.app_version, 24);
+    doc.items[key] = it;
+    const keys = Object.keys(doc.items);
+    if (keys.length > CH_REPORTS_MAX) {
+      keys.sort((a, b) => (Number(doc.items[a].last_at) || 0) - (Number(doc.items[b].last_at) || 0));
+      for (const k of keys.slice(0, keys.length - CH_REPORTS_MAX)) delete doc.items[k];
+    }
+    return {};
+  });
+  if (isNew) {
+    try {
+      await reqTgSend(env, "📡 القناة <code>" + reqEsc(name) + "</code> متوقفة وتحتاج استبدال رابط.");
+    } catch {
+      /* Telegram is optional */
+    }
+  }
+  return okResponse({ received: true }, "وصل بلاغك للمدير.");
+}
+
+async function handleChannelReportsList(request, env) {
+  const cur = await r2ReadJson(adminBucket(env), adminKey(env, CH_REPORTS_NAME), { version: 1, items: {} }, false);
+  const items = Object.values((cur.doc && cur.doc.items) || {})
+    .filter((it) => it && !it.resolved_at)
+    .sort((a, b) => (Number(b.count) || 0) - (Number(a.count) || 0) || (Number(b.last_at) || 0) - (Number(a.last_at) || 0))
+    .map((it) => ({
+      key: it.key,
+      name: it.name,
+      url: it.url || "",
+      section: it.section || "",
+      count: Number(it.count) || 1,
+      last_user: it.last_user || "",
+      ago: reqAgo(it.last_at, Date.now()),
+    }));
+  return okResponse({ items }, items.length ? "" : "ماكو قنوات مبلَّغ عنها.");
+}
+
+async function handleChannelReportResolve(request, env) {
+  const input = await readRequestData(request);
+  const key = chReportKey(input.key);
+  if (!key) throw new AdminError("bad_channel", "القناة غير محددة.", 400);
+  await mutateJson(adminBucket(env), adminKey(env, CH_REPORTS_NAME), { version: 1, items: {} }, (doc) => {
+    if (doc.items && doc.items[key]) {
+      doc.items[key].resolved_at = Date.now();
+      doc.items[key].new_url = cleanString(input.url).slice(0, 600);
+    }
+    return {};
+  });
+  return okResponse({ key, resolved: true }, "تم تفعيل القناة ✅");
+}
+
+const CHANNEL_REPORT_ROUTES = (() => {
+  const A = adminRoute;
+  const pub = (handler) => async (request, env, url) => {
+    try {
+      return await handler(request, env, url);
+    } catch (error) {
+      return adminErrorResponse(error);
+    }
+  };
+  return {
+    "POST /channel-reports": pub(handleChannelReportPublic),
+    "GET /admin/channel-reports": A(handleChannelReportsList),
+    "POST /admin/channel-reports/resolve": A(handleChannelReportResolve),
   };
 })();
 
@@ -14698,6 +14828,7 @@ async function cigramRoute(request, env, ctx) {
             .concat(Object.keys(MEDIA_ROUTES))
             .concat(Object.keys(OPS_ROUTES))
             .concat(Object.keys(REQUESTS_ROUTES))
+            .concat(Object.keys(CHANNEL_REPORT_ROUTES))
             .concat(Object.keys(PUSH_ROUTES))
             .concat(Object.keys(WN_ROUTES))
             .concat(Object.keys(SUBHUB_ROUTES)),
@@ -14781,6 +14912,8 @@ async function cigramRoute(request, env, ctx) {
       const opsHandler = OPS_ROUTES[request.method + " " + path];
       if (opsHandler) return opsHandler(request, env, url, ctx);
 
+      const channelReportHandler = CHANNEL_REPORT_ROUTES[request.method + " " + path];
+      if (channelReportHandler) return channelReportHandler(request, env, url);
       const requestsHandler = REQUESTS_ROUTES[request.method + " " + path];
       if (requestsHandler) return requestsHandler(request, env, url, ctx);
 
