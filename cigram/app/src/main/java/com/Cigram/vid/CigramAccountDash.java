@@ -113,9 +113,9 @@ final class CigramAccountDash {
                 new View.OnClickListener() {
                     @Override public void onClick(View v) { showThemeDialog(a); }
                 });
-        View logout = ensureRow(a, host, TAG_LOGOUT, "تسجيل الخروج", "من هذا الجهاز فقط", AdsIcons.LOGOUT, 0,
+        View logout = ensureRow(a, host, TAG_LOGOUT, "تسجيل الخروج", "تبقى بيانات حسابك محفوظة", AdsIcons.LOGOUT, 0,
                 new View.OnClickListener() {
-                    @Override public void onClick(View v) { openSettings(a, "logout"); }
+                    @Override public void onClick(View v) { CigramLogout.run(a); }
                 });
         View plus = ensureRow(a, host, TAG_PLUS, "Cigram Plus", plusLabel(a), AdsIcons.CROWN, 0,
                 new View.OnClickListener() {
@@ -236,6 +236,14 @@ final class CigramAccountDash {
         }
         // the old section titles ("الحساب" / "الدعم") are replaced by the ones above
         hideOldTitles(host);
+
+        // «جديد»: shown once per account on what this release added or changed
+        CigramNewBadge.attach(adRequest, "support_chat_2026");
+        CigramNewBadge.attach(contact, "send_request_2026");
+        CigramNewBadge.attach(mine, "watchlist_2026");
+        CigramNewBadge.attach(update, "update_page_2026");
+        CigramNewBadge.attach(fonts, "fonts_2026");
+        CigramNewBadge.attach(plus, "plus_2026");
 
         // ---- shapes + visibility of every group
         style(a, pal, accountRows, host.findViewWithTag(TAG_TITLE + "account"));
