@@ -7750,7 +7750,68 @@ public final class CigramStage1InitProvider extends ContentProvider {
     }
 
     public static JSONArray getStage6History(Context context) {
-        return stage6ReadHistory(context);
+        JSONArray all = stage6ReadHistory(context);
+        java.util.HashSet<String> burned = stage6Burned(context);
+        if (burned.isEmpty()) return all;
+        JSONArray out = new JSONArray();
+        for (int i = 0; i < all.length(); i++) {
+            JSONObject o = all.optJSONObject(i);
+            if (o != null && !burned.contains(o.optString("notification_key", ""))) out.put(o);
+        }
+        return out;
+    }
+
+    // ---- shown once: the messages of the Admin app and the app-update notices ----
+    private static final String KEY_STAGE6_BURNED = "burned_keys_json";
+    private static final int STAGE6_BURNED_MAX = 600;
+
+    private static java.util.HashSet<String> stage6Burned(Context context) {
+        java.util.HashSet<String> out = new java.util.HashSet<String>();
+        try {
+            JSONArray a = new JSONArray(context.getSharedPreferences(PREF_STAGE6, Context.MODE_PRIVATE)
+                    .getString(KEY_STAGE6_BURNED, "[]"));
+            for (int i = 0; i < a.length(); i++) out.add(a.optString(i));
+        } catch (Throwable ignored) { }
+        return out;
+    }
+
+    /**
+     * The viewer has just seen the notifications page: every message that came from the Admin app or announced an app
+     * update (kind "announcement") is removed for good and its key is remembered, so neither the /announcements sync
+     * nor a merge of saved histories can bring it back. Episode / new-title notifications are not touched.
+     *
+     * @return how many were removed
+     */
+    public static int burnShownAnnouncements(Context context) {
+        if (context == null) return 0;
+        synchronized (CigramStage1InitProvider.class) {
+            try {
+                SharedPreferences prefs = context.getSharedPreferences(PREF_STAGE6, Context.MODE_PRIVATE);
+                JSONArray old = stage6ReadHistory(context);
+                JSONArray keep = new JSONArray();
+                JSONArray burned = new JSONArray(prefs.getString(KEY_STAGE6_BURNED, "[]"));
+                int removed = 0;
+                for (int i = 0; i < old.length(); i++) {
+                    JSONObject cur = old.optJSONObject(i);
+                    if (cur == null) continue;
+                    if ("announcement".equals(cur.optString("kind", ""))) {
+                        burned.put(cur.optString("notification_key", ""));
+                        removed++;
+                    } else {
+                        keep.put(cur);
+                    }
+                }
+                if (removed == 0) return 0;
+                JSONArray trimmed = new JSONArray();
+                for (int i = Math.max(0, burned.length() - STAGE6_BURNED_MAX); i < burned.length(); i++) trimmed.put(burned.optString(i));
+                prefs.edit().putString(stage6HistoryStorageKey(context), keep.toString())
+                        .putString(KEY_STAGE6_BURNED, trimmed.toString()).apply();
+                return removed;
+            } catch (Throwable error) {
+                android.util.Log.w("CigramStage6", "burn failed", error);
+                return 0;
+            }
+        }
     }
 
     /**
@@ -8142,6 +8203,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             try {
                 String uniqueKey = "ann|" + id.trim();
                 SharedPreferences prefs = context.getSharedPreferences(PREF_STAGE6, Context.MODE_PRIVATE);
+                if (stage6Burned(context).contains(uniqueKey)) return false;   // already shown once and removed
                 JSONArray old = stage6ReadHistory(context);
                 for (int i = 0; i < old.length(); i++) {
                     JSONObject cur = old.optJSONObject(i);

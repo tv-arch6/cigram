@@ -82,7 +82,14 @@ public final class CigramNotifyCenter {
 
     /** PageState keeps its Activity: a weak key cannot release it, so the entry is dropped when the page is destroyed. */
     static void onDestroyed(Activity activity) {
-        synchronized (PAGE_STATES) { PAGE_STATES.remove(activity); }
+        boolean wasPage;
+        synchronized (PAGE_STATES) { wasPage = PAGE_STATES.remove(activity) != null; }
+        // Admin messages and app-update notices are shown ONCE: leaving the page that displayed them deletes them
+        if (wasPage && activity != null) {
+            try {
+                if (CigramStage1InitProvider.burnShownAnnouncements(activity.getApplicationContext()) > 0) notifyUnreadChanged();
+            } catch (Throwable ignored) { }
+        }
     }
 
     private static WeakReference<Activity> LAST_MAIN_ACTIVITY =
@@ -352,7 +359,7 @@ public final class CigramNotifyCenter {
         state.list.removeAllViews();
         buildNewSection(state);   // v10.54: every new film and series in one section at the top
 
-        // Saved notifications win over empty-state text and never auto-disappear.
+        // Saved notifications win over the empty-state text (admin messages leave after this one look).
         if (history.length() > 0) {
             state.empty.setVisibility(View.GONE);
             state.list.setVisibility(View.VISIBLE);
