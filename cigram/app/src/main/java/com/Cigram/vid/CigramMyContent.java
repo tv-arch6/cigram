@@ -18,7 +18,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 
 /**
- * Extra sections of "محتواي" (the existing page keeps "أكمل المشاهدة" and "المفضلة"):
+ * Extra sections of «قائمة المشاهدة» (the existing page keeps "أكمل المشاهدة" and "المفضلة"):
  *   المشاهدة لاحقاً  |  المسلسلات المشترك بها  |  الإعجابات  |  سجل المشاهدة
  * All of them read the existing stores / CigramUserData; nothing is duplicated.
  */
@@ -66,8 +66,8 @@ public final class CigramMyContent {
             // the viewing history is permanent: it is never cleared by the user (v2.5)
             add(activity, block, "سجل المشاهدة", history);
 
-            if (block.getChildCount() == 0) return;
-            host.addView(block, new LinearLayout.LayoutParams(-1, -2));
+            if (block.getChildCount() > 0) host.addView(block, new LinearLayout.LayoutParams(-1, -2));
+            CigramWatchlist.polish(activity);
         } catch (Throwable error) {
             android.util.Log.w("CigramMyContent", "bind failed", error);
         }
@@ -76,7 +76,7 @@ public final class CigramMyContent {
     private static boolean add(Activity activity, LinearLayout block, String title,
                                java.util.List<JSONObject> items) {
         if (items == null || items.isEmpty()) return false;
-        View section = CigramStage1InitProvider.cigramSectionView(activity, title, items);
+        View section = CigramWatchlist.section(activity, title, items);
         if (section == null) return false;
         block.addView(section, new LinearLayout.LayoutParams(-1, -2));
         return true;

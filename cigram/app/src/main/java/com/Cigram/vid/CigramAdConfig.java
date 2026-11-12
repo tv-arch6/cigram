@@ -139,6 +139,20 @@ public final class CigramAdConfig {
         return DEBUG ? TEST_INTERSTITIAL : REAL_SUPPORT_INTERSTITIAL;
     }
 
+    /**
+     * The banner unit of the bottom slot (first used by «قائمة المشاهدة»). It is published through the remote ad
+     * config (key "banner_unit", an AdMob banner unit of the "Cigram" app); "" = no banner slot is created.
+     */
+    public static String bannerUnit(Context c) {
+        if (DEBUG) return TEST_BANNER;
+        try {
+            JSONObject r = activeRemote(c);
+            String unit = r == null ? "" : r.optString("banner_unit", "").trim();
+            if (unit.startsWith("ca-app-pub-") && unit.indexOf('/') > 0) return unit;
+        } catch (Throwable ignored) { }
+        return "";
+    }
+
     public static String appOpenUnit() {
         return DEBUG ? TEST_APP_OPEN : REAL_APP_OPEN;
     }

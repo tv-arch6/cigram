@@ -393,7 +393,7 @@
 					android:padding="8dp"
 					android:background="@android:color/transparent"
 					android:gravity="center_vertical"
-					android:text="محتوياتي"
+					android:text="قائمة المشاهدة"
 					android:textSize="14sp"
 					android:textColor="#FFFFFF" />
 			</LinearLayout>

@@ -471,7 +471,7 @@ public class MyContentActivity extends AppCompatActivity {
 		}
 		
 		if (pageTitle != null) {
-			pageTitle.setText("محتوياتي");
+			pageTitle.setText("قائمة المشاهدة");
 			pageTitle.setGravity(
 			android.view.Gravity.RIGHT
 			|
