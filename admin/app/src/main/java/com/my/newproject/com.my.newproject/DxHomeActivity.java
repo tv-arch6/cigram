@@ -199,7 +199,7 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
                 StudioUi.deck(this, CgIcons.UPLOAD, "معالج الرفع الجماعي", "موسم كامل أو عدة أفلام دفعة واحدة", StudioUi.ORANGE, StudioUi.go(a, BulkWizardActivity.class))));
         c.addView(StudioUi.pair(this,
                 StudioUi.deck(this, CgIcons.SIGNAL, "قنوات تحتاج رابطاً", "بلاغات «بلّغ المدير» · استبدل برابط", StudioUi.MINT, StudioUi.go(a, CgChannelReportsActivity.class)),
-                StudioUi.deck(this, CgIcons.SHIELD, "AdMob", "تشغيل وإيقاف · توقّعات الأرباح", StudioUi.ORANGE, StudioUi.go(a, OpsAdsActivity.class))));
+                StudioUi.deck(this, CgIcons.CHART, "النبض والأرباح", "رسم حي 24/7 · توقّعات AdMob", StudioUi.ORANGE, StudioUi.go(a, CgPulseActivity.class))));
         c.addView(StudioUi.pair(this,
                 StudioUi.deck(this, CgIcons.FLAG, "طلبات المستخدمين", "يريد فيلماً أو مسلسلاً · انسخ الاسم", StudioUi.SKY, StudioUi.go(a, NxRequestsActivity.class)),
                 StudioUi.deck(this, CgIcons.CHAT, "الدعم والتواصل", "محادثات المستخدمين: Plus والمشاكل", StudioUi.VIOLET, StudioUi.go(a, AdInboxActivity.class))));

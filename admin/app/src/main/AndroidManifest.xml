@@ -73,6 +73,11 @@
     android:name="com.my.newproject.AdInboxNotifier$Job"
     android:permission="android.permission.BIND_JOB_SERVICE"
     android:exported="false" />
+<!-- the pulse: one sample of the live numbers every 15 minutes, app open or closed -->
+<service
+    android:name="com.my.newproject.CgPulse$Job"
+    android:permission="android.permission.BIND_JOB_SERVICE"
+    android:exported="false" />
 <!-- 19.0: push of a new user message while the app is closed (needs APP_ID and API_KEY in AdFcmConfig.java, see DEPLOY.md section 9) -->
 <service
     android:name="com.my.newproject.AdFcmService"
@@ -303,6 +308,12 @@
     android:windowSoftInputMode="adjustResize" />
 <activity
     android:name="com.my.newproject.CgChannelReportsActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity
+    android:name="com.my.newproject.CgPulseActivity"
     android:exported="false"
     android:configChanges="orientation|screenSize|keyboardHidden"
     android:theme="@android:style/Theme.Material.NoActionBar"

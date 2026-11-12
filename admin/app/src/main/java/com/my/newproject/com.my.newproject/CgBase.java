@@ -67,6 +67,7 @@ public abstract class CgBase extends Activity {
         onBuild();
         // 2026: new advertising requests / customer messages reach the admin as notifications (idempotent)
         AdInboxNotifier.ensureScheduled(this);
+        CgPulse.ensureScheduled(this);      // the live numbers are recorded around the clock
         if (this instanceof AdInboxActivity) AdInboxNotifier.askPermissionOnce(this);
     }
 
