@@ -94,15 +94,7 @@ public class StudioUiTest {
     }
 
     @Test
-    public void theSubtitleLabAndTheBulkWizardOpenWithoutANetwork() throws Exception {
-        ActivityController<SubLabActivity> lab = Robolectric.buildActivity(SubLabActivity.class).setup();
-        ShadowLooper.idleMainLooper();
-        View root = lab.get().findViewById(android.R.id.content);
-        assertNotNull(root);
-        Bitmap shot = shoot(root, 720, 2600, "subtitle_lab");
-        assertTrue(inked(shot, StudioUi.INK) > 0.15);
-        lab.pause().stop().destroy();
-
+    public void theBulkWizardOpensWithoutANetwork() throws Exception {
         ActivityController<BulkWizardActivity> wiz = Robolectric.buildActivity(BulkWizardActivity.class).setup();
         ShadowLooper.idleMainLooper();
         shoot(wiz.get().findViewById(android.R.id.content), 720, 1300, "bulk_wizard");

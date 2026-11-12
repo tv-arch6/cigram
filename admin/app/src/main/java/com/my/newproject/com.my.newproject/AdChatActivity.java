@@ -36,7 +36,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * شاشة محادثة الأدمن مع معلن: رسائل لحظية، وسائط وصوت، ردود سريعة (قوالب)، عروض أسعار، تحويل الطلب لحملة،
+ * شاشة محادثة الأدمن مع مستخدم («الدعم والتواصل»): رسائل لحظية، وسائط وصوت، ردود سريعة (قوالب)، عروض أسعار، تحويل الطلب لحملة،
  * وإدارة المحادثة (حالة، وسوم، ملاحظات داخلية، تعيين، حظر، أرشفة، تصدير). Extras: thread, name.
  */
 public class AdChatActivity extends CgBase {
@@ -57,7 +57,7 @@ public class AdChatActivity extends CgBase {
     }
 
     private final ArrayList<Msg> items = new ArrayList<Msg>();
-    private String thread = "", name = "معلن";
+    private String thread = "", name = "مستخدم";
     private JSONObject threadInfo = new JSONObject();
     private boolean loaded, hasMore = true, loadingOlder, atBottom = true, userTyping, userOnline, active;
     private long lastSeq, replyToSeq;
@@ -157,11 +157,6 @@ public class AdChatActivity extends CgBase {
         attach.setContentDescription("إرفاق");
         attach.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { showAttach(); } });
         comp.addView(attach, new LinearLayout.LayoutParams(CgUi.dp(this, 48), CgUi.dp(this, 48)));
-        TextView quoteBtn = CgUi.button(this, "💰", 1);
-        quoteBtn.setTextSize(18);
-        quoteBtn.setContentDescription("إرسال عرض سعر");
-        quoteBtn.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { showQuoteDialog(); } });
-        comp.addView(quoteBtn, CgUi.lp(this, CgUi.dp(this, 48) / 1, CgUi.dp(this, 48), 4, 0, 0, 0));
         TextView emojiBtn = CgUi.button(this, "☺", 1);
         emojiBtn.setTextSize(20);
         emojiBtn.setContentDescription("الرموز التعبيرية");
@@ -875,13 +870,12 @@ public class AdChatActivity extends CgBase {
 
     private void showManage() {
         final boolean banned = threadInfo.optBoolean("banned");
-        final CharSequence[] labels = {"تغيير الحالة", "الوسوم", "ملاحظات داخلية (لا يراها المستخدم)", "تعيين مسؤول", "تحويل طلب إعلان إلى حملة (مسودة)",
-                "فتح ملف المعلن", banned ? "رفع التقييد" : "تقييد الحساب في المحادثة (إساءة)", threadInfo.optBoolean("archived") ? "إلغاء الأرشفة" : "أرشفة المحادثة", "تصدير المحادثة (نص)", "سياسة حفظ المحادثات",
+        final CharSequence[] labels = {"تغيير الحالة", "الوسوم", "ملاحظات داخلية (لا يراها المستخدم)", "تعيين مسؤول", banned ? "رفع التقييد" : "تقييد الحساب في المحادثة (إساءة)", threadInfo.optBoolean("archived") ? "إلغاء الأرشفة" : "أرشفة المحادثة", "تصدير المحادثة (نص)", "سياسة حفظ المحادثات",
                 "المعرّف الداخلي للمستخدم"};
         CgUi.choose(this, "إدارة المحادثة", labels, new CgUi.IntCb() {
             @Override public void run(int i) {
                 try {
-                    if (i == 10) { showIdentity(); return; }
+                    if (i == 8) { showIdentity(); return; }
                     if (i == 0) {
                         final String[] st = {"open", "pending", "quoted", "won", "closed"};
                         CharSequence[] ls = new CharSequence[st.length];
@@ -908,34 +902,12 @@ public class AdChatActivity extends CgBase {
                             @Override public void run(String v) { try { patchThread(new JSONObject().put("assigned", v), "تم التعيين."); } catch (Throwable ignored) { } }
                         });
                     } else if (i == 4) {
-                        CgUi.confirm(AdChatActivity.this, "تحويل الطلب", "ننشئ مسودة حملة من آخر طلب أرسله المعلن (لا تُنشر قبل موافقتك).", "تحويل", false, new Runnable() {
-                            @Override public void run() {
-                                try {
-                                    AdApi.post(AdChatActivity.this, "/admin/chat/convert-order", new JSONObject().put("thread", thread), new AdApi.Cb() {
-                                        @Override public void on(AdApi.Result r) {
-                                            if (!alive()) return;
-                                            if (!r.ok) { CgUi.toast(AdChatActivity.this, r.message); return; }
-                                            Intent in = new Intent(AdChatActivity.this, AdCampaignActivity.class);
-                                            in.putExtra("id", r.json.optJSONObject("campaign").optString("id"));
-                                            startActivity(in);
-                                        }
-                                    });
-                                } catch (Throwable ignored) { }
-                            }
-                        });
-                    } else if (i == 5) {
-                        String adv = threadInfo.optString("adv_id");
-                        if (adv.length() == 0) { CgUi.toast(AdChatActivity.this, "لم يُنشأ ملف معلن لهذا المستخدم بعد (يُنشأ مع أول رسالة)."); return; }
-                        Intent in = new Intent(AdChatActivity.this, AdAdvertiserActivity.class);
-                        in.putExtra("id", adv);
-                        startActivity(in);
-                    } else if (i == 6) {
                         patchThread(new JSONObject().put("banned", !banned), banned ? "رُفع الحظر." : "تم الحظر.");
-                    } else if (i == 7) {
+                    } else if (i == 5) {
                         patchThread(new JSONObject().put("archived", !threadInfo.optBoolean("archived")), "تم.");
-                    } else if (i == 8) {
+                    } else if (i == 6) {
                         exportChat();
-                    } else if (i == 9) {
+                    } else if (i == 7) {
                         // 19.0: conversations are permanent. There is no delete: the server refuses purge / delete-message (409)
                         CgUi.dialog(AdChatActivity.this).setTitle("المحادثات دائمة")
                                 .setMessage("لا يمكن حذف أي محادثة أو رسالة من التطبيق (وكذلك يرفض الخادم ذلك).\n\n"

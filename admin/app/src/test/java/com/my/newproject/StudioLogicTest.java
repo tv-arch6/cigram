@@ -128,19 +128,4 @@ public class StudioLogicTest {
         assertEquals("bad_url", bad.reason);
         assertTrue(bad.detail().length() > 3 && "متوقفة".equals(bad.label()));
     }
-
-    @Test
-    public void whatTheAdminTypesInTheSubtitleLabIsUnderstood() {
-        assertEquals(Long.valueOf(1500), SubLabActivity.seconds("1.5"));
-        assertEquals(Long.valueOf(-800), SubLabActivity.seconds("-0.8"));
-        assertEquals(Long.valueOf(-800), SubLabActivity.seconds("‎-0.8"));
-        assertEquals(Long.valueOf(2500), SubLabActivity.seconds("٢٫٥"));
-        assertEquals(null, SubLabActivity.seconds("abc"));
-        assertEquals(Long.valueOf(3723500), SubLabActivity.clock("01:02:03.500"));
-        assertEquals(Long.valueOf(3723500), SubLabActivity.clock("01:02:03,5"));
-        assertEquals(Long.valueOf(125000), SubLabActivity.clock("2:05"));
-        assertEquals(Long.valueOf(90000), SubLabActivity.clock("90"));
-        assertEquals(null, SubLabActivity.clock("1:2:3:4"));
-        assertEquals(null, SubLabActivity.clock(""));
-    }
 }

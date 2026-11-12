@@ -168,13 +168,6 @@ public class SubJobActivity extends CgBase {
             add(box, "كل النتائج واختيار إصدار آخر", 1, new Runnable() { @Override public void run() { allResults(); } });
         }
         add(box, "رفع ملف عربي يدوياً (SRT / VTT)", 1, new Runnable() { @Override public void run() { pick(REQ_AR); } });
-        add(box, "رفع الملف الأصلي (لغة أخرى) كمصدر للترجمة", 1, new Runnable() { @Override public void run() { pick(REQ_ORIG); } });
-        if (job.originalFile.length() > 0 && !"ar".equals(job.sourceLanguage) && SubQueue.canMove(job.state, SubQueue.State.TRANSLATION_QUEUED)) {
-            add(box, "طلب ترجمة آلية لهذا العنوان", 1, new Runnable() { @Override public void run() { requestTranslation(); } });
-        }
-        if (job.providerJobId.length() > 0 && (job.state == SubQueue.State.TRANSLATION_QUEUED || job.state == SubQueue.State.TRANSLATING)) {
-            add(box, "تحديث حالة الترجمة الآلية", 1, new Runnable() { @Override public void run() { pollTranslation(); } });
-        }
         page.addView(box, CgUi.lp(this, CgUi.MATCH, CgUi.WRAP, 0, 0, 0, 8));
     }
 
@@ -198,7 +191,6 @@ public class SubJobActivity extends CgBase {
                 try {
                     SubCenterStore.queue(SubJobActivity.this).approve(job, SubCenterStore.nowIso(), System.currentTimeMillis());
                     final String approvedId = job.contentId;
-                    CgHttp.bg(new Runnable() { @Override public void run() { SubTranslate.recordApproval(approvedId, true, "", "admin"); } });
                     SubCenterStore.save(SubJobActivity.this);
                     SubCenterStore.addHistory(SubJobActivity.this, historyEntry("اعتماد"));
                 } catch (IllegalStateException e) {
@@ -370,133 +362,6 @@ public class SubJobActivity extends CgBase {
                         if (!alive()) return;
                         hideLoading();
                         if (fe != null) CgUi.info(SubJobActivity.this, "تعذر الجلب", fe);
-                        render();
-                    }
-                });
-            }
-        });
-    }
-
-    /**
-     * Real OpenSubtitles AI translation (through the Worker): 1) the live catalogue of services that support Arabic,
-     * 2) the exact upper-bound estimate for THIS file, 3) the admin types the maximum credits he approves,
-     * 4) the Worker refuses anything above it. The result comes back to «مراجعة الجودة»; it is never approved or published here.
-     */
-    private void requestTranslation() {
-        showLoading("جارٍ قراءة خدمات الترجمة...");
-        CgHttp.bg(new Runnable() {
-            @Override public void run() {
-                String err = null;
-                List<SubTranslate.Api> apis = null;
-                try {
-                    apis = SubTranslate.options();
-                } catch (CxApi.Failure f) {
-                    err = f.getMessage();
-                } catch (Throwable t) {
-                    err = "تعذر قراءة خدمات الترجمة.";
-                }
-                final String fe = err;
-                final List<SubTranslate.Api> fa = apis;
-                runOnUiThread(new Runnable() {
-                    @Override public void run() {
-                        if (!alive()) return;
-                        hideLoading();
-                        if (fe != null) { CgUi.info(SubJobActivity.this, "لم تبدأ الترجمة", fe); return; }
-                        if (fa == null || fa.isEmpty()) { CgUi.info(SubJobActivity.this, "لا توجد خدمة", "لا توجد خدمة ترجمة تدعم العربية عند المزوّد حالياً."); return; }
-                        CharSequence[] labels = new CharSequence[fa.size()];
-                        for (int i = 0; i < labels.length; i++) labels[i] = fa.get(i).describe();
-                        CgUi.choose(SubJobActivity.this, "اختر خدمة الترجمة", labels, new CgUi.IntCb() {
-                            @Override public void run(int w) { estimateTranslation(fa.get(w)); }
-                        });
-                    }
-                });
-            }
-        });
-    }
-
-    private void estimateTranslation(final SubTranslate.Api api) {
-        showLoading("جارٍ حساب التكلفة...");
-        CgHttp.bg(new Runnable() {
-            @Override public void run() {
-                String err = null;
-                JSONObject est = null;
-                try {
-                    est = SubTranslate.estimate(api.name, new String(SubCenterStore.getText(SubJobActivity.this, job.originalFile), "UTF-8"));
-                } catch (CxApi.Failure f) {
-                    err = f.getMessage();
-                } catch (Throwable t) {
-                    err = "تعذر حساب التكلفة.";
-                }
-                final String fe = err;
-                final JSONObject fest = est;
-                runOnUiThread(new Runnable() {
-                    @Override public void run() {
-                        if (!alive()) return;
-                        hideLoading();
-                        if (fe != null || fest == null) { CgUi.info(SubJobActivity.this, "لم تبدأ الترجمة", fe == null ? "تعذر حساب التكلفة." : fe); return; }
-                        final long max = fest.optLong("credits_max");
-                        String msg = "الخدمة: " + api.label + "\nحروف الملف: " + fest.optLong("chars_file") + "\nالتكلفة القصوى المقدّرة: " + max + " رصيد"
-                                + " (للنص وحده " + fest.optLong("credits_text") + ").\nتُخصم من رصيد حساب OpenSubtitles المضبوط في الخادم، ولا يُسترد إلا إذا فشل فحص الجودة عند المزوّد.\n\n"
-                                + "أدخل الحد الأقصى الذي توافق عليه (بالرصيد):";
-                        CgUi.input(SubJobActivity.this, "الموافقة على صرف الرصيد", msg, String.valueOf(max), false, new CgUi.Callback<String>() {
-                            @Override public void run(String v) {
-                                double approved = 0;
-                                try { approved = Double.parseDouble(v.trim().replace(',', '.')); } catch (Exception ignored) { }
-                                if (approved < max) { CgUi.info(SubJobActivity.this, "الحد أقل من التقدير", "الحد الأقصى المعتمد يجب ألا يقل عن " + max + " رصيد. لم يُرسل شيء."); return; }
-                                submitTranslation(api, approved);
-                            }
-                        });
-                    }
-                });
-            }
-        });
-    }
-
-    private void submitTranslation(final SubTranslate.Api api, final double approvedMax) {
-        showLoading("جارٍ إرسال الطلب...");
-        CgHttp.bg(new Runnable() {
-            @Override public void run() {
-                String err = null;
-                JSONObject r = null;
-                try {
-                    r = SubTranslate.submit(job.contentId, api.name, new String(SubCenterStore.getText(SubJobActivity.this, job.originalFile), "UTF-8"),
-                            job.sourceLanguage, SubTranslate.approval("admin", approvedMax), null);
-                } catch (CxApi.Failure f) {
-                    err = f.getMessage();
-                } catch (Throwable t) {
-                    err = "تعذر الإرسال.";
-                }
-                final String fe = err;
-                final JSONObject fr = r;
-                runOnUiThread(new Runnable() {
-                    @Override public void run() {
-                        if (!alive()) return;
-                        hideLoading();
-                        if (fe != null) { CgUi.info(SubJobActivity.this, "لم تبدأ الترجمة", fe); return; }
-                        SubQueue q = SubCenterStore.queue(SubJobActivity.this);
-                        q.move(job, SubQueue.State.TRANSLATION_QUEUED, "قبله المزوّد (" + api.label + ")", System.currentTimeMillis());
-                        job.translationProvider = "opensubtitles_ai:" + api.name;
-                        job.providerJobId = fr.optString("correlation_id");
-                        SubCenterStore.save(SubJobActivity.this);
-                        SubCenterStore.addHistory(SubJobActivity.this, historyEntry("إرسال للترجمة الآلية · حد معتمد " + (long) approvedMax + " رصيد"));
-                        render();
-                    }
-                });
-            }
-        });
-    }
-
-    private void pollTranslation() {
-        showLoading("جارٍ قراءة حالة الترجمة...");
-        CgHttp.bg(new Runnable() {
-            @Override public void run() {
-                final SubTranslate.Polled p = SubTranslate.poll(SubJobActivity.this, SubCenterStore.queue(SubJobActivity.this), job);
-                runOnUiThread(new Runnable() {
-                    @Override public void run() {
-                        if (!alive()) return;
-                        hideLoading();
-                        if ("ERROR".equals(p.state) || "FAILED".equals(p.state)) CgUi.info(SubJobActivity.this, "حالة الترجمة", p.detail);
-                        else if ("TRANSLATING".equals(p.state)) CgUi.toast(SubJobActivity.this, "ما زالت قيد الترجمة (" + p.detail + ").");
                         render();
                     }
                 });

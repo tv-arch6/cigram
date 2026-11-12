@@ -265,18 +265,12 @@
 <service android:name="com.my.newproject.SubCenterService" android:exported="false" android:foregroundServiceType="dataSync" />
 <activity android:name="com.my.newproject.AdInboxActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
 <activity android:name="com.my.newproject.AdChatActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|keyboard|uiMode" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
-<activity android:name="com.my.newproject.AdCampaignsActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
-<activity android:name="com.my.newproject.AdCampaignActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
-<activity android:name="com.my.newproject.AdAdvertisersActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
-<activity android:name="com.my.newproject.AdAdvertiserActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
 <activity android:name="com.my.newproject.AdSettingsActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
-<activity android:name="com.my.newproject.AdReportsActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" />
 <activity android:name="com.my.newproject.PlusCodesActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
 <activity android:name="com.my.newproject.OpsErrorsActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
 <activity android:name="com.my.newproject.OpsStatsActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
 <activity android:name="com.my.newproject.OpsAdsActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
 <activity android:name="com.my.newproject.OpsAdCheckActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
-<activity android:name="com.my.newproject.OpsAdMapActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
 <activity
     android:name="com.my.newproject.NxMovieActivity"
     android:exported="false"
@@ -343,7 +337,6 @@
 <activity android:name="com.my.newproject.CigramMediaViewer" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode" android:hardwareAccelerated="true" android:theme="@android:style/Theme.Material.NoActionBar" />
 
 <!-- 3.0 Cigram Studio: Subtitle Lab, Bulk Upload Wizard, Cigram Live Health -->
-<activity android:name="com.my.newproject.SubLabActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
 <activity android:name="com.my.newproject.BulkWizardActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
 <activity android:name="com.my.newproject.LiveHealthActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" />
 

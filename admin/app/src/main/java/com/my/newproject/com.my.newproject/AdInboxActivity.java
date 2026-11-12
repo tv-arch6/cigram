@@ -12,7 +12,7 @@ import org.json.JSONObject;
 import java.util.Date;
 
 /**
- * 18.2: Cigram Developer Inbox (صندوق المطوّر) — every private conversation of the app's «أريد إعلاناً» / Private Support
+ * 18.2: the support inbox (الدعم والتواصل) — every private conversation of the app's «أريد إعلاناً» / Private Support
  * entry (and the advertisers' threads, same server). Unread first, state filters, search by name / e-mail / tag / INTERNAL ID
  * (the ids are only shown here, behind the admin token), online state, archive; WebSocket + polling.
  *
@@ -31,7 +31,7 @@ public class AdInboxActivity extends CgBase {
     private JSONObject lastCounts;
     private final java.util.HashMap<String, Long> typingUntil = new java.util.HashMap<String, Long>();
     private final java.util.ArrayList<TextView> chipViews = new java.util.ArrayList<TextView>();
-    private final String[][] chips = {{"all", "الكل"}, {"unread", "غير مقروء"}, {"open", "مفتوحة"}, {"pending", "بانتظار المعلن"}, {"quoted", "عرض سعر"}, {"won", "تم الاتفاق"}, {"closed", "مغلقة"}, {"archived", "المؤرشفة"}};
+    private final String[][] chips = {{"all", "الكل"}, {"unread", "غير مقروء"}, {"open", "مفتوحة"}, {"pending", "بانتظار المستخدم"}, {"quoted", "عرض سعر"}, {"won", "تم الاتفاق"}, {"closed", "مغلقة"}, {"archived", "المؤرشفة"}};
     private boolean active;
     private int reqId;
     private int lastUnread;
@@ -44,7 +44,7 @@ public class AdInboxActivity extends CgBase {
         }
     };
 
-    @Override protected String screenTitle() { return "صندوق المطوّر"; }
+    @Override protected String screenTitle() { return "الدعم والتواصل"; }
 
     @Override protected void onBuild() {
         bar.action("تحديث", new Runnable() { @Override public void run() { load(true); } });

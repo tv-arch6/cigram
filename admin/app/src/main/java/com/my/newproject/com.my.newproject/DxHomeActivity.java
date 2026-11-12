@@ -198,8 +198,8 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
                 StudioUi.deck(this, CgIcons.SEND, "إضافة سريعة", "الصق رابطاً وانشر بخطوة واحدة", StudioUi.RED, StudioUi.go(a, QuickAddActivity.class)),
                 StudioUi.deck(this, CgIcons.UPLOAD, "معالج الرفع الجماعي", "موسم كامل أو عدة أفلام دفعة واحدة", StudioUi.ORANGE, StudioUi.go(a, BulkWizardActivity.class))));
         c.addView(StudioUi.pair(this,
-                StudioUi.deck(this, CgIcons.FILE, "مختبر الترجمة", "مزامنة · إصلاح · ترميز · تنظيف · معاينة", StudioUi.SKY, StudioUi.go(a, SubLabActivity.class)),
-                StudioUi.deck(this, CgIcons.CHAT, "صندوق المطوّر", "محادثات الدعم الخاص والمعلنين", StudioUi.VIOLET, StudioUi.go(a, AdInboxActivity.class))));
+                StudioUi.deck(this, CgIcons.FLAG, "طلبات المستخدمين", "يريد فيلماً أو مسلسلاً · انسخ الاسم", StudioUi.SKY, StudioUi.go(a, NxRequestsActivity.class)),
+                StudioUi.deck(this, CgIcons.CHAT, "الدعم والتواصل", "محادثات المستخدمين: Plus والمشاكل", StudioUi.VIOLET, StudioUi.go(a, AdInboxActivity.class))));
 
         // «ما الجديد؟»: cached discovery numbers (never calls TMDB) + the way into the discovery center
         whatsNew = new WnHomeCard(this);
@@ -253,7 +253,6 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
 
         c.addView(StudioUi.label(this, "الترجمة"));
         LinearLayout subs = StudioUi.group(this);
-        StudioUi.row(subs, CgIcons.FILE, "مختبر الترجمة", "Auto Sync · تأخير · انحراف · إصلاح SRT · ترميز · تداخل · ناقص · FPS · تنظيف · معاينة", "جديد", StudioUi.SKY, StudioUi.go(a, SubLabActivity.class));
         StudioUi.row(subs, CgIcons.SHIELD, "مركز الترجمة العربية", "العناوين بلا ترجمة: بحث جماعي، مراجعة، اعتماد ونشر", "", StudioUi.MINT, StudioUi.go(a, SubCenterActivity.class));
         StudioUi.row(subs, CgIcons.UPLOAD, "رفع ترجمة وربطها", "ملف لعنوان واحد", "", StudioUi.VIOLET, StudioUi.go(a, CxSubsActivity.class));
         StudioUi.row(subs, CgIcons.FOLDER, "ترجمات موسم كامل", "حزمة ZIP أو عدة ملفات تُطابق بالحلقات", "", StudioUi.VIOLET, StudioUi.go(a, CgSeasonSubsActivity.class));
@@ -293,7 +292,7 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
         final Activity a = this;
         c.addView(StudioUi.label(this, "المستخدمون"));
         LinearLayout u = StudioUi.group(this);
-        StudioUi.row(u, CgIcons.CHAT, "صندوق المطوّر", "الدعم الخاص ورسائل المستخدمين والمعلنين", "", StudioUi.VIOLET, StudioUi.go(a, AdInboxActivity.class));
+        StudioUi.row(u, CgIcons.CHAT, "الدعم والتواصل", "الدعم الخاص ورسائل المستخدمين والمعلنين", "", StudioUi.VIOLET, StudioUi.go(a, AdInboxActivity.class));
         StudioUi.row(u, CgIcons.SEND, "إرسال إشعار", "إشعار فوري لكل المستخدمين", "", StudioUi.ORANGE, StudioUi.go(a, NxNotifyActivity.class));
         StudioUi.row(u, CgIcons.HISTORY, "الرسائل العامة", "رسائل تظهر داخل التطبيق بجدولة", "", StudioUi.SKY, StudioUi.go(a, CgAnnouncementsActivity.class));
         StudioUi.row(u, CgIcons.BELL, "طلبات المستخدمين", "أفلام ومسلسلات وقنوات طلبها المشاهدون", "", StudioUi.PINK, StudioUi.go(a, NxRequestsActivity.class));
@@ -302,13 +301,9 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
 
         c.addView(StudioUi.label(this, "الإعلانات"));
         LinearLayout ads = StudioUi.group(this);
-        StudioUi.row(ads, CgIcons.MEGAPHONE, "الحملات", "إنشاء ومراجعة وموافقة وتقارير", "", StudioUi.ORANGE, StudioUi.go(a, AdCampaignsActivity.class));
-        StudioUi.row(ads, CgIcons.USERS, "المعلنون", "ملفات الشركات وسجل حملاتها", "", StudioUi.SKY, StudioUi.go(a, AdAdvertisersActivity.class));
-        StudioUi.row(ads, CgIcons.GEAR, "الأسعار والإعدادات", "أسعار الحملات، سياسة التواصل، ساعات العمل", "", CgCfg.GRAY, StudioUi.go(a, AdSettingsActivity.class));
-        StudioUi.row(ads, CgIcons.FLAG, "بلاغات الإعلانات", "حملات أبلغ عنها المستخدمون", "", CgCfg.BAD, StudioUi.go(a, AdReportsActivity.class));
-        StudioUi.row(ads, CgIcons.SHIELD, "تفعيل وإيقاف الإعلانات", "المفتاح الرئيسي لكل موضع", "", StudioUi.MINT, StudioUi.go(a, OpsAdsActivity.class));
-        StudioUi.row(ads, CgIcons.CHART, "فحص الإعلانات", "نسبة التعبئة وأسباب الفشل", "", StudioUi.MINT, StudioUi.go(a, OpsAdCheckActivity.class));
-        StudioUi.row(ads, CgIcons.EYE, "خريطة الإعلانات", "أين ومتى يظهر كل إعلان", "", StudioUi.VIOLET, StudioUi.go(a, OpsAdMapActivity.class));
+        StudioUi.row(ads, CgIcons.GEAR, "إعدادات المحادثة", "سياسة التواصل وساعات العمل", "", CgCfg.GRAY, StudioUi.go(a, AdSettingsActivity.class));
+        StudioUi.row(ads, CgIcons.SHIELD, "AdMob: تشغيل وإيقاف", "المفتاح الرئيسي ومواضع إعلانات AdMob", "", StudioUi.MINT, StudioUi.go(a, OpsAdsActivity.class));
+        StudioUi.row(ads, CgIcons.CHART, "AdMob: الفحص", "نسبة التعبئة وأسباب الفشل", "", StudioUi.MINT, StudioUi.go(a, OpsAdCheckActivity.class));
         c.addView(ads);
     }
 

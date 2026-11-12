@@ -162,16 +162,12 @@ public class DxSectionActivity extends CgBase {
             box.addView(DxUi.item(this, CgIcons.SEND, "إرسال إشعار", "إشعار فوري لكل المستخدمين", "", NxUi.ORANGE, go(NxNotifyActivity.class)));
             box.addView(DxUi.item(this, CgIcons.HISTORY, "الرسائل العامة", "رسائل تظهر داخل التطبيق بجدولة", "", NxUi.BLUE, go(CgAnnouncementsActivity.class)));
             box.addView(DxUi.item(this, CgIcons.CHAT, "طلبات المستخدمين", "أفلام ومسلسلات وقنوات طلبها المشاهدون", "", NxUi.PINK, go(NxRequestsActivity.class)));
-            box.addView(DxUi.item(this, CgIcons.CHAT, "صندوق المطوّر", "Cigram Developer Inbox — محادثات الدعم الخاص", "", NxUi.VIOLET, go(AdInboxActivity.class)));
+            box.addView(DxUi.item(this, CgIcons.CHAT, "الدعم والتواصل", "محادثات الدعم الخاص", "", NxUi.VIOLET, go(AdInboxActivity.class)));
         } else if ("ads".equals(key)) {
-            box.addView(DxUi.item(this, CgIcons.CHAT, "صندوق المطوّر", "الدعم الخاص ورسائل المستخدمين والمعلنين", "", NxUi.PINK, go(AdInboxActivity.class)));
-            box.addView(DxUi.item(this, CgIcons.MEGAPHONE, "الحملات", "إنشاء ومراجعة وموافقة وتقارير", "", NxUi.ORANGE, go(AdCampaignsActivity.class)));
-            box.addView(DxUi.item(this, CgIcons.USERS, "المعلنون", "ملفات الشركات وسجل حملاتها", "", NxUi.BLUE, go(AdAdvertisersActivity.class)));
-            box.addView(DxUi.item(this, CgIcons.GEAR, "الأسعار والإعدادات", "أسعار الحملات، سياسة التواصل، ساعات العمل", "", CgCfg.GRAY, go(AdSettingsActivity.class)));
-            box.addView(DxUi.item(this, CgIcons.FLAG, "بلاغات الإعلانات", "حملات أبلغ عنها المستخدمون", "", CgCfg.BAD, go(AdReportsActivity.class)));
-            box.addView(DxUi.item(this, CgIcons.SHIELD, "تفعيل وإيقاف الإعلانات", "المفتاح الرئيسي لكل موضع", "", NxUi.TEAL, go(OpsAdsActivity.class)));
-            box.addView(DxUi.item(this, CgIcons.CHART, "فحص الإعلانات", "نسبة التعبئة وأسباب الفشل", "", NxUi.UP, go(OpsAdCheckActivity.class)));
-            box.addView(DxUi.item(this, CgIcons.EYE, "خريطة الإعلانات", "أين ومتى يظهر كل إعلان", "", NxUi.VIOLET, go(OpsAdMapActivity.class)));
+            box.addView(DxUi.item(this, CgIcons.CHAT, "الدعم والتواصل", "الدعم الخاص ورسائل المستخدمين والمعلنين", "", NxUi.PINK, go(AdInboxActivity.class)));
+            box.addView(DxUi.item(this, CgIcons.GEAR, "إعدادات المحادثة", "سياسة التواصل وساعات العمل", "", CgCfg.GRAY, go(AdSettingsActivity.class)));
+            box.addView(DxUi.item(this, CgIcons.SHIELD, "AdMob: تشغيل وإيقاف", "المفتاح الرئيسي ومواضع إعلانات AdMob", "", NxUi.TEAL, go(OpsAdsActivity.class)));
+            box.addView(DxUi.item(this, CgIcons.CHART, "AdMob: الفحص", "نسبة التعبئة وأسباب الفشل", "", NxUi.UP, go(OpsAdCheckActivity.class)));
         } else if ("stats".equals(key)) {
             box.addView(DxUi.item(this, CgIcons.CHART, "الإحصائيات التفصيلية", "رسوم اليوم والساعة والإصدارات", "", NxUi.UP, go(OpsStatsActivity.class)));
             box.addView(DxUi.item(this, CgIcons.WARNING, "أخطاء التطبيق", "انهيارات ومشاكل التشغيل مجمّعة", "", CgCfg.BAD, go(OpsErrorsActivity.class)));
