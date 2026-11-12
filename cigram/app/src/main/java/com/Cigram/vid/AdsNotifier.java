@@ -157,8 +157,8 @@ public final class AdsNotifier {
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm == null) return;
             if (Build.VERSION.SDK_INT >= 26) {
-                NotificationChannel ch = new NotificationChannel(CHANNEL, "الدعم الخاص", NotificationManager.IMPORTANCE_HIGH);
-                ch.setDescription("رسائل مطوّر Cigram في محادثتك الخاصة");
+                NotificationChannel ch = new NotificationChannel(CHANNEL, "الدعم والتواصل", NotificationManager.IMPORTANCE_HIGH);
+                ch.setDescription("ردود فريق Cigram على رسائلك");
                 nm.createNotificationChannel(ch);
             }
             if (last != null && last.optJSONObject("dev") != null) CigramSupport.learn(c, last.optJSONObject("dev"));

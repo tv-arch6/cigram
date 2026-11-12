@@ -143,12 +143,11 @@ public class ChatKitUiTest {
         shoot(chips, 720, 0, "suggest_user_quote");
         chips.setItems(CigramChatSuggest.forDeveloper(false, "image"));
         shoot(chips, 720, 0, "suggest_developer_media");
-        // every suggestion carries an emoji the atlas really has
-        CigramEmoji.Index ix = CigramEmoji.index(a);
+        // every suggestion carries a monochrome icon of the app's own set (no emoji)
         String[][][] all = {CigramChatSuggest.forUser(true, "", false), CigramChatSuggest.forUser(false, "quote", false),
                 CigramChatSuggest.forUser(false, "", true), CigramChatSuggest.forDeveloper(true, ""), CigramChatSuggest.forDeveloper(false, "image"), CigramChatSuggest.forDeveloper(false, "")};
         for (String[][] set : all) for (String[] it : set) {
-            assertTrue("emoji of «" + it[1] + "» is in the atlas", ix.lookup.containsKey(it[0]) || ix.lookup.containsKey(it[0].replace("️", "")));
+            assertTrue("icon of «" + it[1] + "»", CigramChatSuggest.iconOf(it[0]) > 0);
             assertTrue(it[2].length() > 0);
         }
     }

@@ -18,7 +18,7 @@ import java.util.Locale;
  * It is the existing chat (cigram-ads-api ChatHub: one thread per signed-in account, WebSocket + polling, encrypted
  * storage, media uploads) with a new face; no second chat system. This class holds what the screens share: the
  * developer's PUBLIC identity (display name, picture, online / last active — never an internal id), the black theme,
- * the 24-hour clock and the entry point that replaced the old «أعلن هنا» page.
+ * the 24-hour clock and the entry point.
  */
 public final class CigramSupport {
 
@@ -55,12 +55,12 @@ public final class CigramSupport {
         return g;
     }
 
-    static final String TITLE = "الدعم الخاص";
-    static final String SUBTITLE_EN = "Cigram Private Support";
+    static final String TITLE = "الدعم والتواصل";
+    static final String SUBTITLE_EN = "Cigram Plus · المزايا · المشاكل";
 
     // ------------------------------------------------------------------ entry
 
-    /** «أريد إعلاناً» (and every old link to the advertise page) opens the private conversation. */
+    /** «الدعم والتواصل» opens the private conversation. */
     public static void open(Activity a) {
         if (a == null) return;
         try {

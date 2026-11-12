@@ -45,10 +45,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 18.2: Cigram Private Support (الدعم الخاص) — the private conversation between the viewer and the Cigram developer
- * (entry «أريد إعلاناً»). Same server thread, same reliability layer as before; new premium black design, developer
+ * (entry «الدعم والتواصل»). Same server thread, same reliability layer as before; new premium black design, developer
  * identity, emoji panel, voice preview, 24-hour times, offline retry with backoff. See {@link CigramSupport}.
  *
- * شاشة محادثة المعلن مع إدارة Cigram: نص، صور، فيديو، ملفات، رسائل صوتية، عروض أسعار، طلبات إعلان،
+ * شاشة محادثة المستخدم مع إدارة Cigram: نص، صور، فيديو، ملفات، رسائل صوتية، عروض أسعار، طلبات إعلان،
  * حضور وكتابة لحظية (WebSocket) مع بديل استطلاع، رسائل معلّقة تُعاد تلقائياً، ونسخة محلية مشفّرة.
  * Intent extras: order_json (اختياري) — يُرسل كبطاقة طلب مرة واحدة.
  */
@@ -125,6 +125,7 @@ public class AdsChatActivity extends Activity {
     private AdsViews.Round devAvatar;
     private CigramEmojiPanel emojiPanel;
     private CigramChatSuggest suggest;
+    private View micOff;
     private boolean recLocked;
     private TextView recHint;
     private LinearLayout voicePreview;
@@ -424,7 +425,24 @@ public class AdsChatActivity extends Activity {
         micBtn = new AdsIcons.Icon(this, AdsIcons.MIC, 0xFF000000);
         act.addView(sendBtn, new FrameLayout.LayoutParams(AdsUi.dp(this, 24), AdsUi.dp(this, 24), Gravity.CENTER));
         act.addView(micBtn, new FrameLayout.LayoutParams(AdsUi.dp(this, 24), AdsUi.dp(this, 24), Gravity.CENTER));
-        act.setContentDescription("إرسال أو تسجيل رسالة صوتية");
+        // the microphone is switched off in this conversation: a red slash sits on top of it
+        micOff = new View(this) {
+            private final android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            @Override protected void onDraw(android.graphics.Canvas c) {
+                float w = getWidth(), h = getHeight(), in = w * 0.16f;
+                p.setStyle(android.graphics.Paint.Style.STROKE);
+                p.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+                p.setColor(0xFFFFFFFF);
+                p.setStrokeWidth(w * 0.17f);
+                c.drawLine(w - in, in, in, h - in, p);      // white halo keeps the slash readable on the button
+                p.setColor(0xFFE5231B);
+                p.setStrokeWidth(w * 0.095f);
+                c.drawLine(w - in, in, in, h - in, p);
+            }
+        };
+        act.addView(micOff, new FrameLayout.LayoutParams(AdsUi.dp(this, 30), AdsUi.dp(this, 30), Gravity.CENTER));
+        micBtn.setAlpha(0.45f);
+        act.setContentDescription("إرسال — الرسائل الصوتية متوقفة");
         sendBtn.setVisibility(View.GONE);
         composer.addView(act, new LinearLayout.LayoutParams(AdsUi.dp(this, 48), AdsUi.dp(this, 48)));
         composer.addView(videoBtn, new LinearLayout.LayoutParams(AdsUi.dp(this, 42), AdsUi.dp(this, 48)));
@@ -453,6 +471,7 @@ public class AdsChatActivity extends Activity {
                 boolean has = s.toString().trim().length() > 0;
                 sendBtn.setVisibility(has ? View.VISIBLE : View.GONE);
                 micBtn.setVisibility(has ? View.GONE : View.VISIBLE);
+                if (micOff != null) micOff.setVisibility(has ? View.GONE : View.VISIBLE);
                 if (has) notifyTyping();
                 refreshSuggest();
             }
@@ -1066,55 +1085,7 @@ public class AdsChatActivity extends Activity {
             if (a == MotionEvent.ACTION_UP) doSend();
             return true;
         }
-        if (banned) return true;
-        if (recLocked) {                                   // hands-free recording: this tap finishes it
-            if (a == MotionEvent.ACTION_UP) finishRecording(false);
-            return true;
-        }
-        if (a == MotionEvent.ACTION_DOWN) {
-            if (pendingVoice != null) return true;         // a recording is waiting in the preview
-            if (!CigramPermissions.ensure(this, "android.permission.RECORD_AUDIO", REQ_PERM_AUDIO,
-                    "يحتاج Cigram إلى الميكروفون لتسجيل رسالتك الصوتية فقط، ولا يستمع إليك في أي وقت آخر.")) {
-                return true;
-            }
-            recDownX = e.getRawX();
-            recCancelled = false;
-            recorder = new AdsVoice.Recorder();
-            if (!recorder.start(this, new AdsVoice.Recorder.Tick() {
-                @Override public void onTick(int ms, int amp) { timerText.setText(AdsMedia.durLabel(ms)); }
-            })) {
-                String why = recorder.lastError;
-                recorder = null;
-                AdsUi.toast(this, why.length() > 0 ? why : "تعذر بدء التسجيل.");
-                return true;
-            }
-            if (emojiPanel != null) emojiPanel.setVisibility(View.GONE);
-            input.setVisibility(View.INVISIBLE);
-            recBar.setVisibility(View.VISIBLE);
-            recHint.setText("اسحب للإلغاء");
-            timerText.setText("0:00");
-            refreshSuggest();
-            try { getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); } catch (Throwable ignored) { }
-            return true;
-        }
-        if (recorder == null) return true;
-        if (a == MotionEvent.ACTION_MOVE) {
-            boolean cancel = Math.abs(e.getRawX() - recDownX) > AdsUi.dp(this, 90);
-            if (cancel != recCancelled) {
-                recCancelled = cancel;
-                timerText.setTextColor(cancel ? CigramUI.DANGER : CigramSupport.TEXT);
-            }
-        } else if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) {
-            boolean cancel = recCancelled || a == MotionEvent.ACTION_CANCEL;
-            if (!cancel && recorder.elapsed() < 600) {     // a tap, not a hold: keep recording hands-free
-                recLocked = true;
-                recHint.setText("اضغط الزر للإنهاء · اضغط هنا للإلغاء");
-                micBtn.setVisibility(View.GONE);
-                sendBtn.setVisibility(View.VISIBLE);
-                return true;
-            }
-            finishRecording(cancel);
-        }
+        // voice messages are off in this conversation: the microphone does nothing
         return true;
     }
 
@@ -1329,19 +1300,11 @@ public class AdsChatActivity extends Activity {
     }
 
     private void showMenu() {
-        final CharSequence[] items = {"حملاتي الإعلانية", "إعدادات الإشعارات"};
-        new android.app.AlertDialog.Builder(this).setItems(items, new android.content.DialogInterface.OnClickListener() {
-            @Override public void onClick(android.content.DialogInterface d, int w) {
-                try {
-                    if (w == 0) startActivity(new Intent(AdsChatActivity.this, MyAdsActivity.class));
-                    else {
-                        Intent i = new Intent("android.settings.APP_NOTIFICATION_SETTINGS");
-                        i.putExtra("android.provider.extra.APP_PACKAGE", getPackageName());
-                        startActivity(i);
-                    }
-                } catch (Throwable ignored) { }
-            }
-        }).show();
+        try {
+            Intent i = new Intent("android.settings.APP_NOTIFICATION_SETTINGS");
+            i.putExtra("android.provider.extra.APP_PACKAGE", getPackageName());
+            startActivity(i);
+        } catch (Throwable ignored) { }
     }
 
     /**
@@ -1365,7 +1328,7 @@ public class AdsChatActivity extends Activity {
                     String line = p != null ? (p.optString("title") + (p.optString("body").length() > 0 ? ": " + p.optString("body") : "")) : pol.optString(i);
                     if (line.trim().length() > 0) txt.append("• ").append(line.trim()).append("\n");
                 }
-                if (pol == null || pol.length() == 0) txt.append("• تُستخدم المحادثة للتواصل الخاص بينك وبين مطوّر Cigram فقط.\n");
+                if (pol == null || pol.length() == 0) txt.append("• هذه المحادثة لأسعار Cigram Plus ومزاياه والمشاكل فقط.\n");
                 new android.app.AlertDialog.Builder(AdsChatActivity.this).setTitle("سياسة التواصل").setMessage(txt.toString())
                         .setNegativeButton("ليس الآن", new android.content.DialogInterface.OnClickListener() {
                             @Override public void onClick(android.content.DialogInterface d, int w) { consentAsked = false; }
@@ -1655,54 +1618,49 @@ public class AdsChatActivity extends Activity {
     }
 
     /**
-     * 19.2: a compact preview that shows the WHOLE picture in its own shape (portrait stays portrait, wide stays wide)
-     * with rounded corners; only an extreme panorama / strip is cropped. A tap opens it inside the app
-     * ({@link CigramMediaViewer}): zoom + save for a photo, the player with seek / sound for a video.
+     * A picture or a video arrives as a CLOSED file: nothing of it is drawn (or downloaded) in the conversation. A tap
+     * opens it inside the app ({@link CigramMediaViewer}): zoom + save for a photo, the player for a video.
      */
     private View imageView(final Msg m, final boolean video) {
-        int w = m.media.optInt("w"), hh = m.media.optInt("h");
-        float ratio = (w > 0 && hh > 0) ? (float) w / hh : (video ? 16f / 9f : 4f / 3f);
-        boolean extreme = ratio > 2.2f || ratio < 0.5f;
-        ratio = Math.max(0.5f, Math.min(2.2f, ratio));
-        int maxW = Math.min(maxBubble - AdsUi.dp(this, 24), AdsUi.dp(this, 232)), maxH = AdsUi.dp(this, 264);
-        int bw = maxW, bh = Math.round(bw / ratio);
-        if (bh > maxH) { bh = maxH; bw = Math.round(bh * ratio); }
-        bw = Math.max(bw, AdsUi.dp(this, 132));
+        int bw = Math.min(maxBubble - AdsUi.dp(this, 24), AdsUi.dp(this, 236)), bh = AdsUi.dp(this, 78);
         FrameLayout f = new FrameLayout(this);
-        AdsViews.Round iv = new AdsViews.Round(this, AdsUi.dp(this, 14));
-        iv.setBackgroundColor(0xFF0C0C0E);
-        iv.setScaleType(extreme || w <= 0 ? android.widget.ImageView.ScaleType.CENTER_CROP : android.widget.ImageView.ScaleType.FIT_CENTER);
-        iv.setContentDescription(video ? "فيديو — اضغط للتشغيل" : "صورة — اضغط للعرض");
-        f.addView(iv, new FrameLayout.LayoutParams(bw, bh));
-        if (m.localPath != null && !video && new File(m.localPath).isFile()) {
-            try {
-                BitmapFactory.Options o = new BitmapFactory.Options();
-                o.inJustDecodeBounds = true;
-                BitmapFactory.decodeFile(m.localPath, o);
-                int sample = 1;
-                while (Math.max(o.outWidth, o.outHeight) / sample > 1280) sample *= 2;
-                BitmapFactory.Options o2 = new BitmapFactory.Options();
-                o2.inSampleSize = sample;
-                Bitmap b = BitmapFactory.decodeFile(m.localPath, o2);
-                if (b != null) iv.setImageBitmap(b);
-            } catch (Throwable ignored) { }
-        } else if (m.media.optString("url").length() > 0) {
-            AdsMedia.loadInto(this, iv, m.media.optString("url"), 640, video);
-        }
-        if (video) {
-            FrameLayout badge = new FrameLayout(this);
-            badge.setBackground(CigramSupport.round(0x8C000000, 0x59FFFFFF, 26, this));
-            badge.addView(new AdsIcons.Icon(this, AdsIcons.PLAY, 0xFFFFFFFF), new FrameLayout.LayoutParams(AdsUi.dp(this, 24), AdsUi.dp(this, 24), Gravity.CENTER));
-            f.addView(badge, new FrameLayout.LayoutParams(AdsUi.dp(this, 52), AdsUi.dp(this, 52), Gravity.CENTER));
-            if (m.media.optInt("dur") > 0) {
-                TextView d = AdsUi.text(this, AdsMedia.durLabel(m.media.optInt("dur")), 11f, 0xFFFFFFFF, true);
-                d.setBackground(CigramSupport.round(0xB3000000, 9, this));
-                d.setPadding(AdsUi.dp(this, 7), AdsUi.dp(this, 2), AdsUi.dp(this, 7), AdsUi.dp(this, 2));
-                FrameLayout.LayoutParams dl = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.LEFT);
-                dl.setMargins(AdsUi.dp(this, 7), 0, 0, AdsUi.dp(this, 7));
-                f.addView(d, dl);
-            }
-        }
+        LinearLayout card = AdsUi.hbox(this);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(AdsUi.dp(this, 12), 0, AdsUi.dp(this, 12), 0);
+        GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{0xFF1C1C1F, 0xFF0A0A0B});
+        bg.setCornerRadius(AdsUi.dp(this, 18));
+        bg.setStroke(Math.max(1, AdsUi.dp(this, 1)), 0x33FFFFFF);
+        card.setBackground(bg);
+        card.setContentDescription(video ? "فيديو مغلق — اضغط للفتح" : "صورة مغلقة — اضغط للفتح");
+
+        FrameLayout open = new FrameLayout(this);
+        open.setBackground(CigramSupport.round(0xFFFFFFFF, 20, this));
+        open.addView(new AdsIcons.Icon(this, AdsIcons.LOCK, 0xFF000000), new FrameLayout.LayoutParams(AdsUi.dp(this, 20), AdsUi.dp(this, 20), Gravity.CENTER));
+        card.addView(open, new LinearLayout.LayoutParams(AdsUi.dp(this, 40), AdsUi.dp(this, 40)));
+
+        LinearLayout texts = AdsUi.vbox(this);
+        texts.setGravity(Gravity.RIGHT);
+        TextView title = AdsUi.text(this, video ? "فيديو مغلق" : "صورة مغلقة", 14.5f, CigramSupport.TEXT, true);
+        title.setGravity(Gravity.RIGHT);
+        texts.addView(title, new LinearLayout.LayoutParams(-1, -2));
+        StringBuilder meta = new StringBuilder("اضغط للفتح داخل Cigram");
+        if (video && m.media.optInt("dur") > 0) meta.append(" · ").append(AdsMedia.durLabel(m.media.optInt("dur")));
+        TextView sub = AdsUi.text(this, meta.toString(), 11.5f, CigramSupport.MUTED, false);
+        sub.setGravity(Gravity.RIGHT);
+        sub.setMaxLines(1);
+        texts.addView(sub, AdsUi.lp(-1, -2, 0, AdsUi.dp(this, 3), 0, 0));
+        LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(0, -2);
+        tl.weight = 1f;
+        tl.setMargins(AdsUi.dp(this, 10), 0, AdsUi.dp(this, 10), 0);
+        card.addView(texts, tl);
+
+        FrameLayout kind = new FrameLayout(this);
+        kind.setBackground(CigramSupport.round(0x14FFFFFF, 0x26FFFFFF, 12, this));
+        kind.addView(new AdsIcons.Icon(this, video ? AdsIcons.VIDEO : AdsIcons.IMAGE, 0xFFFFFFFF),
+                new FrameLayout.LayoutParams(AdsUi.dp(this, 22), AdsUi.dp(this, 22), Gravity.CENTER));
+        card.addView(kind, new LinearLayout.LayoutParams(AdsUi.dp(this, 44), AdsUi.dp(this, 52)));
+
+        f.addView(card, new FrameLayout.LayoutParams(bw, bh));
         if (m.progress >= 0 && m.state == 1) f.addView(uploadOverlay(m), new FrameLayout.LayoutParams(bw, bh));
         final String url = m.media.optString("url");
         f.setOnClickListener(new View.OnClickListener() {
