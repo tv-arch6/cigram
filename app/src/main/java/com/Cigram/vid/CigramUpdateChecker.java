@@ -157,7 +157,8 @@ public final class CigramUpdateChecker {
         String url = m.optString("downloadUrl", "");
         if (url.length() == 0) url = m.optString("url", "");
         url = url.trim();
-        return (url.startsWith("https://") || url.startsWith("http://")) ? url : "";
+        // 19.6: HTTPS only (a plain-http package link can be swapped in transit) and no user-info trick in the host
+        return CigramUpdateVerify.isSecureUrl(url) ? url : "";
     }
 
     /** True when a newer, published release exists that the user can actually download. */

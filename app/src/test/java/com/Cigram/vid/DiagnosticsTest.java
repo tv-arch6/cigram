@@ -179,21 +179,69 @@ public class DiagnosticsTest {
     public void everyBranchOfTheUpdateDecisionIsCovered() {
         String own = "com.Cigram.vid";
         String sha = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
-        assertEquals(CigramUpdateVerify.Verdict.EMPTY, CigramUpdateVerify.decide(0, "", "", own, 96, own, 95));
-        assertEquals(CigramUpdateVerify.Verdict.OK, CigramUpdateVerify.decide(10, "", "", own, 96, own, 95));
-        assertEquals(CigramUpdateVerify.Verdict.OK, CigramUpdateVerify.decide(10, sha, sha.toUpperCase(), own, 96, own, 95));
-        assertEquals(CigramUpdateVerify.Verdict.OK, CigramUpdateVerify.decide(10, sha, "sha256:" + sha, own, 96, own, 95));
-        assertEquals(CigramUpdateVerify.Verdict.HASH_MISMATCH, CigramUpdateVerify.decide(10, "00" + sha.substring(2), sha, own, 96, own, 95));
-        assertEquals(CigramUpdateVerify.Verdict.WRONG_PACKAGE, CigramUpdateVerify.decide(10, "", "", "com.evil.app", 999, own, 95));
-        assertEquals(CigramUpdateVerify.Verdict.NOT_NEWER, CigramUpdateVerify.decide(10, "", "", own, 95, own, 95));
-        assertEquals(CigramUpdateVerify.Verdict.NOT_NEWER, CigramUpdateVerify.decide(10, "", "", own, 90, own, 95));
-        // a package this process cannot read is left to the installer (not rejected on a guess)
-        assertEquals(CigramUpdateVerify.Verdict.OK, CigramUpdateVerify.decide(10, "", "", null, 0, own, 95));
-        // a field that is not a SHA-256 is ignored, never treated as a mismatch
-        assertEquals(CigramUpdateVerify.Verdict.OK, CigramUpdateVerify.decide(10, "anything", "not-a-hash", own, 96, own, 95));
+        java.util.Set<String> mine = new java.util.HashSet<String>(java.util.Arrays.asList("aa11", "bb22"));
+        java.util.Set<String> none = java.util.Collections.<String>emptySet();
+        // 19.6 fail-closed: every decision needs a fingerprint in the published manifest
+        assertEquals(CigramUpdateVerify.Verdict.EMPTY, CigramUpdateVerify.decide(0, sha, sha, own, 96, own, 95, mine, mine));
+        assertEquals(CigramUpdateVerify.Verdict.NO_HASH, CigramUpdateVerify.decide(10, "", "", own, 96, own, 95, mine, mine));
+        assertEquals(CigramUpdateVerify.Verdict.NO_HASH, CigramUpdateVerify.decide(10, "anything", "not-a-hash", own, 96, own, 95, mine, mine));
+        assertEquals(CigramUpdateVerify.Verdict.NO_HASH, CigramUpdateVerify.decide(10, sha, null, own, 96, own, 95, mine, mine));
+        assertEquals(CigramUpdateVerify.Verdict.OK, CigramUpdateVerify.decide(10, sha, sha, own, 96, own, 95, mine, mine));
+        assertEquals(CigramUpdateVerify.Verdict.OK, CigramUpdateVerify.decide(10, sha, sha.toUpperCase(), own, 96, own, 95, mine, mine));
+        assertEquals(CigramUpdateVerify.Verdict.OK, CigramUpdateVerify.decide(10, sha, "sha256:" + sha, own, 96, own, 95, mine, mine));
+        assertEquals(CigramUpdateVerify.Verdict.HASH_MISMATCH, CigramUpdateVerify.decide(10, "00" + sha.substring(2), sha, own, 96, own, 95, mine, mine));
+        assertEquals(CigramUpdateVerify.Verdict.HASH_MISMATCH, CigramUpdateVerify.decide(10, "", sha, own, 96, own, 95, mine, mine));
+        assertEquals(CigramUpdateVerify.Verdict.WRONG_PACKAGE, CigramUpdateVerify.decide(10, sha, sha, "com.evil.app", 999, own, 95, mine, mine));
+        assertEquals(CigramUpdateVerify.Verdict.NOT_NEWER, CigramUpdateVerify.decide(10, sha, sha, own, 95, own, 95, mine, mine));
+        assertEquals(CigramUpdateVerify.Verdict.NOT_NEWER, CigramUpdateVerify.decide(10, sha, sha, own, 90, own, 95, mine, mine));
+        // a package this process cannot parse is accepted only because its SHA-256 matched the published one
+        assertEquals(CigramUpdateVerify.Verdict.OK, CigramUpdateVerify.decide(10, sha, sha, null, 0, own, 95, none, none));
+        assertEquals(CigramUpdateVerify.Verdict.OK, CigramUpdateVerify.decide(10, sha, sha, null, 0, own, 95, null, null));
+        // signer pinning: a different certificate is refused, a shared one (or a rotation lineage containing it) passes
+        java.util.Set<String> stranger = new java.util.HashSet<String>(java.util.Arrays.asList("ee99"));
+        java.util.Set<String> rotated = new java.util.HashSet<String>(java.util.Arrays.asList("ff00", "bb22"));
+        assertEquals(CigramUpdateVerify.Verdict.BAD_SIGNER, CigramUpdateVerify.decide(10, sha, sha, own, 96, own, 95, stranger, mine));
+        assertEquals(CigramUpdateVerify.Verdict.OK, CigramUpdateVerify.decide(10, sha, sha, own, 96, own, 95, rotated, mine));
+        // certificates that could not be read on either side skip the pin (the hash already matched)
+        assertEquals(CigramUpdateVerify.Verdict.OK, CigramUpdateVerify.decide(10, sha, sha, own, 96, own, 95, none, mine));
+        assertEquals(CigramUpdateVerify.Verdict.OK, CigramUpdateVerify.decide(10, sha, sha, own, 96, own, 95, stranger, none));
+        // the order matters: a swapped file is a HASH problem before it is a signer problem
+        assertEquals(CigramUpdateVerify.Verdict.HASH_MISMATCH, CigramUpdateVerify.decide(10, "00" + sha.substring(2), sha, own, 96, own, 95, stranger, mine));
         assertEquals("", CigramUpdateVerify.normalizeHash(null));
         assertEquals("", CigramUpdateVerify.normalizeHash("zz" + sha.substring(2)));
         assertEquals(sha, CigramUpdateVerify.normalizeHash("  " + sha.toUpperCase() + " "));
+    }
+
+    @Test
+    public void onlyHttpsPackageLinksWithARealHostAreOffered() {
+        assertTrue(CigramUpdateVerify.isSecureUrl("https://pub-abc.r2.dev/cigram-18.6.0.apk"));
+        assertTrue(CigramUpdateVerify.isSecureUrl("  HTTPS://downloads.example.org/app.apk  "));
+        assertFalse(CigramUpdateVerify.isSecureUrl("http://pub-abc.r2.dev/cigram.apk"));          // downgrade
+        assertFalse(CigramUpdateVerify.isSecureUrl("ftp://example.org/cigram.apk"));
+        assertFalse(CigramUpdateVerify.isSecureUrl("file:///sdcard/cigram.apk"));
+        assertFalse(CigramUpdateVerify.isSecureUrl("//example.org/cigram.apk"));
+        assertFalse(CigramUpdateVerify.isSecureUrl("https://"));
+        assertFalse(CigramUpdateVerify.isSecureUrl("https:///cigram.apk"));                         // no host
+        assertFalse(CigramUpdateVerify.isSecureUrl("https://trusted.example@evil.example/a.apk"));  // user-info host trick
+        assertFalse(CigramUpdateVerify.isSecureUrl("https://exa mple.org/a.apk"));                  // not a valid URI
+        assertFalse(CigramUpdateVerify.isSecureUrl(""));
+        assertFalse(CigramUpdateVerify.isSecureUrl(null));
+    }
+
+    @Test
+    public void everyRefusalHasAnExplanationForTheViewer() {
+        for (CigramUpdateVerify.Verdict v : CigramUpdateVerify.Verdict.values()) {
+            String msg = CigramUpdateVerify.messageFor(v);
+            if (v == CigramUpdateVerify.Verdict.OK) assertEquals("", msg);
+            else assertTrue("no message for " + v, msg.length() > 0);
+        }
+    }
+
+    @Test
+    public void certificateDigestsAreStableSha256() {
+        // SHA-256 of the three bytes "abc" – the same reference value the file hash is checked against
+        assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+                CigramUpdateVerify.sha256Hex("abc".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
     }
 
     @Test

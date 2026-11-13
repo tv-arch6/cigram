@@ -31,22 +31,54 @@ jobs:
         with:
           gradle-version: "8.13"
 
+      # Secrets are handed over through env (never interpolated into the script text) and written to GITHUB_ENV masked.
       - name: Signing key
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
+          set -euo pipefail
+          for v in KEYSTORE_B64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            [ -n "${!v}" ] || { echo "::error::secret $v is empty - refusing to build an unsigned release"; exit 1; }
+          done
           echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/cigram.jks"
-          echo "CIGRAM_STORE_FILE=$RUNNER_TEMP/cigram.jks" >> "$GITHUB_ENV"
-          echo "CIGRAM_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
-          echo "CIGRAM_KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> "$GITHUB_ENV"
-          echo "CIGRAM_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> "$GITHUB_ENV"
+          {
+            echo "CIGRAM_STORE_FILE=$RUNNER_TEMP/cigram.jks"
+            echo "CIGRAM_STORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "CIGRAM_KEY_ALIAS=$KEY_ALIAS"
+            echo "CIGRAM_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
 
-      # R8 (shrink + obfuscate) is switched on only here, in the cloud, where it has the memory and threads it needs.
-      - name: Enable R8 for this build
-        run: sed -i 's/isMinifyEnabled = false/isMinifyEnabled = true/; s/isShrinkResources = false/isShrinkResources = true/' app/build.gradle.kts
-
+      # R8 (shrink + obfuscate) is ON for every release build (app/build.gradle.kts); requireSigning makes the build
+      # fail instead of producing an unsigned APK when the keystore is missing.
       - name: Build (APK to share + AAB for Play)
-        run: gradle --no-daemon :app:assembleDirectRelease :app:bundlePlayRelease
+        run: gradle --no-daemon -Pcigram.r8=true -Pcigram.requireSigning=true :app:assembleDirectRelease :app:bundlePlayRelease
+
+      # The APK users receive must carry OUR release certificate - never the shared "Android Debug" one.
+      - name: Verify signature + print the update fingerprint
+        run: |
+          set -euo pipefail
+          APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          shopt -s nullglob
+          apks=(app/build/outputs/apk/direct/release/*.apk)
+          [ ${#apks[@]} -gt 0 ] || { echo "::error::no release APK was produced"; exit 1; }
+          for apk in "${apks[@]}"; do
+            out="$("$APKSIGNER" verify --verbose --print-certs "$apk")"
+            echo "$out"
+            if echo "$out" | grep -qiE "CN=Android Debug"; then
+              echo "::error::$apk is signed with the Android DEBUG key"; exit 1
+            fi
+            echo "$out" | grep -q "Verifies" || { echo "::error::$apk does not verify"; exit 1; }
+            {
+              echo "### $(basename "$apk")"
+              echo "Put this value in the update manifest as \`sha256\` (the app refuses an update without it):"
+              echo '```'
+              sha256sum "$apk" | cut -d' ' -f1
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          done
 
       - uses: actions/upload-artifact@v4
         with:
