@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+: the system splash shows the rounded Cigram logo (112 dp, inside the 192 dp safe circle) on the
+         theme's page colour. It used to be @android:color/transparent, i.e. an empty dark screen. -->
+    <style name="CigramLaunchTheme" parent="AppTheme">
+        <item name="android:windowBackground">@drawable/cigram_launch_bg</item>
+        <item name="android:colorBackground">@color/cg_launch_bg</item>
+        <item name="android:statusBarColor">@color/cg_launch_bg</item>
+        <item name="android:navigationBarColor">@color/cg_launch_bg</item>
+        <item name="android:windowSplashScreenBackground">@color/cg_launch_bg</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/cigram_splash_icon</item>
+        <item name="android:windowSplashScreenAnimationDuration">0</item>
+    </style>
+    <style name="CigramLaunchTheme.Dark" parent="CigramLaunchTheme">
+        <item name="android:windowBackground">@drawable/cigram_launch_bg_dark</item>
+        <item name="android:colorBackground">@color/cg_launch_bg_dark</item>
+        <item name="android:windowSplashScreenBackground">@color/cg_launch_bg_dark</item>
+    </style>
+    <style name="CigramLaunchTheme.Light" parent="CigramLaunchTheme">
+        <item name="android:windowBackground">@drawable/cigram_launch_bg_light</item>
+        <item name="android:colorBackground">@color/cg_launch_bg_light</item>
+        <item name="android:windowSplashScreenBackground">@color/cg_launch_bg_light</item>
+    </style>
+</resources>

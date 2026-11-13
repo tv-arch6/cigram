@@ -1,0 +1,516 @@
+
+<manifest
+	xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:tools="http://schemas.android.com/tools">
+	<uses-permission android:name="android.permission.INTERNET" />
+	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+	<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+	<uses-permission android:name="android.permission.RECORD_AUDIO" />
+	<!-- 19.2: «حفظ» of a chat photo / video on Android 9 and older (Android 10+ saves through MediaStore without any permission) -->
+	<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+	<!-- REQUEST_INSTALL_PACKAGES lives only in src/direct/AndroidManifest.xml (side-load flavor). -->
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+	<uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+	<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+	<uses-permission android:name="com.google.android.gms.permission.AD_ID" />
+	<uses-permission android:name="android.permission.WAKE_LOCK" />
+	<!-- the periodic new-episode check is a persisted job (JobScheduler needs this to keep it after a reboot;
+	     without it scheduling threw IllegalArgumentException and the check silently never ran) -->
+	<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+	<uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
+	<!-- Android TV: no touch screen / microphone required, and the app is offered with the leanback (TV) launcher -->
+	<uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+	<uses-feature android:name="android.software.leanback" android:required="false" />
+	<uses-feature android:name="android.hardware.microphone" android:required="false" />
+	<uses-feature android:name="android.hardware.faketouch" android:required="false" />
+	<uses-feature android:name="android.hardware.camera" android:required="false" />
+	<queries>
+		<package android:name="com.cigram.player" />
+		<intent>
+			<action android:name="android.intent.action.VIEW" />
+			<category android:name="android.intent.category.BROWSABLE" />
+			<data android:scheme="https" />
+		</intent>
+		<intent>
+			<action android:name="android.support.customtabs.action.CustomTabsService" />
+		</intent>
+	</queries>
+	<application
+		android:allowBackup="false"
+		android:icon="@mipmap/ic_launcher"
+		android:roundIcon="@mipmap/ic_launcher_round"
+		android:banner="@drawable/tv_banner"
+		android:label="@string/app_name"
+		android:networkSecurityConfig="@xml/network_security_config"
+		android:usesCleartextTraffic="true"
+		android:enableOnBackInvokedCallback="false"
+		android:theme="@style/AppTheme">
+		<activity
+			android:name=".MainActivity"
+			android:theme="@style/CigramLaunchTheme"
+			android:exported="true" />
+		<!-- CIGRAM TV EDITION: the dedicated television front-end. MainActivity hands off to it on a TV. -->
+		<activity
+			android:name=".CigramTvActivity"
+			android:theme="@style/CigramDarkTheme"
+			android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
+			android:hardwareAccelerated="true"
+			android:screenOrientation="landscape"
+			android:exported="false" />
+		<!-- CIGRAM TV EDITION: the TV details page (film / series). Opened only from the TV front-end. -->
+		<activity
+			android:name=".CigramTvDetailsActivity"
+			android:theme="@style/CigramDarkTheme"
+			android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
+			android:hardwareAccelerated="true"
+			android:screenOrientation="landscape"
+			android:exported="false" />
+		<!-- Launcher icons (Cigram Plus "app icon"): exactly one alias is enabled; CigramAppIcon switches them at runtime. -->
+		<activity-alias
+			android:name=".IconClassic"
+			android:targetActivity=".MainActivity"
+			android:enabled="true"
+			android:exported="true"
+			android:icon="@mipmap/ic_launcher"
+			android:roundIcon="@mipmap/ic_launcher_round"
+			android:label="@string/app_name">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+				<category android:name="android.intent.category.LAUNCHER" />
+				<category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+			</intent-filter>
+		</activity-alias>
+		<activity-alias
+			android:name=".IconGold"
+			android:targetActivity=".MainActivity"
+			android:enabled="false"
+			android:exported="true"
+			android:icon="@mipmap/ic_launcher_gold"
+			android:roundIcon="@mipmap/ic_launcher_gold_round"
+			android:label="@string/app_name">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+				<category android:name="android.intent.category.LAUNCHER" />
+				<category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+			</intent-filter>
+		</activity-alias>
+		<activity-alias
+			android:name=".IconNeon"
+			android:targetActivity=".MainActivity"
+			android:enabled="false"
+			android:exported="true"
+			android:icon="@mipmap/ic_launcher_neon"
+			android:roundIcon="@mipmap/ic_launcher_neon_round"
+			android:label="@string/app_name">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+				<category android:name="android.intent.category.LAUNCHER" />
+				<category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+			</intent-filter>
+		</activity-alias>
+		<activity-alias
+			android:name=".IconMinimal"
+			android:targetActivity=".MainActivity"
+			android:enabled="false"
+			android:exported="true"
+			android:icon="@mipmap/ic_launcher_minimal"
+			android:roundIcon="@mipmap/ic_launcher_minimal_round"
+			android:label="@string/app_name">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+				<category android:name="android.intent.category.LAUNCHER" />
+				<category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+			</intent-filter>
+		</activity-alias>
+		<activity-alias
+			android:name=".IconCinema"
+			android:targetActivity=".MainActivity"
+			android:enabled="false"
+			android:exported="true"
+			android:icon="@mipmap/ic_launcher_cinema"
+			android:roundIcon="@mipmap/ic_launcher_cinema_round"
+			android:label="@string/app_name">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+				<category android:name="android.intent.category.LAUNCHER" />
+				<category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+			</intent-filter>
+		</activity-alias>
+		<activity-alias
+			android:name=".IconGlass"
+			android:targetActivity=".MainActivity"
+			android:enabled="false"
+			android:exported="true"
+			android:icon="@mipmap/ic_launcher_glass"
+			android:roundIcon="@mipmap/ic_launcher_glass_round"
+			android:label="@string/app_name">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+				<category android:name="android.intent.category.LAUNCHER" />
+				<category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+			</intent-filter>
+		</activity-alias>
+		<activity
+			android:name=".DetailsActivity"
+			android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
+			android:hardwareAccelerated="true"
+			android:supportsPictureInPicture="true"
+			android:windowSoftInputMode="stateHidden" />
+		<activity
+			android:name=".PlayerActivity"
+			android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
+			android:hardwareAccelerated="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/AppTheme.FullScreen"
+			android:screenOrientation="fullUser"
+			android:windowSoftInputMode="stateHidden" />
+		<activity
+			android:name=".ChannelsActivity"
+			android:theme="@style/CigramDarkTheme"
+			android:windowSoftInputMode="stateHidden" />
+		<activity
+			android:name=".SearchXmlActivity"
+			android:theme="@style/CigramDarkTheme"
+			android:configChanges="orientation|screenSize|keyboard|keyboardHidden|navigation|smallestScreenSize|screenLayout"
+			android:windowSoftInputMode="stateHidden|adjustPan" />
+		<activity
+			android:name=".AccountActivity"
+			android:theme="@style/CigramDarkTheme"
+			android:windowSoftInputMode="stateHidden" />
+		<activity
+			android:name=".SettingsActivity"
+			android:theme="@style/CigramDarkTheme"
+			android:windowSoftInputMode="stateHidden" />
+		<activity
+			android:name=".LiveActivity"
+			android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
+			android:hardwareAccelerated="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/AppTheme.FullScreen"
+			android:screenOrientation="landscape"
+			android:windowSoftInputMode="stateHidden" />
+		<activity
+			android:name=".MyContentActivity"
+			android:theme="@style/CigramDarkTheme"
+			android:windowSoftInputMode="stateHidden" />
+		<activity
+			android:name=".SectionActivity"
+			android:theme="@style/CigramDarkTheme" />
+		<activity
+			android:name=".NotificationsActivity"
+			android:theme="@style/CigramDarkTheme"
+			android:windowSoftInputMode="stateHidden" />
+		<activity
+			android:name=".CommunicationActivity"
+			android:theme="@style/CigramDarkTheme" />
+		<!-- «التحقق من التحديثات»: its own page, the update runs inside the app -->
+		<activity
+			android:name=".CigramUpdateActivity"
+			android:theme="@style/CigramDarkTheme"
+			android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
+			android:exported="false" />
+		<!-- «المتابعة بحساب Google»: no UI of its own (account picker → auth worker → back) -->
+		<activity
+			android:name=".CigramGoogleAuth"
+			android:theme="@android:style/Theme.Translucent.NoTitleBar"
+			android:exported="false" />
+		<!-- 19.5: «حول Cigram» (settings → الدعم والتحديثات) -->
+		<activity
+			android:name=".CigramAboutActivity"
+			android:theme="@style/CigramDarkTheme"
+			android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
+			android:exported="false" />
+		<!-- Terms and Conditions page -->
+		<activity
+			android:name=".CigramTermsActivity"
+			android:theme="@style/CigramDarkTheme"
+			android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
+			android:exported="false" />
+		<activity
+			android:name="com.google.android.gms.ads.AdActivity"
+			android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize|smallestScreenSize"
+			android:exported="false"
+			android:theme="@android:style/Theme.Translucent" />
+		<!-- AdMob is started by the app itself on a background thread (CigramAdManager / MainActivity);
+		     the library's auto-start provider ran it on the main thread during process start-up. -->
+		<provider
+			android:name="com.google.android.gms.ads.MobileAdsInitProvider"
+			android:authorities="com.Cigram.vid.mobileadsinitprovider"
+			tools:node="remove" />
+		<service
+			android:name="com.google.android.gms.ads.AdService"
+			android:enabled="true"
+			android:exported="false" />
+		<activity
+			android:name="com.google.android.gms.ads.OutOfContextTestingActivity"
+			android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize|smallestScreenSize"
+			android:exported="false" />
+		<service
+			android:name="androidx.room.MultiInstanceInvalidationService"
+			android:directBootAware="true"
+			android:exported="false" />
+		<provider
+			android:name="androidx.startup.InitializationProvider"
+			android:authorities="com.Cigram.vid.androidx-startup"
+			android:exported="false">
+			<meta-data
+				android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+				android:value="androidx.startup" />
+			<meta-data
+				android:name="androidx.work.WorkManagerInitializer"
+				android:value="androidx.startup" />
+			<meta-data
+				android:name="androidx.emoji2.text.EmojiCompatInitializer"
+				android:value="androidx.startup" />
+		</provider>
+		<service
+			android:name="androidx.work.impl.background.systemalarm.SystemAlarmService"
+			android:directBootAware="false"
+			android:enabled="@bool/enable_system_alarm_service_default"
+			android:exported="false" />
+		<service
+			android:name="androidx.work.impl.background.systemjob.SystemJobService"
+			android:directBootAware="false"
+			android:enabled="@bool/enable_system_job_service_default"
+			android:exported="true"
+			android:permission="android.permission.BIND_JOB_SERVICE" />
+		<service
+			android:name="androidx.work.impl.foreground.SystemForegroundService"
+			android:directBootAware="false"
+			android:enabled="@bool/enable_system_foreground_service_default"
+			android:exported="false" />
+		<receiver
+			android:name="androidx.work.impl.utils.ForceStopRunnable$BroadcastReceiver"
+			android:directBootAware="false"
+			android:enabled="true"
+			android:exported="false" />
+		<receiver
+			android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$BatteryChargingProxy"
+			android:directBootAware="false"
+			android:enabled="false"
+			android:exported="false">
+			<intent-filter>
+				<action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
+				<action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
+			</intent-filter>
+		</receiver>
+		<receiver
+			android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$BatteryNotLowProxy"
+			android:directBootAware="false"
+			android:enabled="false"
+			android:exported="false">
+			<intent-filter>
+				<action android:name="android.intent.action.BATTERY_OKAY" />
+				<action android:name="android.intent.action.BATTERY_LOW" />
+			</intent-filter>
+		</receiver>
+		<receiver
+			android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$StorageNotLowProxy"
+			android:directBootAware="false"
+			android:enabled="false"
+			android:exported="false">
+			<intent-filter>
+				<action android:name="android.intent.action.DEVICE_STORAGE_LOW" />
+				<action android:name="android.intent.action.DEVICE_STORAGE_OK" />
+			</intent-filter>
+		</receiver>
+		<receiver
+			android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$NetworkStateProxy"
+			android:directBootAware="false"
+			android:enabled="false"
+			android:exported="false">
+			<intent-filter>
+				<action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+			</intent-filter>
+		</receiver>
+		<receiver
+			android:name="androidx.work.impl.background.systemalarm.RescheduleReceiver"
+			android:directBootAware="false"
+			android:enabled="false"
+			android:exported="false">
+			<intent-filter>
+				<action android:name="android.intent.action.BOOT_COMPLETED" />
+				<action android:name="android.intent.action.TIME_SET" />
+				<action android:name="android.intent.action.TIMEZONE_CHANGED" />
+			</intent-filter>
+		</receiver>
+		<receiver
+			android:name="androidx.work.impl.background.systemalarm.ConstraintProxyUpdateReceiver"
+			android:directBootAware="false"
+			android:enabled="@bool/enable_system_alarm_service_default"
+			android:exported="false">
+			<intent-filter>
+				<action android:name="androidx.work.impl.background.systemalarm.UpdateProxies" />
+			</intent-filter>
+		</receiver>
+		<receiver
+			android:name="androidx.work.impl.diagnostics.DiagnosticsReceiver"
+			android:directBootAware="false"
+			android:enabled="true"
+			android:exported="true"
+			android:permission="android.permission.DUMP">
+			<intent-filter>
+				<action android:name="androidx.work.diagnostics.REQUEST_DIAGNOSTICS" />
+			</intent-filter>
+		</receiver>
+		<meta-data
+			android:name="com.google.android.gms.version"
+			android:value="@integer/google_play_services_version" />
+		<meta-data
+			android:name="com.google.android.gms.ads.APPLICATION_ID"
+			android:value="ca-app-pub-7010031756978837~1229517223" />
+		<service
+			android:name="com.google.firebase.messaging.FirebaseMessagingService"
+			android:exported="false">
+			<intent-filter android:priority="-500">
+				<action android:name="com.google.firebase.MESSAGING_EVENT" />
+			</intent-filter>
+		</service>
+<uses-library
+			android:name="org.apache.http.legacy"
+			android:required="false" />
+
+<meta-data
+    android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
+    android:value="com.Cigram.vid.CigramCastOptionsProvider" />
+<provider
+    android:name="com.Cigram.vid.CigramStage1InitProvider"
+    android:authorities="com.Cigram.vid.cigram.stage1.init"
+    android:exported="false"
+    android:initOrder="100" />
+<service
+    android:name="com.Cigram.vid.CigramStage6JobService"
+    android:permission="android.permission.BIND_JOB_SERVICE"
+    android:exported="true" />
+<receiver
+    android:name="com.Cigram.vid.CigramCarouselWidget"
+    android:label="@string/cg_widget_name"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+    </intent-filter>
+    <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/cigram_carousel_widget_info" />
+</receiver>
+<activity
+    android:name="com.Cigram.vid.CigramWidgetOpenActivity"
+    android:exported="false"
+    android:excludeFromRecents="true"
+    android:noHistory="true"
+    android:taskAffinity=""
+    android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+<activity
+    android:name="com.Cigram.vid.CigramPlusCodeActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize|stateHidden" />
+<activity
+    android:name="com.Cigram.vid.CigramPlusActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize|stateHidden" />
+<activity
+    android:name="com.Cigram.vid.CigramDiscoverActivity"
+    android:exported="false"
+    android:theme="@android:style/Theme.Material.NoActionBar" />
+
+<activity
+    android:name="com.Cigram.vid.AdsChatActivity"
+    android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|keyboard|uiMode"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<provider
+    android:name="com.Cigram.vid.AdsFileProvider"
+    android:authorities="com.Cigram.vid.adsfiles"
+    android:exported="false"
+    android:grantUriPermissions="true" />
+<service
+    android:name="com.Cigram.vid.AdsPollJob"
+    android:exported="false"
+    android:permission="android.permission.BIND_JOB_SERVICE" />
+
+<activity
+    android:name="com.Cigram.vid.CigramTogetherActivity"
+    android:exported="true"
+    android:launchMode="singleTop"
+    android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode"
+    android:theme="@android:style/Theme.Material.NoActionBar"
+    android:windowSoftInputMode="adjustResize|stateHidden">
+    <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="cigram" android:host="together" />
+    </intent-filter>
+</activity>
+<activity
+    android:name="com.Cigram.vid.CigramTogetherPlayerActivity"
+    android:exported="false"
+    android:launchMode="singleTop"
+    android:screenOrientation="sensorLandscape"
+    android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode|layoutDirection"
+    android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen"
+    android:windowSoftInputMode="adjustNothing" />
+<service
+    android:name="com.Cigram.vid.CigramFcmService"
+    android:exported="false">
+    <intent-filter>
+        <action android:name="com.google.firebase.MESSAGING_EVENT" />
+    </intent-filter>
+</service>
+<service
+    android:name="com.Cigram.vid.CigramCastKeepAlive"
+    android:exported="false"
+    android:stopWithTask="false"
+    android:foregroundServiceType="mediaPlayback" />
+<activity
+    android:name="com.Cigram.vid.CigramBannerActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
+    android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+<activity
+    android:name="com.Cigram.vid.CigramWaitActivity"
+    android:exported="false"
+    android:screenOrientation="portrait"
+    android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode"
+    android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+<activity
+    android:name="com.Cigram.vid.CigramLinkActivity"
+    android:exported="true"
+    android:noHistory="true"
+    android:excludeFromRecents="true"
+    android:theme="@android:style/Theme.Translucent.NoTitleBar">
+    <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="cigram" android:host="title" />
+        <data android:scheme="cigram" android:host="requests" />
+    </intent-filter>
+</activity>
+<provider
+    android:name="com.Cigram.vid.CigramShareProvider"
+    android:authorities="com.Cigram.vid.sharecards"
+    android:exported="false"
+    android:grantUriPermissions="true" />
+
+	<!-- 19.2: photos and videos of the private conversation open inside the app (zoom / player / save) -->
+<activity
+    android:name="com.Cigram.vid.CigramMediaViewer"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode"
+    android:hardwareAccelerated="true"
+    android:theme="@android:style/Theme.Material.NoActionBar" />
+<!-- 19.2: Cigram Watch Calendar -->
+<activity
+    android:name="com.Cigram.vid.CigramWatchCalendarActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode"
+    android:theme="@android:style/Theme.Material.NoActionBar" />
+</application>
+</manifest>
