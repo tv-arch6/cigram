@@ -3,12 +3,10 @@ package com.my.newproject;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
-import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
@@ -21,13 +19,13 @@ import android.widget.TextView;
 /**
  * Suggestion chips above the message field of the private conversation.
  *
- * A chip is a ready sentence: one tap writes it into the field (the user can still edit it before sending — nothing is
- * sent on his behalf). The row follows the conversation: an empty conversation offers the opening questions about
- * advertising, a price offer from the developer offers answers to it, and so on ({@link #forUser}). It hides itself
- * while the user is typing or recording.
+ * A chip is a ready sentence: one tap writes it into the field (the admin can still edit it before sending — nothing
+ * is sent on his behalf). The row follows the conversation: an empty conversation offers the greeting and the Plus
+ * prices, a file from the user offers the receipt answers, and so on ({@link #forDeveloper}). It hides itself while
+ * the admin is typing or recording.
  *
- * Look: dark glass pills with a thin red-to-gold ring (the two Cigram accents), an emoji from the app's own atlas and
- * a soft press animation. One recycled row, no images, nothing loaded from the network.
+ * Look: black pills with a thin white ring and a white line icon from the admin's own set ({@link CgIcons}); no emoji,
+ * no colours, no images, nothing loaded from the network. (The viewer's side lives in the app, not here.)
  */
 final class CigramChatSuggest extends HorizontalScrollView {
 
@@ -66,7 +64,8 @@ final class CigramChatSuggest extends HorizontalScrollView {
     void setListener(Listener l) { listener = l; }
 
     /**
-     * @param items rows of {emoji, label, sentence}; the sentence is what is written into the field (label when empty)
+     * @param items rows of {icon (a {@link CgIcons} number, see {@link #iconOf}), label, sentence}; the sentence is
+     *              what is written into the field (label when empty)
      */
     void setItems(String[][] items) {
         StringBuilder sig = new StringBuilder();
@@ -86,7 +85,7 @@ final class CigramChatSuggest extends HorizontalScrollView {
         requestLayout();
     }
 
-    private View chip(final String emoji, String label, final String sentence) {
+    private View chip(final String iconCell, String label, final String sentence) {
         final LinearLayout chip = new LinearLayout(getContext());
         chip.setOrientation(LinearLayout.HORIZONTAL);
         chip.setGravity(Gravity.CENTER_VERTICAL);
@@ -100,10 +99,13 @@ final class CigramChatSuggest extends HorizontalScrollView {
         t.setMaxLines(1);
         t.setIncludeFontPadding(false);
         chip.addView(t, new LinearLayout.LayoutParams(-2, -2));
-        if (emoji != null && emoji.length() > 0) {            // Arabic reads from the right: the emoji leads on the right
-            EmojiDot dot = new EmojiDot(getContext(), emoji);
-            LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(dp(19), dp(19));
-            dl.setMargins(dp(7), 0, 0, 0);
+        int kind = iconOf(iconCell);
+        if (kind >= 0) {                                      // Arabic reads from the right: the icon leads on the right
+            View dot = new View(getContext());
+            dot.setBackground(CgIcons.icon(kind, 0xFFFFFFFF));
+            dot.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
+            LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(dp(18), dp(18));
+            dl.setMargins(dp(8), 0, 0, 0);
             chip.addView(dot, dl);
         }
         chip.setOnTouchListener(new OnTouchListener() {
@@ -125,63 +127,40 @@ final class CigramChatSuggest extends HorizontalScrollView {
 
     // ------------------------------------------------------------------ what to offer
 
-    /** The viewer's side («أريد إعلاناً»). */
-    static String[][] forUser(boolean emptyConversation, String lastDeveloperType, boolean lastIsMine) {
-        if ("quote".equals(lastDeveloperType) && !lastIsMine) {
-            return new String[][]{
-                    {"✅", "موافق على العرض", "موافق على العرض، كيف أكمل الدفع؟"},
-                    {"✏️", "أريد تعديل العرض", "أريد تعديلاً على العرض: "},
-                    {"💳", "طرق الدفع", "ما طرق الدفع المتاحة؟"},
-                    {"📅", "متى يبدأ الإعلان؟", "متى يبدأ ظهور الإعلان بعد الدفع؟"},
-            };
-        }
-        if (emptyConversation) {
-            return new String[][]{
-                    {"📣", "أريد إعلاناً", "مرحباً، أريد إعلاناً داخل Cigram. ما الخطوات؟"},
-                    {"💰", "الأسعار والباقات", "ما أسعار الإعلانات والباقات المتوفرة؟"},
-                    {"📍", "أماكن ظهور الإعلان", "أين يظهر الإعلان داخل التطبيق؟ وما الفرق بين الأماكن؟"},
-                    {"📅", "مدة الإعلان", "ما المدد المتاحة للإعلان (يوم / أسبوع / شهر)؟"},
-                    {"🎨", "أحتاج تصميماً", "ليس لدي تصميم جاهز، هل يمكنكم تصميم الإعلان؟"},
-                    {"💳", "طرق الدفع", "ما طرق الدفع المتاحة؟"},
-                    {"🛠️", "مشكلة في التطبيق", "أواجه مشكلة في التطبيق وأحتاج مساعدة: "},
-            };
-        }
-        return new String[][]{
-                {"💰", "الأسعار", "ما أسعار الإعلانات والباقات المتوفرة؟"},
-                {"📊", "نتائج إعلاني", "أريد معرفة نتائج وإحصائيات إعلاني الحالي."},
-                {"🔁", "تجديد الإعلان", "أريد تجديد إعلاني لمدة إضافية."},
-                {"🎨", "تغيير التصميم", "أريد تغيير تصميم إعلاني الحالي."},
-                {"👍", "شكراً", "شكراً لكم 🌹"},
-        };
+    /** The icon number of a chip row ({@link CgIcons}); -1 = none. */
+    static int iconOf(String cell) {
+        try { return cell == null ? -1 : Integer.parseInt(cell.trim()); } catch (Throwable e) { return -1; }
     }
 
-    /** The developer's side (Cigram Admin): the usual answers. Saved templates of the admin are appended by the caller. */
-static String[][] forDeveloper(boolean emptyConversation, String lastUserType) {
+    private static String ic(int kind) { return String.valueOf(kind); }
+
+    /** The admin's side (Cigram Admin): the usual answers. Saved templates of the admin are appended by the caller. */
+    static String[][] forDeveloper(boolean emptyConversation, String lastUserType) {
         if (emptyConversation) {
             return new String[][]{
-                    {"👋", "ترحيب", "أهلاً بك في Cigram 👋 كيف أستطيع مساعدتك؟"},
-                    {"💰", "أسعار Plus", "أسعار Cigram Plus الحالية تجدها داخل صفحة Cigram Plus، وأي مدة تختارها أفعّلها لك فوراً."},
+                    {ic(CgIcons.CHAT), "ترحيب", "أهلاً بك في Cigram، كيف أستطيع مساعدتك؟"},
+                    {ic(CgIcons.CHART), "أسعار Plus", "أسعار Cigram Plus الحالية تجدها داخل صفحة Cigram Plus، وأي مدة تختارها أفعّلها لك فوراً."},
             };
         }
         if ("image".equals(lastUserType) || "video".equals(lastUserType) || "file".equals(lastUserType)) {
             return new String[][]{
-                    {"✅", "تم الاستلام", "تم استلام الملف ✅ سأراجعه وأعود إليك."},
-                    {"💳", "وصل الدفع", "وصلني إثبات الدفع، سأفعّل اشتراكك الآن."},
-                    {"🛠️", "أحتاج تفاصيل", "أرسل لي اسم العنوان ورقم الحلقة التي تظهر فيها المشكلة."},
+                    {ic(CgIcons.CHECK), "تم الاستلام", "تم استلام الملف، سأراجعه وأعود إليك."},
+                    {ic(CgIcons.FILE), "وصل الدفع", "وصلني إثبات الدفع، سأفعّل اشتراكك الآن."},
+                    {ic(CgIcons.INFO), "أحتاج تفاصيل", "أرسل لي اسم العنوان ورقم الحلقة التي تظهر فيها المشكلة."},
             };
         }
         return new String[][]{
-                {"👋", "ترحيب", "أهلاً بك 👋 كيف أستطيع مساعدتك؟"},
-                {"🌟", "مزايا Plus", "Cigram Plus: مشاهدة بلا إعلانات، جودة أعلى، موقّت النوم، وأيقونات وخطوط خاصة."},
-                {"🚀", "تم التفعيل", "تم تفعيل اشتراكك في Cigram Plus 🚀 مشاهدة ممتعة."},
-                {"⏳", "قيد المراجعة", "طلبك قيد المراجعة وسأعود إليك قريباً."},
-                {"✅", "تم الحل", "تم حل المشكلة، جرّب الآن وأخبرني."},
+                {ic(CgIcons.CHAT), "ترحيب", "أهلاً بك، كيف أستطيع مساعدتك؟"},
+                {ic(CgIcons.PLUS), "مزايا Plus", "Cigram Plus: مشاهدة بلا إعلانات، جودة أعلى، موقّت النوم، وأيقونات وخطوط خاصة."},
+                {ic(CgIcons.STAR), "تم التفعيل", "تم تفعيل اشتراكك في Cigram Plus، مشاهدة ممتعة."},
+                {ic(CgIcons.HISTORY), "قيد المراجعة", "طلبك قيد المراجعة وسأعود إليك قريباً."},
+                {ic(CgIcons.CHECK), "تم الحل", "تم حل المشكلة، جرّب الآن وأخبرني."},
         };
     }
 
     // ------------------------------------------------------------------ drawing
 
-    /** Dark glass pill with a 1.2 dp ring that runs from Cigram red to Cigram gold. */
+    /** Black pill with a thin white ring (the monochrome iOS look of the whole admin). */
     private static final class Ring extends Drawable {
         private final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -190,14 +169,10 @@ static String[][] forDeveloper(boolean emptyConversation, String lastUserType) {
 
         Ring(float density) {
             d = density;
-            fill.setColor(0xFF151517);
+            fill.setColor(0xFF0E0E10);
+            ring.setColor(0x59FFFFFF);
             ring.setStyle(Paint.Style.STROKE);
-            ring.setStrokeWidth(1.2f * d);
-        }
-
-        @Override protected void onBoundsChange(Rect b) {
-            ring.setShader(new LinearGradient(b.left, b.top, b.right, b.bottom,
-                    new int[]{0xFFE21B14, 0xFFFF6A5E, 0xFFF2C14E}, null, Shader.TileMode.CLAMP));
+            ring.setStrokeWidth(1f * d);
         }
 
         @Override public void draw(Canvas c) {
@@ -211,23 +186,5 @@ static String[][] forDeveloper(boolean emptyConversation, String lastUserType) {
         @Override public void setAlpha(int a) { ring.setAlpha(a); fill.setAlpha(a); invalidateSelf(); }
         @Override public void setColorFilter(ColorFilter f) { }
         @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
-    }
-
-    private static final class EmojiDot extends View {
-        private final int idx;
-        private final RectF dst = new RectF();
-
-        EmojiDot(Context c, String emoji) {
-            super(c);
-            Integer i = CigramEmoji.index(c).lookup.get(emoji);
-            if (i == null) i = CigramEmoji.index(c).lookup.get(emoji.replace("️", ""));
-            idx = i == null ? -1 : i;
-            setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
-        }
-
-        @Override protected void onDraw(Canvas canvas) {
-            dst.set(0, 0, getWidth(), getHeight());
-            CigramEmoji.draw(getContext(), canvas, idx, dst);
-        }
     }
 }

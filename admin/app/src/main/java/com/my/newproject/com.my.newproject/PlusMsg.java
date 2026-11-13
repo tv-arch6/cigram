@@ -7,8 +7,8 @@ final class PlusMsg {
     /** The message sent to the customer. */
     static String message(String name, String code, int months, int validDays) {
         StringBuilder m = new StringBuilder();
-        m.append(name.length() > 0 ? "أهلاً " + name + " 👋" : "أهلاً 👋").append('\n');
-        m.append("تم اعتماد اشتراكك في Cigram Plus ✅").append("\n\n");
+        m.append(name.length() > 0 ? "أهلاً " + name : "أهلاً بك").append('\n');
+        m.append("تم اعتماد اشتراكك في Cigram Plus").append("\n\n");
         m.append("كود التفعيل:\n").append(code).append("\n\n");
         m.append("الباقة: ").append(months).append(" أشهر").append('\n');
         m.append("لتفعيله: افتح تطبيق سيكرام ← حسابي ← «ضع كود التفعيل» ← الصق الكود واضغط تفعيل.").append('\n');

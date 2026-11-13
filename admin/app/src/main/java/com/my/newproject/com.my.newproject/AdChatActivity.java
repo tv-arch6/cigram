@@ -271,7 +271,7 @@ public class AdChatActivity extends CgBase {
             JSONObject t = savedTemplates.optJSONObject(i);
             if (t == null || t.optString("body").trim().length() == 0) continue;
             String title = t.optString("title").trim();
-            all.add(new String[]{"\uD83D\uDCCC", title.length() > 0 ? title : "قالب " + (i + 1), t.optString("body")});
+            all.add(new String[]{String.valueOf(CgIcons.DRAFT), title.length() > 0 ? title : "قالب " + (i + 1), t.optString("body")});
         }
         suggest.setItems(all.toArray(new String[0][]));
         suggest.setVisibility(View.VISIBLE);
