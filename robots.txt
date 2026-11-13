@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://cigram.wwq-mixtv.workers.dev/sitemap.xml
