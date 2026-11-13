@@ -15,7 +15,9 @@ globalThis.addEventListener = () => {}; globalThis.window = globalThis; globalTh
 Object.defineProperty(globalThis, 'navigator', { value: { userAgent: 'test' }, configurable: true });
 
 // ------------------------------------------------------------------ الخادم الحقيقي في الذاكرة
-const src = fs.readFileSync(new URL('../../admin/docs/backend/deploy/cigram-ads-api/worker.js', import.meta.url), 'utf8');
+const workerUrl = new URL('../../admin/docs/backend/deploy/cigram-ads-api/worker.js', import.meta.url);
+if (!fs.existsSync(workerUrl)) { console.log('site support-upload-worker tests: skipped (the worker source is not next to this folder; run from the repository)'); process.exit(0); }
+const src = fs.readFileSync(workerUrl, 'utf8');
 const mod = await import('data:text/javascript;base64,' + Buffer.from(src).toString('base64'));
 const worker = mod.default;
 
