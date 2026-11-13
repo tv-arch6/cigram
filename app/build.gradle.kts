@@ -104,6 +104,15 @@ android {
     }
 }
 
+// CodeAssist (the phone IDE) generates its own view-binding classes that implement androidx.viewbinding.ViewBinding but does
+// not ship that interface, so a tiny stub lives in src/main/java/androidx/viewbinding and MUST stay in the source tree for the
+// phone build. Real Gradle/AGP adds the real runtime (androidx.databinding:viewbinding) with the same interface; compiling the
+// stub there too makes R8 fail with "Type androidx.viewbinding.ViewBinding is defined multiple times". So: keep the file,
+// but do not compile it under Gradle.
+tasks.withType<JavaCompile>().configureEach {
+    exclude("androidx/viewbinding/ViewBinding.java")
+}
+
 // A release artifact that is not signed with the release key must be loud (or, with -Pcigram.requireSigning=true, fatal).
 gradle.taskGraph.whenReady {
     val buildsRelease = allTasks.any { task ->

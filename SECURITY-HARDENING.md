@@ -19,7 +19,7 @@ Reviewed: manifest, build files, network layer, updater, WebView use, reflection
 | `android:usesCleartextTraffic="true"` | **Removed** (it was already overridden by `network_security_config.xml`, which still allows plain-http IPTV hosts and forbids it for Cigram's own back-ends — behaviour unchanged) |
 | Exported background job service `CigramStage6JobService` | **Fixed**: `exported="false"` (JobScheduler binds it as the system, no other app needs to) |
 | `READ_EXTERNAL_STORAGE` (API ≤ 32) never requested by any code | **Removed** (a `maxSdkVersion=28` copy is still added by the build because `WRITE_EXTERNAL_STORAGE` is declared for saving photos on Android 9-) |
-| Duplicate `androidx.viewbinding.ViewBinding` class in the source tree | **Fixed**: it made every R8 build fail (`Type … is defined multiple times`) |
+| Duplicate `androidx.viewbinding.ViewBinding` class in the source tree | **Fixed without breaking the phone build**: the stub file stays in `src/main/java` (CodeAssist's own view-binding generator needs it), and `app/build.gradle.kts` excludes it from Gradle's javac so R8 no longer fails with `Type … is defined multiple times` |
 | `RECORD_AUDIO`, `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`, ad SDK, runtime launcher-icon switch | Kept: real features (voice messages, push, persisted job, ads, Cigram Plus icons) |
 
 ## Updater (`CigramUpdateVerify`, `CigramUpdateChecker`) — direct flavor only
