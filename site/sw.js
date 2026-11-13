@@ -1,7 +1,7 @@
 // يخزن هيكل الموقع ليفتح بسرعة وبدون إنترنت. لا يخزن الفيديو.
 // كل الملفات تُطلب من الشبكة أولاً، فأي تحديث تنشره للموقع يصل للمستخدم مباشرة،
 // والنسخة المحفوظة تُستخدم فقط عند انقطاع الإنترنت.
-const VERSION = 'v14';
+const VERSION = 'v15';
 const SHELL = `shell-${VERSION}`;
 const DATA = 'data-v1';
 const PLUS_HOST = 'cigram-plus-api.wwq-mixtv.workers.dev';
