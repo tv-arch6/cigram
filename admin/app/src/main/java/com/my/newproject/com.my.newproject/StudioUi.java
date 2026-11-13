@@ -46,7 +46,7 @@ final class StudioUi {
 
     static int dp(Context c, float v) { return CgUi.dp(c, v); }
 
-    private static void press(final View v) {
+    static void press(final View v) {
         v.setOnTouchListener(new View.OnTouchListener() {
             @Override public boolean onTouch(View view, MotionEvent e) {
                 int a = e.getActionMasked();
@@ -57,7 +57,7 @@ final class StudioUi {
         });
     }
 
-    private static GradientDrawable panel(Context c, int fill, float radius) {
+    static GradientDrawable panel(Context c, int fill, float radius) {
         GradientDrawable g = new GradientDrawable();
         g.setColor(fill);
         g.setCornerRadius(dp(c, radius));

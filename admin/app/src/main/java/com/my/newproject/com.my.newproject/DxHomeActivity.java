@@ -1,49 +1,50 @@
 package com.my.newproject;
 
 import android.app.Activity;
-import android.content.Intent;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
 
 /**
- * Cigram Studio (admin 3.0) — the home of the admin, redesigned from an empty page.
+ * Cigram Studio 4 — the home of the admin.
  *
- * The old home was one long scroll (hero, live chart, eight section tiles, charts). The Studio is FIVE workspaces
- * reached from a dock at the bottom of the screen, each one a short page of its own:
+ * Studio 3 was five workspaces behind a bottom dock, each one a list of rows. Studio 4 drops the dock: the home is ONE
+ * page that answers four questions in order, and every tool of the admin is one or two taps away.
  *
  * <pre>
- *   الاستوديو   what needs you now: the four daily actions, things to fix, the catalogue in numbers
- *   المحتوى     Content Studio: add · manage · subtitles (lab + centre) · what the app's home shows
- *   البث        who is watching right now, channels, Cigram Live Health
- *   التواصل     developer inbox, notifications, requests, advertising, Plus
- *   النظام      app update, maintenance, history / backups, statistics, errors, privacy, the admin token
+ *   ابحث             one search for every tool and every title ({@link StudioSearchActivity})
+ *   الآن في التطبيق   live numbers: active · watching · users today
+ *   يحتاجك الآن       what is wrong or waiting (titles with errors, missing subtitles, drafts)
+ *   اختصاراتي        the tools the admin pinned (long-press any tile to pin) — the daily five are there from the start
+ *   غرف الاستوديو     six rooms (library · subtitles · app face · live · audience · system), a bento grid; a room page
+ *                    ({@link StudioRoomActivity}) lists ALL of its tools. {@link StudioMap} is the single list of tools.
  * </pre>
- * A workspace is built the first time it is opened (the first frame only pays for the first one), every row opens a
- * screen that already exists, and the data layer (catalogue snapshot, live socket, auto refresh, token gate) is the
- * one the previous home used — only the face is new. Components: {@link StudioUi}.
+ * Under the map: what's new (TMDB discovery summary) and the library in numbers. The data layer — catalogue snapshot with
+ * its on-device fallback, the one-second live poll, the 2-minute quiet refresh, the token gate — is the previous home's,
+ * unchanged; only the face is new.
  */
 public class DxHomeActivity extends CgBase implements NxLive.Listener {
 
     private NxLive live;
-    private DxLive liveUi;
-    private TextView status;
+    private StudioKit.Pulse pulse;
     private LinearLayout contentBox;
+    private LinearLayout attentionBox;
+    private LinearLayout pinsBox;
     private WnHomeCard whatsNew;
     private TextView lastUpdated;
+    private TextView libraryLine;
+    private final View[] roomCards = new View[StudioMap.ROOMS.length];
     private boolean contentBuilt;
     private boolean resumed;
-    // Studio
-    private android.widget.FrameLayout stage;
-    private final View[] panels = new View[5];
-    private StudioUi.Dock dock;
-    private static final String[] TAB_TITLES = {"Cigram Studio", "استوديو المحتوى", "البث المباشر", "التواصل والإعلانات", "النظام والخصوصية"};
 
     /** Keeps the dashboard numbers current on their own, every 2 minutes, without the admin tapping "تحديث". */
     private static final long AUTO_REFRESH_MS = 120000;
@@ -90,7 +91,7 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
         live.setListener(this);
         build();
         bar.action("بحث", new Runnable() {
-            @Override public void run() { DxPanels.openContent(DxHomeActivity.this, null, -1); }
+            @Override public void run() { StudioGo.openSearch(DxHomeActivity.this); }
         });
         bar.action("تحديث", new Runnable() {
             @Override public void run() { reloadContent(); }
@@ -105,6 +106,7 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
         TokenGate.ensure(this, new Runnable() { @Override public void run() { reloadContent(); } });
         if (whatsNew != null) whatsNew.refresh();               // one cheap read of the cached summary
         if (live != null) live.start();
+        fillPins();                                              // the admin may have pinned or unpinned in a room
         if (contentBuilt && CgData.loaded()) showContent();     // counts may have changed after an edit
         ui().removeCallbacks(autoRefresh);
         ui().postDelayed(autoRefresh, AUTO_REFRESH_MS);
@@ -121,231 +123,164 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
     // ------------------------------------------------------------------ layout
 
     private void build() {
-        final Activity a = this;
         body.removeAllViews();
         body.setBackgroundColor(StudioUi.INK);
-        stage = new android.widget.FrameLayout(this);
-        body.addView(stage, new LinearLayout.LayoutParams(CgUi.MATCH, 0, 1f));
-        View line = new View(this);
-        line.setBackgroundColor(StudioUi.LINE);
-        body.addView(line, new LinearLayout.LayoutParams(CgUi.MATCH, Math.max(1, CgUi.dp(this, 0.7f))));
-        dock = new StudioUi.Dock(this, new String[]{"الاستوديو", "المحتوى", "البث", "التواصل", "النظام"},
-                new int[]{CgIcons.BOX, CgIcons.FILM, CgIcons.SIGNAL, CgIcons.CHAT, CgIcons.GEAR}, new StudioUi.OnTab() {
-            @Override public void onTab(int index) { show(index); }
-        });
-        body.addView(dock.view, new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP));
-        // the live board exists from the start (it is fed every second), it is only ATTACHED when «البث» is opened
-        liveUi = new DxLive(this);
-        dock.select(0);
-        show(0);
-    }
-
-    /** A workspace page: a scroll with the Studio's margins. */
-    private LinearLayout page(int index) {
-        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        ScrollView sv = new ScrollView(this);
         sv.setVerticalScrollBarEnabled(false);
-        sv.setFillViewport(false);
-        LinearLayout col = CgUi.vbox(this);
+        LinearLayout c = CgUi.vbox(this);
         int p = CgUi.dp(this, 14);
-        col.setPadding(p, CgUi.dp(this, 6), p, CgUi.dp(this, 28));
-        sv.addView(col, new android.widget.ScrollView.LayoutParams(CgUi.MATCH, CgUi.WRAP));
-        panels[index] = sv;
-        stage.addView(sv, new android.widget.FrameLayout.LayoutParams(CgUi.MATCH, CgUi.MATCH));
-        return col;
-    }
+        c.setPadding(p, CgUi.dp(this, 6), p, CgUi.dp(this, 28));
+        sv.addView(c, new ScrollView.LayoutParams(CgUi.MATCH, CgUi.WRAP));
+        body.addView(sv, new LinearLayout.LayoutParams(CgUi.MATCH, 0, 1f));
 
-    private void show(int index) {
-        if (panels[index] == null) {
-            LinearLayout col = page(index);
-            if (index == 0) buildStudio(col);
-            else if (index == 1) buildContent(col);
-            else if (index == 2) buildLive(col);
-            else if (index == 3) buildAudience(col);
-            else buildSystem(col);
-            CgUi.applyTree(panels[index]);
-        }
-        for (int i = 0; i < panels.length; i++) if (panels[i] != null) panels[i].setVisibility(i == index ? View.VISIBLE : View.GONE);
-        bar.titleView.setText(TAB_TITLES[index]);
-    }
-
-    @Override public void onBackPressed() {
-        if (dock != null && dock.selected() != 0) { dock.select(0); show(0); return; }
-        super.onBackPressed();
-    }
-
-    // ------------------------------------------------------------------ workspace 1: الاستوديو
-
-    private void buildStudio(LinearLayout c) {
-        final Activity a = this;
-        // greeting line: date on the right, connection state on the left
-        LinearLayout hello = CgUi.hbox(this);
-        hello.setGravity(Gravity.CENTER_VERTICAL);
-        status = StudioUi.pill(this, "جارٍ الاتصال", CgCfg.GRAY);
-        hello.addView(status, new LinearLayout.LayoutParams(CgUi.WRAP, CgUi.WRAP));
-        LinearLayout hl = CgUi.vbox(this);
-        TextView hi = CgUi.text(this, "أهلاً بك في الاستوديو", 21, CgCfg.TEXT, true);
+        // 1. greeting + search
+        LinearLayout hello = CgUi.vbox(this);
+        TextView hi = CgUi.text(this, "أهلاً بك في الاستوديو", 22, CgCfg.TEXT, true);
         hi.setGravity(Gravity.RIGHT);
-        hl.addView(hi, new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP));
+        hello.addView(hi, new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP));
         TextView day = CgUi.text(this, today(), 12.5f, CgCfg.MUTED, false);
         day.setGravity(Gravity.RIGHT);
-        hl.addView(day, new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP));
-        hello.addView(hl, new LinearLayout.LayoutParams(0, CgUi.WRAP, 1f));
-        hello.setLayoutParams(CgUi.lp(this, CgUi.MATCH, CgUi.WRAP, 4, 4, 4, 14));
+        hello.addView(day, new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP));
+        hello.setLayoutParams(CgUi.lp(this, CgUi.MATCH, CgUi.WRAP, 4, 4, 4, 12));
         c.addView(hello);
+        View search = StudioKit.searchPill(this, "ابحث عن أي أداة أو عنوان…", new Runnable() {
+            @Override public void run() { StudioGo.openSearch(DxHomeActivity.this); }
+        });
+        search.setLayoutParams(CgUi.lp(this, CgUi.MATCH, CgUi.WRAP, 0, 0, 0, 12));
+        c.addView(search);
 
-        // the deck: what an editor does every day
-        c.addView(StudioUi.pair(this,
-                StudioUi.deck(this, CgIcons.SEND, "إضافة سريعة", "الصق رابطاً وانشر بخطوة واحدة", StudioUi.RED, StudioUi.go(a, QuickAddActivity.class)),
-                StudioUi.deck(this, CgIcons.UPLOAD, "معالج الرفع الجماعي", "موسم كامل أو عدة أفلام دفعة واحدة", StudioUi.ORANGE, StudioUi.go(a, BulkWizardActivity.class))));
-        c.addView(StudioUi.pair(this,
-                StudioUi.deck(this, CgIcons.SIGNAL, "قنوات تحتاج رابطاً", "بلاغات «بلّغ المدير» · استبدل برابط", StudioUi.MINT, StudioUi.go(a, CgChannelReportsActivity.class)),
-                StudioUi.deck(this, CgIcons.CHART, "النبض والأرباح", "رسم حي 24/7 · توقّعات AdMob", StudioUi.ORANGE, StudioUi.go(a, CgPulseActivity.class))));
-        c.addView(StudioUi.pair(this,
-                StudioUi.deck(this, CgIcons.FLAG, "طلبات المستخدمين", "يريد فيلماً أو مسلسلاً · انسخ الاسم", StudioUi.SKY, StudioUi.go(a, NxRequestsActivity.class)),
-                StudioUi.deck(this, CgIcons.CHAT, "الدعم والتواصل", "محادثات المستخدمين: Plus والمشاكل", StudioUi.VIOLET, StudioUi.go(a, AdInboxActivity.class))));
+        // 2. live numbers
+        pulse = new StudioKit.Pulse(this);
+        pulse.view.setLayoutParams(CgUi.lp(this, CgUi.MATCH, CgUi.WRAP, 0, 0, 0, 4));
+        c.addView(pulse.view);
 
-        // «ما الجديد؟»: cached discovery numbers (never calls TMDB) + the way into the discovery center
+        // 3. what needs the admin
+        c.addView(StudioUi.label(this, "يحتاجك الآن"));
+        attentionBox = CgUi.vbox(this);
+        attentionBox.addView(CxUi.skeleton(this, 1));
+        c.addView(attentionBox, new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP));
+
+        // 4. pinned shortcuts
+        c.addView(StudioUi.label(this, "اختصاراتي"));
+        pinsBox = CgUi.vbox(this);
+        c.addView(pinsBox, new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP));
+        fillPins();
+
+        // 5. the rooms (bento): the library as a wide card, four half cards, the system as a wide card
+        c.addView(StudioUi.label(this, "غرف الاستوديو"));
+        libraryLine = CgUi.text(this, "", 12, CgCfg.FAINT, false);
+        libraryLine.setGravity(Gravity.RIGHT);
+        LinearLayout.LayoutParams wide = new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP);
+        wide.bottomMargin = CgUi.dp(this, 10);
+        roomCards[StudioMap.LIBRARY] = room(StudioMap.LIBRARY, true, libraryLine);
+        c.addView(roomCards[StudioMap.LIBRARY], wide);
+        ArrayList<View> halves = new ArrayList<View>();
+        int[] middle = {StudioMap.SUBS, StudioMap.FACE, StudioMap.LIVE, StudioMap.AUDIENCE};
+        for (int i = 0; i < middle.length; i++) {
+            roomCards[middle[i]] = room(middle[i], false, null);
+            halves.add(roomCards[middle[i]]);
+        }
+        c.addView(StudioKit.grid(this, halves, 10));
+        LinearLayout.LayoutParams wide2 = new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP);
+        wide2.bottomMargin = CgUi.dp(this, 4);
+        roomCards[StudioMap.SYSTEM] = room(StudioMap.SYSTEM, true, null);
+        c.addView(roomCards[StudioMap.SYSTEM], wide2);
+
+        // 6. what's new + the library in numbers
         whatsNew = new WnHomeCard(this);
-        c.addView(whatsNew.view);
+        LinearLayout.LayoutParams wl = new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP);
+        wl.topMargin = CgUi.dp(this, 12);
+        c.addView(whatsNew.view, wl);
 
         LinearLayout ovHead = CgUi.hbox(this);
         ovHead.setGravity(Gravity.CENTER_VERTICAL);
         lastUpdated = CgUi.muted(this, "");
         lastUpdated.setTextSize(11.5f);
         ovHead.addView(lastUpdated, new LinearLayout.LayoutParams(CgUi.WRAP, CgUi.WRAP));
-        TextView ovTitle = StudioUi.label(this, "المكتبة بالأرقام");
-        ovHead.addView(ovTitle, new LinearLayout.LayoutParams(0, CgUi.WRAP, 1f));
+        ovHead.addView(StudioUi.label(this, "المكتبة بالأرقام"), new LinearLayout.LayoutParams(0, CgUi.WRAP, 1f));
         c.addView(ovHead);
         contentBox = CgUi.vbox(this);
         contentBox.addView(CxUi.skeleton(this, 3));
         c.addView(contentBox, new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP));
-    }
 
-    // ------------------------------------------------------------------ workspace 2: المحتوى (Content Studio)
-
-    private void buildContent(LinearLayout c) {
-        final Activity a = this;
-        c.addView(StudioUi.label(this, "إضافة"));
-        LinearLayout add = StudioUi.group(this);
-        StudioUi.row(add, CgIcons.STAR, "ما الجديد؟", "اكتشف الجديد وأضفه مع الفيديو والترجمة", "جديد", StudioUi.PINK, StudioUi.go(a, WnActivity.class));
-        StudioUi.row(add, CgIcons.FILM, "إضافة فيلم", "ابحث بالاسم وأضفه برابطه أو من جوالك", "", StudioUi.SKY, StudioUi.go(a, NxMovieActivity.class));
-        StudioUi.row(add, CgIcons.TV, "إضافة مسلسل", "مسلسل جديد بمواسمه وحلقاته", "", StudioUi.VIOLET, StudioUi.go(a, NxSeriesActivity.class));
-        StudioUi.row(add, CgIcons.PLUS, "إضافة حلقة", "حلقة جديدة لمسلسل موجود", "", StudioUi.MINT, new Runnable() {
-            @Override public void run() { CxNav.addEpisode(a, "", 0, 0); }
-        });
-        StudioUi.row(add, CgIcons.FOLDER, "إضافة موسم كامل", "موسم دفعة واحدة بالروابط", "", StudioUi.MINT, new Runnable() {
-            @Override public void run() { CxNav.addSeason(a, "", 0); }
-        });
-        StudioUi.row(add, CgIcons.UPLOAD, "معالج الرفع الجماعي", "اختر الملفات: يطابقها، يفحصها ثم يسلّمها للرفع", "جديد", StudioUi.ORANGE, StudioUi.go(a, BulkWizardActivity.class));
-        StudioUi.row(add, CgIcons.SEND, "إضافة سريعة", "لصق رابط وإنهاء بخطوة واحدة", "", StudioUi.RED, StudioUi.go(a, QuickAddActivity.class));
-        c.addView(add);
-
-        c.addView(StudioUi.label(this, "إدارة المكتبة"));
-        LinearLayout manage = StudioUi.group(this);
-        StudioUi.row(manage, CgIcons.SEARCH, "كل المحتوى", "بحث وفلترة وتحرير وحذف", "", StudioUi.SKY, new Runnable() {
-            @Override public void run() { DxPanels.openContent(a, null, -1); }
-        });
-        int drafts = 0;
-        try { drafts = CxDraft.count(this); } catch (Throwable ignored) { }
-        StudioUi.row(manage, CgIcons.DRAFT, "المسودات", "ما بدأت به ولم تكمله", drafts > 0 ? String.valueOf(drafts) : "", StudioUi.GOLD, new Runnable() {
-            @Override public void run() { CxNav.drafts(a); }
-        });
-        StudioUi.row(manage, CgIcons.CLIP, "الرفع والتحميلات", "متابعة الملفات الجارية والفاشلة", "", StudioUi.ORANGE, StudioUi.go(a, CgUploadsActivity.class));
-        StudioUi.row(manage, CgIcons.COPY, "دمج العناوين", "ضم المكرر في عنوان واحد", "", CgCfg.GRAY, StudioUi.go(a, CgMergeActivity.class));
-        c.addView(manage);
-
-        c.addView(StudioUi.label(this, "الترجمة"));
-        LinearLayout subs = StudioUi.group(this);
-        StudioUi.row(subs, CgIcons.SHIELD, "مركز الترجمة العربية", "العناوين بلا ترجمة: بحث جماعي، مراجعة، اعتماد ونشر", "", StudioUi.MINT, StudioUi.go(a, SubCenterActivity.class));
-        StudioUi.row(subs, CgIcons.UPLOAD, "رفع ترجمة وربطها", "ملف لعنوان واحد", "", StudioUi.VIOLET, StudioUi.go(a, CxSubsActivity.class));
-        StudioUi.row(subs, CgIcons.FOLDER, "ترجمات موسم كامل", "حزمة ZIP أو عدة ملفات تُطابق بالحلقات", "", StudioUi.VIOLET, StudioUi.go(a, CgSeasonSubsActivity.class));
-        c.addView(subs);
-
-        c.addView(StudioUi.label(this, "واجهة التطبيق"));
-        LinearLayout face = StudioUi.group(this);
-        StudioUi.row(face, CgIcons.IMAGE, "الكاروسيل", "الشرائح المتحركة أعلى الرئيسية", "", StudioUi.VIOLET, new Runnable() {
-            @Override public void run() { CxNav.carouselManage(a); }
-        });
-        StudioUi.row(face, CgIcons.PLUS, "إضافة شريحة", "شريحة جديدة للكاروسيل", "", StudioUi.MINT, new Runnable() {
-            @Override public void run() { CxNav.carouselAdd(a, ""); }
-        });
-        StudioUi.row(face, CgIcons.FOLDER, "الأقسام", "أسماء الأقسام وما يظهر منها", "", StudioUi.SKY, StudioUi.go(a, CgSectionsActivity.class));
-        StudioUi.row(face, CgIcons.EDIT, "ترتيب الرئيسية", "رتّب الأقسام كما تريد", "", StudioUi.ORANGE, StudioUi.go(a, CgHomeOrderActivity.class));
-        StudioUi.row(face, CgIcons.STAR, "المحتوى المميز", "ما يظهر في الواجهة أولاً", "", StudioUi.GOLD, StudioUi.go(a, CgFeaturedActivity.class));
-        c.addView(face);
-    }
-
-    // ------------------------------------------------------------------ workspace 3: البث
-
-    private void buildLive(LinearLayout c) {
-        final Activity a = this;
-        c.addView(liveUi.main);
-        c.addView(StudioUi.label(this, "القنوات"));
-        LinearLayout ch = StudioUi.group(this);
-        StudioUi.row(ch, CgIcons.SIGNAL, "Cigram Live Health", "فحص كل القنوات الآن: تعمل · بطيئة · متوقفة، مع السبب", "جديد", StudioUi.MINT, StudioUi.go(a, LiveHealthActivity.class));
-        StudioUi.row(ch, CgIcons.PLUS, "إضافة قناة", "رابط البث والشعار والباقة", "", StudioUi.SKY, StudioUi.go(a, NxChannelActivity.class));
-        StudioUi.row(ch, CgIcons.EDIT, "إدارة القنوات", "ترتيب وإخفاء وفحص الروابط", "", StudioUi.VIOLET, StudioUi.go(a, CgChannelsActivity.class));
-        c.addView(ch);
-        c.addView(liveUi.more);
-    }
-
-    // ------------------------------------------------------------------ workspace 4: التواصل
-
-    private void buildAudience(LinearLayout c) {
-        final Activity a = this;
-        c.addView(StudioUi.label(this, "المستخدمون"));
-        LinearLayout u = StudioUi.group(this);
-        StudioUi.row(u, CgIcons.CHAT, "الدعم والتواصل", "الدعم الخاص ورسائل المستخدمين والمعلنين", "", StudioUi.VIOLET, StudioUi.go(a, AdInboxActivity.class));
-        StudioUi.row(u, CgIcons.SEND, "إرسال إشعار", "إشعار فوري لكل المستخدمين", "", StudioUi.ORANGE, StudioUi.go(a, NxNotifyActivity.class));
-        StudioUi.row(u, CgIcons.HISTORY, "الرسائل العامة", "رسائل تظهر داخل التطبيق بجدولة", "", StudioUi.SKY, StudioUi.go(a, CgAnnouncementsActivity.class));
-        StudioUi.row(u, CgIcons.BELL, "طلبات المستخدمين", "أفلام ومسلسلات وقنوات طلبها المشاهدون", "", StudioUi.PINK, StudioUi.go(a, NxRequestsActivity.class));
-        StudioUi.row(u, CgIcons.STAR, "اشتراكات Plus", "أكواد التفعيل والمشتركون", "", StudioUi.GOLD, StudioUi.go(a, PlusCodesActivity.class));
-        c.addView(u);
-
-        c.addView(StudioUi.label(this, "الإعلانات"));
-        LinearLayout ads = StudioUi.group(this);
-        StudioUi.row(ads, CgIcons.GEAR, "إعدادات المحادثة", "سياسة التواصل وساعات العمل", "", CgCfg.GRAY, StudioUi.go(a, AdSettingsActivity.class));
-        StudioUi.row(ads, CgIcons.SHIELD, "AdMob: تشغيل وإيقاف", "المفتاح الرئيسي ومواضع إعلانات AdMob", "", StudioUi.MINT, StudioUi.go(a, OpsAdsActivity.class));
-        StudioUi.row(ads, CgIcons.CHART, "AdMob: الفحص", "نسبة التعبئة وأسباب الفشل", "", StudioUi.MINT, StudioUi.go(a, OpsAdCheckActivity.class));
-        c.addView(ads);
-    }
-
-    // ------------------------------------------------------------------ workspace 5: النظام
-
-    private void buildSystem(LinearLayout c) {
-        final Activity a = this;
-        c.addView(StudioUi.label(this, "التطبيق"));
-        LinearLayout app = StudioUi.group(this);
-        StudioUi.row(app, CgIcons.UPDATE, "تحديث التطبيق", "نشر إصدار جديد وجدولته", "", StudioUi.SKY, StudioUi.go(a, CgUpdateActivity.class));
-        StudioUi.row(app, CgIcons.LOCK, "وضع الصيانة", "إيقاف التطبيق مؤقتاً برسالة", "", StudioUi.GOLD, StudioUi.go(a, CgMaintenanceActivity.class));
-        StudioUi.row(app, CgIcons.LINK, "الروابط الخارجية", "رابط التطبيق أو قناة تليكرام بصفحة الحساب", "", StudioUi.MINT, StudioUi.go(a, ExternalLinksActivity.class));
-        c.addView(app);
-
-        c.addView(StudioUi.label(this, "المراقبة"));
-        LinearLayout watch = StudioUi.group(this);
-        StudioUi.row(watch, CgIcons.CHART, "الإحصائيات التفصيلية", "رسوم اليوم والساعة والإصدارات", "", StudioUi.MINT, StudioUi.go(a, OpsStatsActivity.class));
-        StudioUi.row(watch, CgIcons.WARNING, "أخطاء التطبيق", "انهيارات ومشاكل التشغيل مجمّعة", "", CgCfg.BAD, StudioUi.go(a, OpsErrorsActivity.class));
-        StudioUi.row(watch, CgIcons.SIGNAL, "صحة النظام", "الخوادم والملفات وزمن الاستجابة", "", StudioUi.SKY, StudioUi.go(a, CgHealthActivity.class));
-        StudioUi.row(watch, CgIcons.HISTORY, "سجل العمليات والنسخ", "تراجع واستعادة النسخ الاحتياطية", "", StudioUi.VIOLET, StudioUi.go(a, CgHistoryActivity.class));
-        c.addView(watch);
-
-        c.addView(StudioUi.label(this, "الخصوصية والأمان"));
-        LinearLayout sec = StudioUi.group(this);
-        StudioUi.row(sec, CgIcons.SHIELD, "خصوصية ملفات الإدارة", "تشفير الرمز، قفل التطبيق، منع تصوير الشاشة، مسح الملفات المؤقتة", "جديد", StudioUi.MINT, new Runnable() {
-            @Override public void run() { CgVault.showPrivacy(DxHomeActivity.this); }
-        });
-        StudioUi.row(sec, CgIcons.LOCK, "رمز الإدارة", "تغيير الرمز المحفوظ على هذا الجهاز", "", StudioUi.GOLD, new Runnable() {
-            @Override public void run() { TokenGate.ask(DxHomeActivity.this, new Runnable() { @Override public void run() { reloadContent(); } }); }
-        });
-        c.addView(sec);
         TextView ver = CgUi.text(this, "Cigram Studio " + versionName(), 11.5f, CgCfg.FAINT, false);
         ver.setGravity(Gravity.CENTER);
         ver.setLayoutParams(CgUi.lp(this, CgUi.MATCH, CgUi.WRAP, 0, 18, 0, 0));
         c.addView(ver);
     }
 
+    private View room(final int index, boolean wide, View extra) {
+        return StudioKit.roomCard(this, StudioMap.ROOMS[index], StudioMap.inRoom(index).size(), wide, extra, new Runnable() {
+            @Override public void run() { StudioGo.openRoom(DxHomeActivity.this, index); }
+        });
+    }
+
+    /** The pinned tools as a sideways strip, or a one-line hint when nothing is pinned. */
+    private void fillPins() {
+        if (pinsBox == null) return;
+        pinsBox.removeAllViews();
+        List<String> ids = StudioPrefs.pins(this);
+        ArrayList<View> items = new ArrayList<View>();
+        for (int i = 0; i < ids.size(); i++) {
+            final StudioMap.Tool t = StudioMap.byId(ids.get(i));
+            if (t == null) continue;
+            items.add(StudioKit.shortcut(this, t, StudioGo.opener(this, t), new Runnable() {
+                @Override public void run() {
+                    StudioPrefs.togglePin(DxHomeActivity.this, t.id);
+                    CgUi.toast(DxHomeActivity.this, "أُزيلت من الاختصارات: " + t.title);
+                    fillPins();
+                }
+            }));
+        }
+        if (items.isEmpty()) {
+            TextView hint = CgUi.text(this, "اضغط مطولاً على أي أداة داخل الغرف لتثبيتها هنا", 12.5f, CgCfg.FAINT, false);
+            hint.setGravity(Gravity.RIGHT);
+            pinsBox.addView(hint, new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP));
+            return;
+        }
+        pinsBox.addView(StudioKit.lane(this, items, 8), new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP));
+    }
+
+    /** What is wrong or waiting, from data already in memory. A quiet "all good" chip when there is nothing. */
+    private void fillAttention() {
+        if (attentionBox == null) return;
+        attentionBox.removeAllViews();
+        CgData d = CgData.cur();
+        if (d == null) {
+            attentionBox.addView(CxUi.skeleton(this, 1));
+            return;
+        }
+        final Activity a = this;
+        int[] n = d.counts();                       // movies, series, episodes, errors, no subtitle, featured, hidden
+        int drafts = 0;
+        try { drafts = CxDraft.count(this); } catch (Throwable ignored) { }
+        ArrayList<View> chips = new ArrayList<View>();
+        if (n[3] > 0) chips.add(StudioKit.attentionChip(this, CgIcons.WARNING, "عناوين فيها أخطاء", String.valueOf(n[3]), CgCfg.BAD, content("errors")));
+        if (n[4] > 0) chips.add(StudioKit.attentionChip(this, CgIcons.FILE, "بدون ترجمة", String.valueOf(n[4]), CgCfg.WARN, content("no_subtitle")));
+        if (drafts > 0) chips.add(StudioKit.attentionChip(this, CgIcons.DRAFT, "مسودات غير مكتملة", String.valueOf(drafts), CgCfg.TEXT, new Runnable() {
+            @Override public void run() { CxNav.drafts(a); }
+        }));
+        if (chips.isEmpty()) chips.add(StudioKit.attentionChip(this, CgIcons.CHECK, "كل شيء على ما يرام", "", CgCfg.GOOD, null));
+        attentionBox.addView(StudioKit.lane(this, chips, 8), new LinearLayout.LayoutParams(CgUi.MATCH, CgUi.WRAP));
+
+        StudioKit.setRoomNote(roomCards[StudioMap.SUBS], n[4] > 0 ? n[4] + " بلا ترجمة" : "", CgCfg.WARN);
+        StudioKit.setRoomNote(roomCards[StudioMap.LIBRARY], drafts > 0 ? drafts + " مسودة" : "", CgCfg.WARN);
+        if (libraryLine != null) {
+            libraryLine.setText(StudioKit.fmt(n[0]) + " فيلم  ·  " + StudioKit.fmt(n[1]) + " مسلسل  ·  " + StudioKit.fmt(n[2]) + " حلقة");
+        }
+    }
+
+    private Runnable content(final String preset) {
+        return new Runnable() {
+            @Override public void run() { DxPanels.openContent(DxHomeActivity.this, preset, -1); }
+        };
+    }
+
     private String versionName() {
-        try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Throwable t) { return ""; }
+        try {
+            String v = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            return v == null ? "" : v;
+        } catch (Throwable t) { return ""; }
     }
 
     private static String today() {
@@ -375,6 +310,7 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
         DxPanels.content(this, contentBox);   // removes previous children, then fills the overview
         View warn = warningCard();
         if (warn != null) contentBox.addView(warn, 0);
+        fillAttention();
         CgData d = CgData.cur();
         if (lastUpdated != null && d != null) {
             lastUpdated.setText((d.fromCache ? "محفوظة · " : "آخر تحديث: ") + CgUi.ago(CgUi.toIso(d.loadedAt)));
@@ -385,17 +321,17 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
 
     @Override
     public void onTick(NxLive l, boolean fresh) {
-        if (!alive()) return;
-        liveUi.update(l, fresh);
-        if (status == null) return;
+        if (!alive() || pulse == null) return;
+        pulse.update(l);
         if (l.connected) {
-            StudioUi.setPill(status, "● متصل", CgCfg.GOOD);
+            pulse.status("● متصل", CgCfg.GOOD);
         } else if (l.routeMissing) {
-            StudioUi.setPill(status, "بدون بث مباشر", CgCfg.WARN);
+            pulse.status("بدون بث مباشر", CgCfg.WARN);
         } else if (l.everConnected) {
-            StudioUi.setPill(status, "انقطع الاتصال", CgCfg.BAD);
+            pulse.status("انقطع الاتصال", CgCfg.BAD);
         } else if (l.error != null && l.error.length() > 0) {
-            StudioUi.setPill(status, "تعذر الاتصال", CgCfg.BAD);
+            pulse.status("تعذر الاتصال", CgCfg.BAD);
         }
+        StudioKit.setRoomNote(roomCards[StudioMap.LIVE], l.watching > 0 ? StudioKit.fmt(l.watching) + " يشاهدون" : "", CgCfg.GOOD);
     }
 }

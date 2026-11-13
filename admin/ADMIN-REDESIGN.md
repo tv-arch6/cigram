@@ -88,3 +88,7 @@ All add / edit / upload / ads / ops / update screens.
 - New: `WnActivity` (discovery center), `WnDetailActivity`, `WnBulkActivity`, `WnHistoryActivity`, `WnHomeCard` (dashboard card), `WnApi`, `WnPipeline`, `WnLogic`, `WnUi`; 4 manifest entries; a card in `DxHomeActivity` and a row in «المحتوى».
 - Backend: additive section in the `cigram-admin-api` Worker (`/admin/discover/*`) — see `../docs/WHATS-NEW.md`.
 - Security: the hard-coded admin token was removed; the app asks for it once (home screen, button «الرمز») and stores it on the phone only.
+
+## v4.0 — Cigram Studio 4 (الاستوديو بتصميم جديد)
+الرئيسية صارت صفحة واحدة بدل خمسة تبويبات: بحث شامل · أرقام حية · «يحتاجك الآن» · اختصاراتي · خريطة من ست غرف (`StudioRoomActivity`)
+فيها كل الأدوات (`StudioMap`، 41 أداة). التفاصيل والتحقق في `UPDATE-STUDIO-4-REPORT.md`، واللقطات في `docs/screenshots-studio4/`.

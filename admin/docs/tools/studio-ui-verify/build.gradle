@@ -1,0 +1,26 @@
+// Renders the Studio screens on the REAL Android view system (Robolectric, native graphics) with no Android SDK and no
+// resources: the UI is built in code. Needs the jars listed in README.md inside ./libs. Pictures go to ./shots.
+plugins { id 'java' }
+repositories { google(); maven { url 'https://repo1.maven.org/maven2/' } }
+sourceSets { main { java { srcDirs = ['../../../app/src/main/java', 'stubs'] } } }
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-proc:none', '-nowarn', '-Xlint:-options']
+}
+tasks.named('compileJava') { options.release = 8 }
+def libs = { names -> files(names.collect { "libs/$it" }) }
+dependencies {
+    compileOnly libs(['android-all.jar'])
+    implementation libs(['okhttp.jar', 'okio.jar', 'kotlin-stdlib.jar', 'gson.jar', 'firebase-messaging.jar', 'firebase-common.jar', 'play-services-tasks.jar', 'play-services-basement.jar'])
+    testCompileOnly libs(['android-all.jar'])
+    testRuntimeOnly libs(['android-all.jar', 'monitor-1.7.2.jar', 'espresso-idling-resource-3.6.1.jar'])
+    testImplementation 'org.robolectric:robolectric:4.14.1'
+    testImplementation 'junit:junit:4.13.2'
+}
+test {
+    useJUnit()
+    maxHeapSize = '3g'
+    jvmArgs '-Dfile.encoding=UTF-8'
+    workingDir = projectDir
+    testLogging { events 'passed', 'failed'; showStandardStreams = true; exceptionFormat = 'full' }
+}

@@ -357,5 +357,9 @@
 <activity android:name="com.my.newproject.BulkWizardActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize" />
 <activity android:name="com.my.newproject.LiveHealthActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" />
 
+<!-- 4.0 Cigram Studio 4: the rooms of the Studio and its one search -->
+<activity android:name="com.my.newproject.StudioRoomActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" />
+<activity android:name="com.my.newproject.StudioSearchActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="stateVisible|adjustResize" />
+
 	</application>
 </manifest>
