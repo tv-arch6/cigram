@@ -20,6 +20,9 @@ const P = {
   lock: '<rect x="5" y="10.500" width="14" height="10" rx="2.500"/><path d="M8 10.500V8a4 4 0 0 1 8 0v2.500"/>',
   mic: '<rect x="9" y="3.500" width="6" height="10.500" rx="3"/><path d="M5.500 11.500a6.500 6.500 0 0 0 13 0M12 18v3"/>',
   chev: '<path d="m14.500 5-7 7 7 7"/>',
+  clip: '<path d="m20.500 11.500-8.600 8.600a5.200 5.200 0 0 1-7.400-7.400l8.800-8.800a3.500 3.500 0 0 1 5 5l-8.900 8.900a1.800 1.800 0 0 1-2.500-2.500l8.200-8.200"/>',
+  retry: '<path d="M4 12a8 8 0 0 1 14-5.300M20 4v4.500h-4.500M20 12a8 8 0 0 1-14 5.300M4 20v-4.500h4.500"/>',
+  close: '<path d="m6.500 6.500 11 11M17.500 6.500l-11 11"/>',
 };
 const ic = (n) => `<svg class="ln" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n] || ''}</svg>`;
 
@@ -94,8 +97,9 @@ export function renderRequests(el, cat) {
 const clock = (ts) => new Date(ts).toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit', hour12: false });
 
 function bubble(m) {
+  const sub = m.mine && m.name ? `<bdi>${esc(m.name)}</bdi>${m.size ? ' · <bdi dir="ltr">' + support.sizeLabel(m.size) + '</bdi>' : ''}` : 'يُفتح داخل تطبيق سيكرام';
   const body = m.kind
-    ? `<span class="ch-file">${ic('lock')}<b>${esc(m.kind)}</b><em>يُفتح داخل تطبيق سيكرام</em></span>`
+    ? `<span class="ch-file">${ic('lock')}<b>${esc(m.kind)}</b><em>${sub}</em></span>`
     : esc(m.text).replace(/\n/g, '<br>');
   return `<div class="ch-msg${m.mine ? ' mine' : ''}" data-seq="${m.seq}"><p>${body}</p><time>${clock(m.ts)}</time></div>`;
 }
@@ -117,13 +121,15 @@ export function renderSupport(el, ctx) {
       <div class="ch-topics">${support.TOPICS.map((t, i) => `<button type="button" class="ch-chip" data-topic="${i}">${ic(t.icon)}<span>${esc(t.label)}</span></button>`).join('')}</div>
       <form class="ch-form">
         <span class="ch-mic" role="img" aria-label="الرسائل الصوتية متوقفة" title="الرسائل الصوتية متوقفة">${ic('mic')}<i></i></span>
+        <button type="button" class="ch-attach" aria-label="إرفاق صورة أو فيديو أو ملف" title="إرفاق">${ic('clip')}</button>
+        <input type="file" class="ch-file-input" accept="${support.ACCEPT}" hidden>
         <textarea name="text" rows="1" maxlength="2000" placeholder="اكتب رسالتك هنا" aria-label="رسالتك"></textarea>
         <button type="submit" class="ch-send" aria-label="إرسال">${ic('send')}</button>
       </form>
     </div>`;
   const listEl = el.querySelector('.ch-list');
   const form = el.querySelector('.ch-form');
-  let last = 0, alive = true, timer = 0, opened = false;
+  let last = 0, alive = true, timer = 0, opened = false, uploading = null;
   if (preset) form.text.value = `أواجه مشكلة: ${preset} — `;
 
   const append = (msgs) => {
@@ -145,6 +151,7 @@ export function renderSupport(el, ctx) {
     if (!alive) return;
     if (!r.ok) { timer = setTimeout(start, 4000); return; }        // بلا نص خطأ: يحاول من جديد بهدوء
     opened = true;
+    if (!uploading) attachBtn.disabled = false;
     listEl.innerHTML = r.messages.length ? '' : '<p class="ch-empty">اختر موضوعاً من الأسفل أو اكتب رسالتك.</p>';
     if (r.messages.length) { opened = false; append(r.messages); }
     if (r.banned) form.hidden = true;
@@ -167,10 +174,65 @@ export function renderSupport(el, ctx) {
     if (!alive) return;
     if (sent) append(sent); else form.text.value = text;            // لم تُرسل: تبقى في الصندوق ليعيد المحاولة
   };
+  // ---- إرفاق ملف: فقاعة مؤقتة بشريط تقدّم، ثم تتحول إلى الرسالة. عند عدم الاكتمال: «إعادة المحاولة» تكمل من حيث توقف.
+  const attachBtn = form.querySelector('.ch-attach');
+  const fileInput = form.querySelector('.ch-file-input');
+  const NOTE = { too_large: 'الحد الأقصى للملف 25 MB.', unsupported_type: 'الأنواع المدعومة: صور وفيديو وPDF وZIP.', banned: 'المحادثة متوقفة.', cancelled: '' };
+  const pendingHtml = (up, pct, note, retry) => `<p class="ch-file">${ic('lock')}<b>${esc(up.kind === 'image' ? 'صورة' : up.kind === 'video' ? 'فيديو' : 'ملف')}</b><em><bdi>${esc(up.name)}</bdi> · <bdi dir="ltr">${support.sizeLabel(up.size)}</bdi></em></p>`
+    + (note || retry
+      ? `<span class="ch-note">${esc(note || 'لم يكتمل الرفع')}</span><span class="ch-acts">${retry ? `<button type="button" class="ch-act" data-up="retry">${ic('retry')}<span>إعادة المحاولة</span></button>` : ''}<button type="button" class="ch-act" data-up="drop">${ic('close')}<span>حذف</span></button></span>`
+      : `<span class="ch-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></span><button type="button" class="ch-act" data-up="drop">${ic('close')}<span>إلغاء</span></button>`);
+  const startUpload = async (up, box) => {
+    const ctl = new AbortController();
+    uploading = { up, ctl };
+    attachBtn.disabled = true;
+    const paint = (pct, note, retry) => { if (box.isConnected) { box.innerHTML = pendingHtml(up, pct, note, retry); box.dataset.state = note || retry ? 'stopped' : 'running'; } };
+    paint(0);
+    const bar = () => box.querySelector('.ch-bar i');
+    const r = await support.run(up, { signal: ctl.signal, onProgress: (p) => { const b = bar(); if (b) { b.style.width = p + '%'; b.parentNode.setAttribute('aria-valuenow', p); } } });
+    uploading = null;
+    if (alive) attachBtn.disabled = false;
+    if (!alive) return;
+    if (r.ok) { box.remove(); const empty = listEl.querySelector('.ch-empty'); if (empty) empty.remove(); append(r.messages); return; }
+    if (r.reason === 'cancelled') { box.remove(); return; }
+    const final = Object.prototype.hasOwnProperty.call(NOTE, r.reason) && r.reason !== 'cancelled';
+    paint(0, final ? NOTE[r.reason] : '', !final);                 // نوع/حجم/حظر: لا فائدة من إعادة المحاولة
+    box.__up = up;
+  };
+  const onPick = () => {
+    const file = fileInput.files && fileInput.files[0];
+    fileInput.value = '';                                         // يسمح باختيار الملف نفسه مرة ثانية
+    if (!file || uploading) return;
+    const why = support.check(file);
+    if (why === 'empty') return;
+    const box = document.createElement('div');
+    box.className = 'ch-msg mine ch-pending';
+    const empty = listEl.querySelector('.ch-empty');
+    if (empty) empty.remove();
+    if (!opened) { listEl.innerHTML = ''; opened = true; }
+    listEl.appendChild(box);
+    listEl.scrollTop = listEl.scrollHeight;
+    const up = support.createUpload(file);
+    box.__up = up;
+    if (why) { box.innerHTML = pendingHtml(up, 0, NOTE[why], false); box.__up = up; return; }
+    startUpload(up, box);
+  };
+  const onUpClick = (e) => {
+    const b = e.target.closest('[data-up]');
+    if (!b) return;
+    const box = b.closest('.ch-pending');
+    if (!box) return;
+    if (b.dataset.up === 'drop') { if (uploading && uploading.up === box.__up) uploading.ctl.abort(); else box.remove(); return; }
+    if (b.dataset.up === 'retry' && !uploading && box.__up) startUpload(box.__up, box);
+  };
+  attachBtn.disabled = true;                                      // يُفتح بعد أن تُفتح المحادثة على الخادم (قبلها لا يوجد ما يُرفع إليه)
+  attachBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', onPick);
   const onKey = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } };
   el.addEventListener('click', onClick);
+  el.addEventListener('click', onUpClick);
   form.addEventListener('submit', onSubmit);
   form.text.addEventListener('keydown', onKey);
   start();
-  return { cleanup() { alive = false; clearTimeout(timer); el.removeEventListener('click', onClick); } };
+  return { cleanup() { alive = false; clearTimeout(timer); if (uploading) uploading.ctl.abort(); el.removeEventListener('click', onClick); el.removeEventListener('click', onUpClick); } };
 }

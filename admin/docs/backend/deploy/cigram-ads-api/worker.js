@@ -30,7 +30,7 @@ function corsHeaders(extra) {
   return Object.assign(
     {
       "access-control-allow-origin": "*",
-      "access-control-allow-methods": "GET,POST,OPTIONS",
+      "access-control-allow-methods": "GET,POST,PUT,OPTIONS",
       "access-control-allow-headers": "Content-Type, Authorization, X-Admin-Token",
       "access-control-max-age": "86400",
       "cache-control": "no-store",
