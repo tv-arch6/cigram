@@ -1,0 +1,32 @@
+name: Build Cigram iOS (IPA)
+on:
+  workflow_dispatch:
+jobs:
+  ipa:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Build (unsigned, device SDK)
+        run: |
+          set -euo pipefail
+          xcodebuild -project Cigram.xcodeproj -scheme Cigram -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            clean build | tee build.log | tail -n 40
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          APP=$(find build/Build/Products -name "Cigram.app" -maxdepth 3 | head -1)
+          [ -d "$APP" ] || { echo "::error::Cigram.app not found"; exit 1; }
+          rm -rf Payload && mkdir Payload && cp -R "$APP" Payload/
+          zip -qry Cigram-unsigned.ipa Payload
+          ls -lh Cigram-unsigned.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Cigram-ipa
+          path: Cigram-unsigned.ipa
