@@ -1,3 +1,4 @@
+import UIKit
 import Foundation
 
 /// Same backend the Android app uses (CigramCatalogSync -> /movies).
@@ -7,8 +8,8 @@ enum Backend {
     // Same embed servers as CigramVidResolver; %@ = tmdb id.
     static let movieServers = ["https://vidfast.vc/movie/%@", "https://vidbolt.pro/movie/%@",
                                "https://vidnest.fun/movie/%@", "https://videm.xyz/movie/%@"]
-    static let tvServers    = ["https://vidfast.vc/tv/%@/%d/%d", "https://vidbolt.pro/tv/%@/%d/%d",
-                               "https://vidnest.fun/tv/%@/%d/%d", "https://videm.xyz/tv/%@/%d/%d"]
+    static let tvServers    = ["https://vidfast.vc/tv/%@/%ld/%ld", "https://vidbolt.pro/tv/%@/%ld/%ld",
+                               "https://vidnest.fun/tv/%@/%ld/%ld", "https://videm.xyz/tv/%@/%ld/%ld"]
 }
 
 struct Title {
