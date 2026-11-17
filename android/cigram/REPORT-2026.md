@@ -86,15 +86,14 @@ and extracts the white mark and a monochrome silhouette with real alpha. `brandi
 ## 6. Account page (CIGRAM ID)
 Same views, ids and listeners (re-parented, never deleted). Groups: **حسابي** (الحساب الشخصي, قائمة المشاهدة, الإعدادات) ·
 **Cigram Plus** · **التطبيق** (تبديل, المظهر, الخطوط, الويدجت) · **الدعم والتواصل** (أريد إعلاناً, الدعم والتواصل, المساعدة, التحديثات) ·
-**عن Cigram** (حول التطبيق, الشروط والأحكام) · **إجراءات الحساب**.
+**الشروط والأحكام** · **إجراءات الحساب**.
 - **تبديل** is wired to the existing interface switch (`CigramTvMode`: phone UI / Cigram TV / automatic) and restarts on Home.
 - **أريد إعلاناً** opens the existing advertising flow (`AdvertiseActivity` → `AdsChatActivity`, order card that the admin inbox receives).
 - Monochrome line icons (white on dark, ink on light), no coloured tiles; thin borders between rows; four-stage gradient page; the user banner is shown without any overlay.
 - The app-icon picker moved to **Settings → أيقونة التطبيق**.
 - Icon collection: `AdsIcons` gained switch, bookmark, crown, Cigram mark, TV, cast, quality, subtitles, audio, speed, apps, replay/forward 10, skip, palette, document — same 24-unit grid and stroke as the existing set.
 
-## 7. About and Terms
-- `CigramAboutActivity`: what Cigram is, why, how it is built (Android/Java app + Cigram cloud services + admin app — all visible in the project), purpose, services (only features that exist), vision, and the founder **حسن سعيد** with the supplied portrait: square, 20 % corners, tilted +4°, a translucent black square tilted −6° behind it, natural colours. No dates, company data, awards or team members were invented.
+## 7. Terms
 - `CigramTermsActivity`: Arabic terms describing how the app works. **Not reviewed by a lawyer; no compliance claim.**
 - Registration (`AccountActivity` register button → `CigramTerms.checkBeforeRegister`): an **unchecked** box «أوافق على الشروط والأحكام» (link opens the terms); no request without it. Version + timestamp stored on the device (per e-mail) and sent as `terms_version` / `terms_accepted_at` with `/register` (the auth worker must persist them for a server-side record).
 
@@ -149,7 +148,7 @@ Legacy teal/navy surfaces (`#00121A`, `#0B2733`, `#1F4553` …, 27 values, ~330 
 ---
 
 ## Files added
-`CigramBrand, CigramPageKit, CigramAboutActivity, CigramTermsActivity, CigramTerms, CigramPlaybackError, CigramPermissions, CigramTvPanels, CigramSystemBars` (main) · `AdInboxNotifier` (admin) · launch / splash / icon resources · `branding/` (masters, scripts, preview).
+`CigramBrand, CigramPageKit, CigramTermsActivity, CigramTerms, CigramPlaybackError, CigramPermissions, CigramTvPanels, CigramSystemBars` (main) · `AdInboxNotifier` (admin) · launch / splash / icon resources · `branding/` (masters, scripts, preview).
 
 ## Remaining limitations (honest list)
 - Backend sources are not in the archives: 1 GB server limit, persisting `terms_version` / `terms_accepted_at`, and any `name` field of creatives depend on the workers accepting them.

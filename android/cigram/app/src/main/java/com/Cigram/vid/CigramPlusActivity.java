@@ -16,9 +16,9 @@ import android.widget.TextView;
 /**
  * The Cigram Plus page (premium design):
  *   hero  ->  [your plan: from / to + progress]  ->  link to the code page  ->  what you get (6 cards)  ->  offer price
- *   ->  payment methods (the three logos side by side, pick one)  ->  what happens next for that method  ->  yellow WhatsApp button
+ *   ->  payment methods (the three logos side by side, pick one)  ->  what happens next for that method  ->  yellow «تفعيل واستلام الكود» button
  *   ->  trust points.
- * No payment data is typed or sent inside the app: payment happens in the WhatsApp conversation, and the message names the chosen method.
+ * No payment data is typed or sent inside the app: payment happens in the private support conversation, and the message names the chosen method.
  */
 public class CigramPlusActivity extends Activity {
 
@@ -333,7 +333,7 @@ public class CigramPlusActivity extends Activity {
         methodDetail.setVisibility(View.GONE);
         s.addView(methodDetail, lp(12, 0));
 
-        // the yellow button: opens WhatsApp with the chosen method in the message
+        // the yellow button: opens the private support chat with the chosen method in the message
         LinearLayout go = new LinearLayout(this);
         go.setOrientation(LinearLayout.VERTICAL);
         go.setGravity(Gravity.CENTER);
@@ -342,7 +342,7 @@ public class CigramPlusActivity extends Activity {
         go.setElevation(dp(3));
         go.setClickable(true);
         go.setFocusable(true);
-        go.setContentDescription("تفعيل واستلام الكود عبر واتساب");
+        go.setContentDescription("تفعيل واستلام الكود عبر الدعم والتواصل");
         waLabel = CigramUI.label(this, "تفعيل واستلام الكود", 17f, 0xFFFFFFFF, true);
         waLabel.setGravity(Gravity.CENTER);
         waLabel.setShadowLayer(dp(2), 0f, dp(1), 0x66000000);        // white on yellow: keep it legible
@@ -353,7 +353,7 @@ public class CigramPlusActivity extends Activity {
         waSub.setVisibility(View.GONE);
         go.addView(waSub);
         go.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { contactOnWhatsApp(); }
+            @Override public void onClick(View v) { contactSupport(); }
         });
         s.addView(go, lp(16, 0));
         return s;
@@ -439,17 +439,17 @@ public class CigramPlusActivity extends Activity {
 
         String[] steps;
         if (index == 1) {
-            steps = new String[]{"اضغط «تفعيل واستلام الكود» لتفتح محادثتنا على واتساب برسالة جاهزة",
+            steps = new String[]{"اضغط «تفعيل واستلام الكود» لتفتح محادثة «الدعم والتواصل» برسالة جاهزة",
                     "نرسل لك رقم الاستلام الخاص بزين كاش",
                     "حوّل المبلغ وأرسل لنا صورة التحويل",
                     "يصلك كود التفعيل هنا لتضعه في الأعلى"};
         } else if (index == 2) {
-            steps = new String[]{"اضغط «تفعيل واستلام الكود» لتفتح محادثتنا على واتساب برسالة جاهزة",
+            steps = new String[]{"اضغط «تفعيل واستلام الكود» لتفتح محادثة «الدعم والتواصل» برسالة جاهزة",
                     "نرسل لك طريقة الدفع الخاصة بأسيا سيل",
                     "ادفع المبلغ وأرسل لنا ما يثبت العملية",
                     "يصلك كود التفعيل هنا لتضعه في الأعلى"};
         } else {
-            steps = new String[]{"اضغط «تفعيل واستلام الكود» لتفتح محادثتنا على واتساب برسالة جاهزة",
+            steps = new String[]{"اضغط «تفعيل واستلام الكود» لتفتح محادثة «الدعم والتواصل» برسالة جاهزة",
                     "نرسل لك طريقة الدفع بالبطاقة (ماستر كارد)",
                     "الدفع يتم خارج التطبيق، ولا تُدخل بيانات بطاقتك فيه",
                     "يصلك كود التفعيل هنا لتضعه في الأعلى"};
@@ -473,7 +473,7 @@ public class CigramPlusActivity extends Activity {
 
     private void buildTrust() {
         column.addView(sectionTitle("ليش تثق بنا"), lp(24, 10));
-        String[] items = {"الدفع يتم عبر محادثة واتساب مباشرة معنا", "لا نطلب بيانات بطاقتك داخل التطبيق", "الكود يعمل في التطبيق والموقع على حسابك", "ينتهي في موعده تلقائياً، ولا يوجد خصم تلقائي"};
+        String[] items = {"الدفع يتم عبر محادثة الدعم والتواصل المباشرة معنا", "لا نطلب بيانات بطاقتك داخل التطبيق", "الكود يعمل في التطبيق والموقع على حسابك", "ينتهي في موعده تلقائياً، ولا يوجد خصم تلقائي"};
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setBackground(CigramPlusArt.surface(this, 22));
@@ -552,7 +552,7 @@ public class CigramPlusActivity extends Activity {
 
     // ------------------------------------------------------------------ actions
 
-    private void contactOnWhatsApp() {
+    private void contactSupport() {
         if (selected[0] < 0) {
             CigramSilent.toast(this, "اختر طريقة الدفع أولاً (ماستر كارد / زين كاش / أسيا سيل)", android.widget.Toast.LENGTH_SHORT);
             methodsRow.animate().translationX(dp(8)).setDuration(60L).withEndAction(new Runnable() {
@@ -560,6 +560,6 @@ public class CigramPlusActivity extends Activity {
             }).start();
             return;
         }
-        CigramPlus.openWhatsApp(this, CigramPlus.METHOD_LABELS[selected[0]]);      // the message names the chosen method
+        CigramPlus.openSubscribeChat(this, CigramPlus.METHOD_LABELS[selected[0]]);   // the message names the chosen method
     }
 }

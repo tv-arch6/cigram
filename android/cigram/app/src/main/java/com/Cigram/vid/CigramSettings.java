@@ -26,7 +26,7 @@ import android.widget.Toast;
  *   الترجمة            إظهار · الحجم · الخط والألوان
  *   التطبيق            الإشعارات (live state) · وضع التلفاز
  *   التخزين            ذاكرة الصور (الحجم) · سجل البحث · إعادة إعدادات المشغّل
- *   الدعم وحول         التحديثات · تواصل معنا · حول Cigram
+ *   الدعم والتحديثات   التحديثات · تواصل معنا
  *   منطقة الخطر        حذف الحساب بشكل نهائي
  *
  * Player values are the same preferences the player reads (cigram_player_prefs /
@@ -360,18 +360,6 @@ public final class CigramSettings {
                     new View.OnClickListener() {
                         @Override public void onClick(View v) {
                             showContact(a);
-                        }
-                    }));
-            help.addView(divider(a));
-            // 19.5: «حول Cigram» is a page of its own (questions, how to subscribe to Plus, the developer)
-            help.addView(row(a, CigramUI.ICON_INFO, 0xFF9AA9B2, CigramAboutActivity.TITLE, "أسئلة وأجوبة · الاشتراك في Plus", false,
-                    new View.OnClickListener() {
-                        @Override public void onClick(View v) {
-                            try {
-                                a.startActivity(new android.content.Intent(a, CigramAboutActivity.class));
-                            } catch (Throwable error) {
-                                showAbout(a);   // the page could not open: the short pop-up as before
-                            }
                         }
                     }));
             col.addView(help);
@@ -823,15 +811,5 @@ public final class CigramSettings {
         t.setBackground(CigramUI.round(CigramUI.BG_SOFT, LINE, 14, a));
         t.setPadding(CigramUI.dp(a, 12), CigramUI.dp(a, 14), CigramUI.dp(a, 12), CigramUI.dp(a, 14));
         return t;
-    }
-
-    private static void showAbout(Activity a) {
-        String v = CigramUpdateChecker.installedName(a);
-        CigramUI.sheet(a)
-                .icon(CigramUI.ICON_INFO, CigramUI.TEAL)
-                .title("حول Cigram")
-                .message("منصة مشاهدة الأفلام والمسلسلات." + (v.length() == 0 ? "" : "\nالإصدار " + v))
-                .primary("حسناً", CigramUI.TEAL, null)
-                .show();
     }
 }

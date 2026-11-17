@@ -16,7 +16,7 @@ public final class AdsIcons {
 
     private AdsIcons() { }
 
-    public static final int MEGAPHONE = 1, CHAT = 2, WHATSAPP = 3, X_LOGO = 4, CHECK_CIRCLE = 5, CROSS_CIRCLE = 6,
+    public static final int MEGAPHONE = 1, CHAT = 2, X_LOGO = 4, CHECK_CIRCLE = 5, CROSS_CIRCLE = 6,
             CHEVRON_LEFT = 7, CHEVRON_DOWN = 8, PLUS = 9, MINUS = 10, CLOSE = 11, CHECK = 12, USERS = 13, EYE = 14,
             CLICK = 15, CLOCK = 16, PIN = 17, GLOBE = 18, SHIELD = 19, FILE = 20, CALC = 21, STAR = 22, SEND = 23,
             LOCK = 24, GEAR = 25, FONT = 26, FOLDER = 27, HELP = 28, DOWNLOAD = 29, REFRESH = 30, HEADSET = 31,
@@ -139,13 +139,6 @@ public final class AdsIcons {
                     rr(c, 3f, 4f, 21f, 17f, 4.5f);
                     path.moveTo(8.5f, 17f); path.lineTo(8.5f, 21f); path.lineTo(13f, 17f); pth(c, false);
                     break;
-                case WHATSAPP:
-                    arc(c, 3f, 3f, 21f, 21f, -45f, 330f);
-                    path.moveTo(4.2f, 20.2f); path.lineTo(5.6f, 15.8f); pth(c, false);
-                    path.reset(); path.moveTo(9.2f, 8.2f); path.cubicTo(8.2f, 9.2f, 8.4f, 11.4f, 10.4f, 13.6f);
-                    path.cubicTo(12.4f, 15.8f, 14.8f, 16.2f, 15.8f, 15.2f); path.lineTo(15.4f, 13.8f); path.lineTo(13.8f, 13.3f);
-                    path.lineTo(13f, 14f); path.cubicTo(11.8f, 13.4f, 10.8f, 12.4f, 10.2f, 11.2f); path.lineTo(10.9f, 10.4f);
-                    path.lineTo(10.4f, 8.8f); path.close(); pth(c, false); break;
                 case X_LOGO:
                     p.setStrokeWidth(2.4f); ln(c, 5f, 4f, 19f, 20f); p.setStrokeWidth(1.8f); ln(c, 19f, 4f, 5f, 20f); break;
                 case CHECK_CIRCLE:

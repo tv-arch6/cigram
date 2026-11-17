@@ -32,7 +32,7 @@ const b64 = (u8) => Buffer.from(u8).toString("base64");
 const env = {
   CHAT_KEY: b64(webcrypto.getRandomValues(new Uint8Array(32))),
   ADMIN_TOKEN: "owner-token-123",
-  DEV_NAME: "حسن سعيد",
+  DEV_NAME: "مطوّر سيكرام",
   DEV_AVATAR: "https://example.invalid/dev.png",
   JWT_SECRET: "jwt-test-secret",
 };
@@ -158,7 +158,7 @@ await test("a wrong token is refused", async () => {
 
 await test("presence returns the developer's public identity and last activity", async () => {
   const r = await call("GET", "/chat/presence");
-  assert.equal(r.json.developer.name, "حسن سعيد");
+  assert.equal(r.json.developer.name, "مطوّر سيكرام");
   assert.equal(typeof r.json.last_active, "number");
 });
 

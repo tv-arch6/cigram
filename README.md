@@ -3,7 +3,7 @@
 | Folder | What | Version |
 |---|---|---|
 | `Sources/`, `project.yml` | Cigram for iPhone / iPad (UIKit, iOS 12+) | **1.1.0** |
-| `android/cigram` | Cigram for Android phones + Android TV | 19.6.0 |
+| `android/cigram` | Cigram for Android phones + Android TV | 18.6.1 (versionCode 98) |
 | `android/admin` | Cigram Studio (the owner's admin app) | 3.1.0 |
 
 ## Builds (GitHub Actions → Run workflow → Artifacts)

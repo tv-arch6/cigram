@@ -24,7 +24,7 @@ import java.util.concurrent.Executors;
 /**
  * Cigram Plus - the paid plan, activated ONLY by an activation code.
  *
- * Flow: the user talks to us on WhatsApp (message built here), pays, receives a code, types it in
+ * Flow: the user talks to us in the private support chat (message built here), pays, receives a code, types it in
  * "ضع كود التفعيل". The SERVER checks the code and answers with the end date; the app only caches that answer.
  * The app never trusts a local "I paid" claim: no code accepted by the server = no Plus.
  *
@@ -41,9 +41,6 @@ public final class CigramPlus {
     static final String AUTH_BASE = "https://cigram-auth-api.wwq-mixtv.workers.dev";
     /** The Plus worker (plus-worker/worker.js). If you mount the routes inside the auth worker instead, set this equal to AUTH_BASE. */
     static final String PLUS_BASE = "https://cigram-plus-api.wwq-mixtv.workers.dev";
-
-    /** WhatsApp number, international format, digits only. Given as 7854314651 = Iraqi mobile 0785 431 4651 -> +964. */
-    static final String WHATSAPP_NUMBER = "9647854314651";
 
     static final String[] METHOD_KEYS = {"mastercard", "zaincash", "asiacell"};
     static final String[] METHOD_LABELS = {"ماستر كارد", "زين كاش", "اسياسيل"};
@@ -83,7 +80,7 @@ public final class CigramPlus {
         return c.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
-    /** false in the Google Play build: no purchase button / payment methods / WhatsApp (Play Payments policy). */
+    /** false in the Google Play build: no purchase button / payment methods (Play Payments policy). */
     static boolean salesEnabled() {
         return BuildConfig.PLUS_SALES;
     }
@@ -268,7 +265,7 @@ public final class CigramPlus {
             case RATE_LIMITED: return "محاولات كثيرة. انتظر قليلاً ثم حاول.";
             case LOGIN_REQUIRED: return "سجّل الدخول أولاً ثم فعّل الكود.";
             case INTRO_NOT_ELIGIBLE: return "هذا كود عرض الـ3 أشهر وهو لأول اشتراك فقط، وحسابك استخدم عرضاً سابقاً. تواصل معنا لكود 6 أشهر.";
-            case NOT_AVAILABLE: return "خدمة التفعيل غير متاحة بعد. تواصل معنا على واتساب.";
+            case NOT_AVAILABLE: return "خدمة التفعيل غير متاحة بعد. تواصل معنا من «الدعم والتواصل».";
             default: return "تعذّر الاتصال. تحقق من الإنترنت وحاول مرة ثانية.";
         }
     }
@@ -344,7 +341,7 @@ public final class CigramPlus {
         }
     }
 
-    // ------------------------------------------------------------------ WhatsApp
+    // ------------------------------------------------------------------ support chat (inside the app)
 
     /** The exact message the owner asked for. */
     static String subscribeMessage(String methodLabel) {
@@ -357,46 +354,25 @@ public final class CigramPlus {
                 + (intro ? INTRO_MONTHS + " أشهر - " + iqd(INTRO_PRICE_IQD) + " (عرض أول اشتراك)" : STANDARD_MONTHS + " أشهر - " + iqd(STANDARD_PRICE_IQD));
     }
 
-    /** Priority support for members: the message carries the Plus tag and the account id. */
+    /** Priority support for members: the private «الدعم والتواصل» chat opens with the Plus tag and the account id already typed. */
     static void openSupport(Activity a) {
         String id = CigramPublicId.get(a);
-        String text = "أنا عضو Plus في Cigram" + (id.length() > 0 ? "\nالمعرّف: " + id : "") + "\nأحتاج مساعدة:";
-        openWhatsAppText(a, text);
+        openSupportChat(a, "أنا عضو Plus في Cigram" + (id.length() > 0 ? "\nالمعرّف: " + id : "") + "\nأحتاج مساعدة:");
     }
 
-    /** 19.5: «حول Cigram» opens the official WhatsApp chat with its own prepared text. */
-    static void openWhatsAppMessage(Activity a, String text) {
-        openWhatsAppText(a, text);
+    /** «تفعيل واستلام الكود»: the private chat opens with the subscription message (plan + chosen method) ready to send. */
+    static void openSubscribeChat(Activity a, String methodLabel) {
+        openSupportChat(a, subscribeMessage(methodLabel, introEligible(a)));
     }
 
-    private static void openWhatsAppText(Activity a, String text) {
-        Uri uri = Uri.parse("https://wa.me/" + WHATSAPP_NUMBER + "?text=" + Uri.encode(text));
+    private static void openSupportChat(Activity a, String prefill) {
+        if (a == null) return;
         try {
-            Intent i = new Intent(Intent.ACTION_VIEW, uri);
-            i.setPackage("com.whatsapp");
+            Intent i = new Intent(a, AdsChatActivity.class);
+            i.putExtra("prefill", prefill);
             a.startActivity(i);
-            return;
-        } catch (Throwable ignored) { }
-        try {
-            a.startActivity(new Intent(Intent.ACTION_VIEW, uri));
         } catch (Throwable t) {
-            CigramSilent.toast(a, "تعذّر فتح واتساب", android.widget.Toast.LENGTH_SHORT);
-        }
-    }
-
-    /** Opens the WhatsApp chat with the prepared text (the WhatsApp app if installed, else the browser). */
-    static void openWhatsApp(Activity a, String methodLabel) {
-        Uri uri = Uri.parse("https://wa.me/" + WHATSAPP_NUMBER + "?text=" + Uri.encode(subscribeMessage(methodLabel, introEligible(a))));
-        try {
-            Intent i = new Intent(Intent.ACTION_VIEW, uri);
-            i.setPackage("com.whatsapp");
-            a.startActivity(i);
-            return;
-        } catch (Throwable ignored) { }
-        try {
-            a.startActivity(new Intent(Intent.ACTION_VIEW, uri));
-        } catch (Throwable t) {
-            CigramSilent.toast(a, "تعذّر فتح واتساب", android.widget.Toast.LENGTH_SHORT);
+            CigramSilent.toast(a, "تعذّر فتح الدعم والتواصل", android.widget.Toast.LENGTH_SHORT);
         }
     }
 

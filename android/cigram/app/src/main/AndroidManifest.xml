@@ -218,12 +218,6 @@
 			android:name=".CigramGoogleAuth"
 			android:theme="@android:style/Theme.Translucent.NoTitleBar"
 			android:exported="false" />
-		<!-- 19.5: «حول Cigram» (settings → الدعم والتحديثات) -->
-		<activity
-			android:name=".CigramAboutActivity"
-			android:theme="@style/CigramDarkTheme"
-			android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
-			android:exported="false" />
 		<!-- Terms and Conditions page -->
 		<activity
 			android:name=".CigramTermsActivity"

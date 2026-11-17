@@ -50,7 +50,7 @@ const b64 = (u8) => Buffer.from(u8).toString("base64");
 const env = {
   CHAT_KEY: b64(webcrypto.getRandomValues(new Uint8Array(32))),
   ADMIN_TOKEN: "owner-token-123",
-  DEV_NAME: "حسن سعيد",
+  DEV_NAME: "مطوّر سيكرام",
   JWT_SECRET: "jwt-test-secret",
   CHAT_RETENTION_DAYS: "1",                 // the old retention switch: it must have no effect any more
   ADS_BUCKET: makeR2(),
@@ -278,7 +278,7 @@ await test("an admin reply pushes ONE targeted FCM message to the right user, wi
   assert.equal(m.token, TOK_C);
   assert.equal(m.data.kind, "chat");
   assert.equal(m.data.to, "user");
-  assert.equal(m.data.title, "حسن سعيد");
+  assert.equal(m.data.title, "مطوّر سيكرام");
   assert.equal(m.data.body, "وعليكم السلام، كيف أساعدك؟");
   assert.equal(m.data.msg_id, r.json.message.id);
   assert.ok(Number(m.data.ts) > 0);
