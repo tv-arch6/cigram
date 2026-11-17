@@ -15,6 +15,11 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
+      # A zip uploaded OVER an older folder leaves the files that were deleted from the app behind, and they break the build:
+      #   Ads.swift (AdMob was removed from the iPhone app in 1.1.1) and CatalogueViewController.swift (the original screen).
+      # Anything listed here is deleted before the project is generated; add a name here whenever a source file is removed.
+      - name: Remove files that are no longer part of the app
+        run: rm -fv Sources/Ads.swift Sources/CatalogueViewController.swift
       - name: Tools
         run: brew install xcodegen
       - name: Generate Xcode project

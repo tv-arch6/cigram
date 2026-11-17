@@ -17,3 +17,9 @@
 - الأسماء: «Cigram apk.zip» و«Cigram ios.zip» (+ Cigram-Studio-admin.zip عند تعديل الإدارة).
 - لا تُرسل صور شاشات للمستخدم (طلب صريح)؛ افحصها بنفسك عند الحاجة.
 - لا ميزة تنزيل أفلام/مسلسلات، ولا استخراج روابط بث من VidBolt (الآيفون يشغّل داخل صفحة VidBolt).
+
+## ملفات iOS المحذوفة (مهم)
+- المالك يرفع محتوى «Cigram ios.zip» فوق فرع `main` يدوياً، والرفع **لا يمسح** الملفات المحذوفة من الزيب.
+- لذلك `.github/workflows/ios.yml` فيه خطوة تحذف الملفات القديمة (حالياً `Ads.swift` و`CatalogueViewController.swift`).
+  **كلما حذفت ملف Swift من `Sources/` أضف اسمه لتلك الخطوة**، وإلا يفشل بناء `main` بخطأ redeclaration/missing module.
+
