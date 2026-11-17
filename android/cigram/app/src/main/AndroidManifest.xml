@@ -465,6 +465,13 @@
         <action android:name="com.google.firebase.MESSAGING_EVENT" />
     </intent-filter>
 </service>
+<activity
+    android:name="com.Cigram.vid.CigramWebPlayerActivity"
+    android:exported="false"
+    android:screenOrientation="sensorLandscape"
+    android:hardwareAccelerated="true"
+    android:configChanges="orientation|screenSize|keyboardHidden|keyboard|navigation|smallestScreenSize|screenLayout|uiMode"
+    android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
 <service
     android:name="com.Cigram.vid.CigramReadyJobService"
     android:permission="android.permission.BIND_JOB_SERVICE"

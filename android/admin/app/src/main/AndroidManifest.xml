@@ -319,6 +319,12 @@
     android:theme="@android:style/Theme.Material.NoActionBar"
     android:windowSoftInputMode="adjustResize" />
 
+<!-- 19.6: «سلاسة التطبيق» — the owner tunes the Cigram app on every phone (CigramPerfConfig) -->
+<activity
+    android:name="com.my.newproject.CgSmoothActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:theme="@android:style/Theme.Material.NoActionBar" />
 <!-- ما الجديد؟ (What's New) — discovery center, detail/import, bulk import, history + settings -->
 <activity
     android:name="com.my.newproject.WnActivity"

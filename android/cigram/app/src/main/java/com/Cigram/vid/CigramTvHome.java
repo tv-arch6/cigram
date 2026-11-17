@@ -54,18 +54,26 @@ final class CigramTvHome {
         rows.setPadding(a.dp(40), a.dp(14), a.dp(28), 0);   // safe-area insets for the rows
 
         final ArrayList<Runnable> jobs = new ArrayList<Runnable>();
-        later(jobs, a, rows, "أضيف حديثاً", take(all, 18));
-        later(jobs, a, rows, "أحدث الأفلام", take(movies, 18));
-        later(jobs, a, rows, "أحدث المسلسلات", take(series, 18));
+        later(jobs, a, rows, "أضيف حديثاً", take(all, CigramDesign.HOME_ROW_MAX));
 
-        // the catalogue's own categories, biggest first (up to 6 rows)
-        Map<String, List<JSONObject>> byCategory = groupByCategory(all);
-        int added = 0;
-        for (Map.Entry<String, List<JSONObject>> e : byCategory.entrySet()) {
-            if (added >= 6) break;
-            if (e.getValue().size() < 4) continue;
-            later(jobs, a, rows, e.getKey(), take(e.getValue(), 18));
-            added++;
+        // 19.6: the SAME sections as the phone's Home — the admin's names, order and «إخفاء / حذف» — 11 posters each
+        Map<String, List<JSONObject>> admin = adminSections(a, all);
+        if (!admin.isEmpty()) {
+            for (Map.Entry<String, List<JSONObject>> e : admin.entrySet()) {
+                later(jobs, a, rows, e.getKey(), take(e.getValue(), CigramDesign.HOME_ROW_MAX));
+            }
+        } else {
+            later(jobs, a, rows, "أحدث الأفلام", take(movies, CigramDesign.HOME_ROW_MAX));
+            later(jobs, a, rows, "أحدث المسلسلات", take(series, CigramDesign.HOME_ROW_MAX));
+            // no registry yet: the catalogue's own categories, biggest first (up to 6 rows)
+            Map<String, List<JSONObject>> byCategory = groupByCategory(all);
+            int added = 0;
+            for (Map.Entry<String, List<JSONObject>> e : byCategory.entrySet()) {
+                if (added >= 6) break;
+                if (e.getValue().size() < 4) continue;
+                later(jobs, a, rows, e.getKey(), take(e.getValue(), CigramDesign.HOME_ROW_MAX));
+                added++;
+            }
         }
 
         col.addView(rows, new LinearLayout.LayoutParams(-1, -2));
@@ -245,6 +253,48 @@ final class CigramTvHome {
     private static List<JSONObject> take(List<JSONObject> src, int n) {
         List<JSONObject> out = new ArrayList<JSONObject>();
         for (int i = 0; i < src.size() && i < n; i++) out.add(src.get(i));
+        return out;
+    }
+
+    /**
+     * 19.6: the catalogue grouped by the administrator's sections (section_id / section_name), in the registry's order,
+     * without the sections the admin hid or deleted (their titles stay in search). Newest first inside a section.
+     */
+    static Map<String, List<JSONObject>> adminSections(CigramTvActivity a, List<JSONObject> all) {
+        LinkedHashMap<String, List<JSONObject>> byId = new LinkedHashMap<String, List<JSONObject>>();
+        final java.util.HashMap<String, String> names = new java.util.HashMap<String, String>();
+        for (JSONObject o : all) {
+            String id = CigramTvCards.str(o, "section_id");
+            if (id.length() == 0) continue;
+            List<JSONObject> list = byId.get(id);
+            if (list == null) { list = new ArrayList<JSONObject>(); byId.put(id, list); }
+            list.add(o);
+            if (!names.containsKey(id)) {
+                String n = CigramTvCards.str(o, "section_name");
+                if (n.length() > 0) names.put(id, n);
+            }
+        }
+        final CigramHomeOrder.Plan plan = CigramHomeOrder.plan(a);
+        List<String> ids = new ArrayList<String>(byId.keySet());
+        for (int i = ids.size() - 1; i >= 0; i--) {
+            String id = ids.get(i);
+            String name = names.containsKey(id) ? names.get(id) : id;
+            if (plan.disabled(id, name) || plan.hiddenOnHome(id, name) || plan.removedFromHome(id, name)) ids.remove(i);
+        }
+        java.util.Collections.sort(ids, new java.util.Comparator<String>() {
+            @Override public int compare(String x, String y) {
+                int rx = plan.rank(x, names.get(x)), ry = plan.rank(y, names.get(y));
+                return rx == ry ? 0 : (rx < ry ? -1 : 1);
+            }
+        });
+        Map<String, List<JSONObject>> out = new LinkedHashMap<String, List<JSONObject>>();
+        for (String id : ids) {
+            List<JSONObject> list = new ArrayList<JSONObject>(byId.get(id));
+            try { CigramOrder.sortJson(list); } catch (Throwable ignored) { }
+            String title = names.containsKey(id) ? names.get(id) : id;
+            String shown = CigramLayoutConfig.titleFor(a, id, title);
+            out.put(shown != null && shown.length() > 0 ? shown : title, list);
+        }
         return out;
     }
 

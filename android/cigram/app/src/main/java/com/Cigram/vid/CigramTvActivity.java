@@ -212,6 +212,74 @@ public final class CigramTvActivity extends Activity implements CigramTvHost {
         });
     }
 
+    // 19.6: a title the admin adds shows on the TV too, without restarting the app
+    private String loadedHash = "";
+    private final android.os.Handler tvHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable changeCheck = new Runnable() {
+        @Override public void run() {
+            tvHandler.removeCallbacks(this);
+            if (isFinishing()) return;
+            String now = CigramStage1InitProvider.catalogMemoryHash();
+            if (catalogReady && now.length() > 0 && !now.equals(loadedHash)) {
+                loadedHash = now;
+                reloadKeepingPanel();
+            }
+            tvHandler.postDelayed(this, 15000L);
+        }
+    };
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        CigramHomeOrder.refresh(this, null);
+        tvHandler.removeCallbacks(changeCheck);
+        tvHandler.postDelayed(changeCheck, 2000L);
+    }
+
+    @Override
+    protected void onPause() {
+        tvHandler.removeCallbacks(changeCheck);
+        super.onPause();
+    }
+
+    private void reloadKeepingPanel() {
+        final int panel = current;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final List<JSONObject> parsed = new ArrayList<JSONObject>();
+                try {
+                    String json = CigramStage1InitProvider.loadCatalogJsonBlocking(getApplicationContext());
+                    if (json != null && json.trim().length() > 0) {
+                        JSONArray flat = new HomeCatalog().parse(CigramTitles.normalizeCatalog(json));
+                        for (int i = 0; i < flat.length(); i++) { JSONObject o = flat.optJSONObject(i); if (o != null) parsed.add(o); }
+                    }
+                } catch (Throwable error) {
+                    android.util.Log.w("CigramTv", "catalog reload failed", error);
+                }
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (isFinishing() || parsed.isEmpty()) return;
+                        catalog.clear();
+                        catalog.addAll(parsed);
+                        SHARED = new ArrayList<JSONObject>(parsed);
+                        if (panel == 0 || panel == 1 || panel == 2) {
+                            // rebuild the visible grid / home only when the remote is not inside it right now
+                            View focus = getCurrentFocus();
+                            boolean inContent = focus != null && isDescendant(content, focus);
+                            if (!inContent) { current = -1; onNav(panel); }
+                        }
+                    }
+                });
+            }
+        }, "cigram-tv-catalog-reload").start();
+    }
+
+    private static boolean isDescendant(View parent, View child) {
+        android.view.ViewParent p = child.getParent();
+        while (p != null) { if (p == parent) return true; p = p.getParent(); }
+        return false;
+    }
+
     private void launch(Class<?> target) {
         try {
             startActivity(new Intent(this, target));
@@ -258,6 +326,7 @@ public final class CigramTvActivity extends Activity implements CigramTvHost {
                         catalog.addAll(result);
                         SHARED = new ArrayList<JSONObject>(result);
                         catalogReady = true;
+                        loadedHash = CigramStage1InitProvider.catalogMemoryHash();
                         if (catalog.isEmpty()) {
                             showError();
                         } else {

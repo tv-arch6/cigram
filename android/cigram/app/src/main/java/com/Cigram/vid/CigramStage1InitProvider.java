@@ -300,6 +300,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
             ((Application) appContext).registerActivityLifecycleCallbacks(
                     new Application.ActivityLifecycleCallbacks() {
                         public void onActivityPreCreated(Activity activity, Bundle state) {
+                            if (tvDetailsRedirect(activity)) return;   // 19.6: on a TV every details page is the TV details page
                             CigramSplash.mark(activity);   // start-up metric (no fixed hold any more)
                             try { CigramProfile.restore(activity); } catch (Throwable ignored) { }
                             cigramStripAdTitleBar(activity);
@@ -340,6 +341,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
 
                         @Override
                         public void onActivityCreated(final Activity activity, Bundle state) {
+                            if (Build.VERSION.SDK_INT < 29 && tvDetailsRedirect(activity)) return;
                             cigramStripAdTitleBar(activity);
                             CigramTvMode.apply(activity);   // v10.64: (Android 9 وما قبل: onActivityPreCreated غير موجود)
                             cigramDarkenWindow(activity);
@@ -824,6 +826,36 @@ public final class CigramStage1InitProvider extends ContentProvider {
         }
         if (!accepted) return false;
         try { return done.await(seconds, java.util.concurrent.TimeUnit.SECONDS); } catch (InterruptedException e) { return false; }
+    }
+
+    /**
+     * 19.6 — «للتلفاز شكل جديد لصفحة التفاصيل في جميع الصفحات»: on a television, a details page opened from ANY screen
+     * (search, «المزيد», my list, notifications, channels…) is the remote-friendly TV details page, never the phone one.
+     * Returns true when the phone page was replaced (it finishes without being drawn).
+     */
+    static boolean tvDetailsRedirect(Activity activity) {
+        try {
+            if (activity == null || activity.isFinishing()) return false;
+            if (!"DetailsActivity".equals(activity.getClass().getSimpleName())) return false;
+            if (!CigramTvMode.isTv(activity)) return false;
+            JSONObject item = stage3DetailsItem(activity);
+            String title = jsonText(item, "series_title", "title", "name");
+            if (title.length() == 0) return false;                    // nothing to show: keep the phone page
+            JSONObject full = findCatalogMemoryItem(inferContentType(item, ""), jsonText(item, "series_id", "id"), title);
+            CigramTvDetailsActivity.open(activity, full != null ? full : item);
+            activity.finish();
+            activity.overridePendingTransition(0, 0);
+            return true;
+        } catch (Throwable error) {
+            android.util.Log.w("CigramTv", "details redirect failed", error);
+            return false;
+        }
+    }
+
+    /** 19.6: the hash of the catalogue in memory (changes when a sync installed a newer one). */
+    static String catalogMemoryHash() {
+        String h = CATALOG_MEMORY_HASH;
+        return h == null ? "" : h;
     }
 
     static boolean isOnlineNow(Context context) {

@@ -13,20 +13,23 @@ jobs:
         run: xcodegen generate
       - name: Build (unsigned, device SDK)
         run: |
-          set -euo pipefail
+          set -o pipefail
           xcodebuild -project Cigram.xcodeproj -scheme Cigram -configuration Release \
             -sdk iphoneos -destination 'generic/platform=iOS' \
             -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            clean build | tee build.log | tail -n 40
+            clean build > build.log 2>&1 || { grep -E "error:|warning: unre" build.log | head -80; tail -n 60 build.log; exit 1; }
+          grep -c "warning:" build.log || true
+          tail -n 15 build.log
       - name: Package IPA
         run: |
           set -euo pipefail
           APP=$(find build/Build/Products -name "Cigram.app" -maxdepth 3 | head -1)
           [ -d "$APP" ] || { echo "::error::Cigram.app not found"; exit 1; }
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Info.plist"
           rm -rf Payload && mkdir Payload && cp -R "$APP" Payload/
-          zip -qry Cigram-unsigned.ipa Payload
-          ls -lh Cigram-unsigned.ipa
+          zip -qry Cigram-1.1.0-unsigned.ipa Payload
+          ls -lh Cigram-1.1.0-unsigned.ipa
       - uses: actions/upload-artifact@v4
         with:
           name: Cigram-ipa
-          path: Cigram-unsigned.ipa
+          path: Cigram-1.1.0-unsigned.ipa

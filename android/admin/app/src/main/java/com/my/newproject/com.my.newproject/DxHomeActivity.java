@@ -317,6 +317,7 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
         c.addView(StudioUi.label(this, "التطبيق"));
         LinearLayout app = StudioUi.group(this);
         StudioUi.row(app, CgIcons.UPDATE, "تحديث التطبيق", "نشر إصدار جديد وجدولته", "", StudioUi.SKY, StudioUi.go(a, CgUpdateActivity.class));
+        StudioUi.row(app, CgIcons.GEAR, "سلاسة التطبيق", "سرعة ظهور الجديد، التحميل المسبق، الجودة، الوضع الخفيف، التشغيل بالخلفية", "جديد", StudioUi.MINT, StudioUi.go(a, CgSmoothActivity.class));
         StudioUi.row(app, CgIcons.LOCK, "وضع الصيانة", "إيقاف التطبيق مؤقتاً برسالة", "", StudioUi.GOLD, StudioUi.go(a, CgMaintenanceActivity.class));
         StudioUi.row(app, CgIcons.LINK, "الروابط الخارجية", "رابط التطبيق أو قناة تليكرام بصفحة الحساب", "", StudioUi.MINT, StudioUi.go(a, ExternalLinksActivity.class));
         c.addView(app);

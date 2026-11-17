@@ -6,6 +6,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.1.0"
+    CURRENT_PROJECT_VERSION: "2"
     CODE_SIGNING_ALLOWED: "NO"
     CODE_SIGNING_REQUIRED: "NO"
     CODE_SIGN_IDENTITY: ""
@@ -19,15 +21,23 @@ targets:
       path: Sources/Info.plist
       properties:
         CFBundleDisplayName: Cigram
-        CFBundleShortVersionString: "1.0.0"
-        CFBundleVersion: "1"
-        UILaunchStoryboardName: ""
+        CFBundleDevelopmentRegion: ar
+        CFBundleShortVersionString: "1.1.0"
+        CFBundleVersion: "2"
+        UILaunchStoryboardName: LaunchScreen
         UIRequiresFullScreen: true
-        UIBackgroundModes: [audio]
+        UIUserInterfaceStyle: Dark
+        UIStatusBarStyle: UIStatusBarStyleLightContent
+        UIViewControllerBasedStatusBarAppearance: true
+        # audio: the player keeps sound with the silent switch on; fetch: the background catalogue check (iOS 12)
+        # and BGAppRefreshTask (iOS 13+) that announce new titles only once they are complete (see Notifier.swift)
+        UIBackgroundModes: [audio, fetch]
+        BGTaskSchedulerPermittedIdentifiers: [com.cigram.vid.refresh]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         NSAppTransportSecurity:
           NSAllowsArbitraryLoadsInWebContent: true
+          NSAllowsArbitraryLoadsForMedia: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cigram.vid

@@ -2578,6 +2578,12 @@ public class PlayerActivity extends AppCompatActivity {
 						}
 						@Override public void onFailed(String reason) {
 							if (isFinishing() || isDestroyed() || embedGeneration != mediaLoadGeneration[0]) return;
+							// 19.6: no dead end on TV boxes / old WebViews: the title plays in the provider's own player inside Cigram
+							if (CigramStage1InitProvider.isOnlineNow(PlayerActivity.this)) {
+								CigramWebPlayerActivity.open(PlayerActivity.this, embedLink, getIntent() == null ? "" : String.valueOf(getIntent().getStringExtra("title")).replace("null", ""));
+								finish();
+								return;
+							}
 							new android.app.AlertDialog.Builder(PlayerActivity.this)
 							.setTitle("تعذّر تشغيل الفيديو")
 							.setMessage(CigramEmbedResolver.friendly(reason) + "\n\n(" + reason + ")")

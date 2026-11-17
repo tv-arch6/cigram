@@ -170,6 +170,8 @@ final class CgHttp {
                 }
             }
             if (body != null) {
+                // 19.6: genres are saved as «كوميديا | دراما» whatever screen wrote them
+                if (url.startsWith(CgCfg.API)) CgMetaLine.normalizeBody(body);
                 byte[] payload = body.toString().getBytes("UTF-8");
                 c.setDoOutput(true);
                 c.setRequestProperty("Content-Type", "application/json; charset=UTF-8");

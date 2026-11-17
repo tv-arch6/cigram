@@ -1,0 +1,48 @@
+# Builds the Cigram Android app (direct APK, phones + Android TV) and the admin app.
+# Optional repository secrets:
+#   KEYSTORE_B64 / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD  -> sign with YOUR key (updates install over existing apps)
+#   CIGRAM_ADMIN_TOKEN                                           -> built into the admin app (it never asks for anything)
+name: Build Cigram Android
+on:
+  workflow_dispatch:
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - name: SDK 36
+        run: yes | sdkmanager "platforms;android-36" "build-tools;36.0.0" >/dev/null
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+      - name: Signing key (optional)
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/cigram.jks"
+            echo "CIGRAM_STORE_FILE=$RUNNER_TEMP/cigram.jks" >> "$GITHUB_ENV"
+            echo "CIGRAM_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+            echo "CIGRAM_KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> "$GITHUB_ENV"
+            echo "CIGRAM_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> "$GITHUB_ENV"
+          fi
+      - name: Cigram (direct APK) + unit tests
+        working-directory: android/cigram
+        run: gradle --no-daemon :app:testDirectDebugUnitTest :app:assembleDirectRelease
+      - name: Cigram Studio (admin APK)
+        working-directory: android/admin
+        env:
+          CIGRAM_ADMIN_TOKEN: ${{ secrets.CIGRAM_ADMIN_TOKEN }}
+        run: gradle --no-daemon :app:assembleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cigram-android
+          path: |
+            android/cigram/app/build/outputs/apk/direct/release/*.apk
+            android/admin/app/build/outputs/apk/release/*.apk

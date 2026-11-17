@@ -798,7 +798,8 @@ public final class CigramTvDetailsActivity extends Activity implements CigramTvH
             }
             @Override public void onFailed(String reason) {
                 if (isFinishing() || token != readyToken) return;
-                setReady("تعذّر", AMBER, CigramEmbedResolver.friendly(reason), "(" + reason + ")", true);
+                // 19.6: a title is never «تعذّر» on TV: the built-in web player takes over (remote-friendly)
+                setReady("جاهز", GREEN, "يُشغَّل بمشغّل VidBolt داخل سيكرام (بالريموت: OK تشغيل، ◀ ▶ تقديم).", "", false);
             }
         });
     }
