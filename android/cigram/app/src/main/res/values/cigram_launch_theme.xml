@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Launch theme for MainActivity. The window background is the real launch screen (page colour + logo), so the
+         very first frame already shows the Cigram identity. The colour follows the device's Light / Dark setting
+         (values / values-night). Android 12+ attributes live in values-v31. -->
+    <style name="CigramLaunchTheme" parent="AppTheme">
+        <item name="android:windowBackground">@drawable/cigram_launch_bg</item>
+        <item name="android:colorBackground">@color/cg_launch_bg</item>
+        <item name="android:statusBarColor">@color/cg_launch_bg</item>
+        <item name="android:navigationBarColor">@color/cg_launch_bg</item>
+    </style>
+    <!-- Explicit variants used on Android 13+ (SplashScreen.setSplashScreenTheme) when the user forced a mode inside
+         the app that differs from the device setting, so the next cold start already shows the right colour. -->
+    <style name="CigramLaunchTheme.Dark" parent="CigramLaunchTheme">
+        <item name="android:windowBackground">@drawable/cigram_launch_bg_dark</item>
+        <item name="android:colorBackground">@color/cg_launch_bg_dark</item>
+    </style>
+    <style name="CigramLaunchTheme.Light" parent="CigramLaunchTheme">
+        <item name="android:windowBackground">@drawable/cigram_launch_bg_light</item>
+        <item name="android:colorBackground">@color/cg_launch_bg_light</item>
+    </style>
+</resources>

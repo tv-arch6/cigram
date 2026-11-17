@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Window for every screen reachable from the bottom bar. v10.70: the colour follows the system
+         Light / Dark setting (values / values-night), so switching tabs never flashes the wrong colour.
+         The name is kept so the manifest and the code need no change. -->
+    <style name="CigramDarkTheme" parent="AppTheme">
+        <item name="android:windowBackground">@color/cg_bg</item>
+        <item name="android:colorBackground">@color/cg_bg</item>
+    </style>
+</resources>

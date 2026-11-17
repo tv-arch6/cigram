@@ -1,0 +1,14 @@
+Cigram emoji atlas
+
+Artwork
+  Fluent Emoji (3D) - Copyright (c) Microsoft Corporation - MIT License
+    https://github.com/microsoft/fluentui-emoji
+  Twemoji (flags and the emoji Fluent does not cover) - Copyright Twitter, Inc and other contributors
+    Graphics licensed under CC-BY 4.0: https://creativecommons.org/licenses/by/4.0/
+    https://github.com/twitter/twemoji (images taken from the emoji-data sprite sheet)
+
+Data
+  emoji-data - Copyright (c) Cal Henderson - MIT License
+    https://github.com/iamcal/emoji-data
+
+The images were resized to 64 px and packed into strips; nothing else was changed.

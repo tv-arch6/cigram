@@ -1,0 +1,36 @@
+{
+  "records": 5322,
+  "movies": 147,
+  "series_headers": 60,
+  "episodes": 5115,
+  "titles": 5262,
+  "with_subtitle": 227,
+  "without_subtitle": 5035,
+  "movies_without": 83,
+  "episodes_without": 4952,
+  "without_subtitle_with_tmdb_or_imdb_id": 5025,
+  "without_subtitle_and_without_any_id": 10,
+  "series_with_missing_episodes": 58,
+  "largest_series_missing": [
+    [
+      "series_37854",
+      1905
+    ],
+    [
+      "series_46260",
+      534
+    ],
+    [
+      "series_46298",
+      346
+    ],
+    [
+      "series_45790",
+      202
+    ],
+    [
+      "series_73223",
+      196
+    ]
+  ]
+}

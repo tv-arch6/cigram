@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Side-load flavor only. The Google Play flavor must NOT declare REQUEST_INSTALL_PACKAGES:
+  Play restricts it and forbids apps that download and install their own APK updates.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+</manifest>

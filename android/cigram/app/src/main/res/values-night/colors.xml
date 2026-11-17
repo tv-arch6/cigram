@@ -1,0 +1,17 @@
+<resources>
+	<!-- v10.70 theme tokens (DARK): the app's original palette. -->
+	<color name="colorControlHighlight">#FFFFFF</color>
+	<color name="colorControlNormal">#FFFFFF</color>
+	<color name="cg_brand">#E21B14</color>
+	<color name="cg_bg">#0E0E10</color>
+	<color name="cg_bg_deep">#111113</color>
+	<color name="cg_surface">#1B1B1F</color>
+	<color name="cg_surface_hi">#222226</color>
+	<color name="cg_stroke">#34343A</color>
+	<color name="cg_text">#FFFFFF</color>
+	<color name="cg_text_2">#C7C7CC</color>
+	<color name="cg_text_3">#8E8E94</color>
+	<color name="cg_nav">#0E0E10</color>
+
+	<color name="cg_launch_bg">#0E0E10</color>
+</resources>

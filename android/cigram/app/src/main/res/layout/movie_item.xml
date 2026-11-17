@@ -1,0 +1,80 @@
+<LinearLayout
+	xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
+	xmlns:tools="http://schemas.android.com/tools"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:orientation="vertical">
+	<LinearLayout
+		android:id="@+id/linear_movie"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:background="@android:color/transparent"
+		android:gravity="center_horizontal"
+		android:orientation="vertical"
+		android:layout_gravity="center_horizontal|center_vertical">
+		<ImageView
+			android:id="@+id/imageview_poster"
+			android:focusable="false"
+			android:layout_width="match_parent"
+			android:layout_height="168dp"
+			android:background="#1A1A1A"
+			android:src="@drawable/default_image"
+			android:scaleType="fitCenter"
+			android:adjustViewBounds="true" />
+		<LinearLayout
+			android:id="@+id/linear_rating"
+			android:layout_width="match_parent"
+			android:layout_height="28dp"
+			android:padding="2dp"
+			android:background="@android:color/transparent"
+			android:gravity="center_horizontal|center_vertical"
+			android:orientation="horizontal">
+			<TextView
+				android:id="@+id/textview_item_imdb"
+				android:focusable="false"
+				android:layout_width="wrap_content"
+				android:layout_height="match_parent"
+				android:layout_marginRight="5dp"
+				android:background="@android:color/transparent"
+				android:gravity="center_horizontal|center_vertical"
+				android:text="0.0"
+				android:textSize="14sp"
+				android:textColor="#FFFFFF" />
+			<ImageView
+				android:id="@+id/textview_imdb_logo"
+				android:focusable="false"
+				android:layout_width="40dp"
+				android:layout_height="18dp"
+				android:background="@android:color/transparent"
+				android:src="@drawable/ic_imdb"
+				android:scaleType="fitCenter"
+				android:layout_gravity="center_vertical" />
+		</LinearLayout>
+		<TextView
+			android:id="@+id/textview_title"
+			android:focusable="false"
+			android:layout_width="match_parent"
+			android:layout_height="35dp"
+			android:padding="2dp"
+			android:background="@android:color/transparent"
+			android:gravity="right|center_vertical"
+			android:text="اسم الفيلم"
+			android:textSize="15sp"
+			android:textColor="#FFFFFF"
+			android:lines="1" />
+		<TextView
+			android:id="@+id/textview_item_year_category"
+			android:focusable="false"
+			android:layout_width="match_parent"
+			android:layout_height="28dp"
+			android:paddingLeft="2dp"
+			android:paddingRight="2dp"
+			android:background="@android:color/transparent"
+			android:gravity="right|center_vertical"
+			android:text="2026,اكشن"
+			android:textSize="12sp"
+			android:textColor="#707980"
+			android:lines="1" />
+	</LinearLayout>
+</LinearLayout>

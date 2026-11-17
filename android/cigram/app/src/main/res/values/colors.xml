@@ -1,0 +1,32 @@
+<resources>
+	<color name="colorPrimary">#181818</color>
+	<color name="colorPrimaryDark">#0C0C0E</color>
+	<color name="colorAccent">#9AA8B2</color>
+	<color name="colorControlHighlight">#FFFFFF</color>
+	<color name="colorControlNormal">#FFFFFF</color>
+
+	<!-- v10.70 theme tokens (LIGHT). values-night/colors.xml holds the same names for dark mode.
+	     The brand red never changes; only surfaces and text follow the system setting. -->
+	<color name="cg_brand">#E21B14</color>
+	<color name="cg_bg">#F4F5F7</color>
+	<color name="cg_bg_deep">#ECEEF1</color>
+	<color name="cg_surface">#FFFFFF</color>
+	<color name="cg_surface_hi">#F0F2F4</color>
+	<color name="cg_stroke">#DADFE3</color>
+	<color name="cg_text">#111418</color>
+	<color name="cg_text_2">#3C474E</color>
+	<color name="cg_text_3">#5F6B73</color>
+	<color name="cg_nav">#FFFFFF</color>
+
+	<!-- 2026 identity: launch screen (light), and the fixed pair used by the explicit Light / Dark launch themes -->
+	<color name="cg_launch_bg">#F4F4F6</color>
+	<color name="cg_launch_bg_light">#F4F4F6</color>
+	<color name="cg_launch_bg_dark">#0E0E10</color>
+	<!-- Cigram charcoal palette (dark) and its light counterpart, shared by the redesigned pages -->
+	<color name="cg_charcoal">#0E0E10</color>
+	<color name="cg_charcoal_2">#141417</color>
+	<color name="cg_charcoal_3">#1B1B1F</color>
+	<color name="cg_charcoal_4">#242429</color>
+	<color name="cg_hairline">#1FFFFFFF</color>
+	<color name="cg_gold">#F2C14E</color>
+</resources>

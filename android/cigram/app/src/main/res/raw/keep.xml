@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Resource shrinker hints.
+  The app resolves many resources at runtime by NAME (Resources.getIdentifier: CigramLogos "res:<drawable>"
+  coming from channel data, CigramPreload layouts, CigramAccountUI ids ...). lax mode + explicit keeps stop
+  shrinkResources from deleting something that is only reachable through a string.
+  The app's own drawables/layouts/ids are tiny (~2 MB total); the big size win comes from R8 + library resources.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:shrinkMode="lax"
+    tools:keep="@drawable/*,@layout/*,@id/*,@mipmap/*,@style/Cigram*,@style/AppTheme*,@raw/*" />

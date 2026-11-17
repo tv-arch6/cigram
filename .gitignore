@@ -1,3 +1,10 @@
 build/
 *.xcodeproj
 .DS_Store
+# Android builds (sources are tracked under android/)
+android/*/build/
+android/*/app/build/
+android/*/.gradle/
+android/*/local.properties
+android/*/docs/screenshots-*/
+dist/

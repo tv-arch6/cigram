@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  CgHooks / AdHooks bind views at runtime with Resources.getIdentifier("linear1" | "button_publish_update" ...).
+  lax mode keeps everything reachable through a string; the explicit list is the safety net.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:shrinkMode="lax"
+    tools:keep="@id/*,@layout/*,@drawable/*,@mipmap/*" />
