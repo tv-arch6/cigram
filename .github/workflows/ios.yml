@@ -33,3 +33,41 @@ jobs:
         with:
           name: Cigram-ipa
           path: Cigram-1.1.0-unsigned.ipa
+
+  # Launches the app in the iOS Simulator against the live catalogue and keeps screenshots (proof that it starts and loads).
+  simulator-check:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Build for the simulator
+        run: |
+          set -o pipefail
+          xcodebuild -project Cigram.xcodeproj -scheme Cigram -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath simbuild CODE_SIGNING_ALLOWED=NO \
+            build > sim.log 2>&1 || { grep -E "error:" sim.log | head -60; tail -n 40 sim.log; exit 1; }
+      - name: Run and screenshot
+        run: |
+          set -x
+          APP=$(find simbuild/Build/Products -name "Cigram.app" -maxdepth 3 | head -1)
+          DEV=$(xcrun simctl list devices available | grep -E "iPhone 1[5-7]( Pro)? \(" | head -1 | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
+          [ -n "$DEV" ] || DEV=$(xcrun simctl list devices available | grep iPhone | head -1 | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
+          xcrun simctl boot "$DEV" || true
+          xcrun simctl bootstatus "$DEV" -b
+          xcrun simctl install "$DEV" "$APP"
+          xcrun simctl launch "$DEV" com.cigram.vid
+          mkdir -p shots
+          sleep 35
+          xcrun simctl io "$DEV" screenshot shots/01-home.png
+          sleep 20
+          xcrun simctl io "$DEV" screenshot shots/02-home-later.png
+          xcrun simctl spawn "$DEV" log show --last 3m --predicate 'process == "Cigram"' --style compact > shots/app-log.txt 2>&1 || true
+          ls -la shots
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Cigram-ios-simulator-check
+          path: shots

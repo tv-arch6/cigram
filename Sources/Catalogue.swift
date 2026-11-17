@@ -227,8 +227,10 @@ enum CatalogueParser {
 
     static func normalize(_ s: String) -> String {
         var t = s.folding(options: [.diacriticInsensitive, .caseInsensitive, .widthInsensitive], locale: Locale(identifier: "ar"))
-        let map: [Character: Character] = ["أ": "ا", "إ": "ا", "آ": "ا", "ٱ": "ا", "ى": "ي", "ة": "ه", "ؤ": "و", "ئ": "ي"]
-        t = String(t.map { map[$0] ?? $0 }).replacingOccurrences(of: "ـ", with: "")
+        let letters: [Character: Character] = ["أ": "ا", "إ": "ا", "آ": "ا", "ٱ": "ا", "ى": "ي", "ة": "ه", "ؤ": "و", "ئ": "ي"]
+        var unified = ""
+        for ch in t { unified.append(letters[ch] ?? ch) }
+        t = unified.replacingOccurrences(of: "ـ", with: "")
         return t.components(separatedBy: CharacterSet.alphanumerics.inverted).filter { !$0.isEmpty }.joined(separator: " ")
     }
 }
