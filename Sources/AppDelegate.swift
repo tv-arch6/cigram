@@ -13,8 +13,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
         styleBars()
 
-        let home = nav(HomeViewController(), title: "الرئيسية", icon: "⌂")
-        let search = nav(SearchViewController(), title: "البحث", icon: "⌕")
+        let home = nav(HomeViewController(), title: "الرئيسية", icon: "house.fill")
+        let search = nav(SearchViewController(), title: "البحث", icon: "magnifyingglass")
         let t = UITabBarController()
         t.viewControllers = [home, search]
         t.tabBar.barStyle = .black
@@ -78,7 +78,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         n.navigationBar.tintColor = .white
         n.navigationBar.isTranslucent = true
         if #available(iOS 11.0, *) { n.navigationBar.prefersLargeTitles = false }
-        n.tabBarItem = UITabBarItem(title: title, image: AppDelegate.glyph(icon), tag: 0)
+        n.tabBarItem = UITabBarItem(title: title, image: AppDelegate.icon(icon), tag: 0)
         return n
     }
 
@@ -89,16 +89,37 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         UITabBar.appearance().barTintColor = Theme.bg
     }
 
-    /// A tab icon drawn from a text glyph (no image assets needed; works on iOS 12).
-    static func glyph(_ text: String) -> UIImage? {
+    /// SF Symbols on iOS 13+, a drawn house / magnifier on iOS 12 (no image assets needed).
+    static func icon(_ symbol: String) -> UIImage? {
+        if #available(iOS 13.0, *) {
+            if let img = UIImage(systemName: symbol) { return img }
+        }
         let size = CGSize(width: 26, height: 26)
         UIGraphicsBeginImageContextWithOptions(size, false, 0)
         defer { UIGraphicsEndImageContext() }
-        let p = NSMutableParagraphStyle()
-        p.alignment = .center
-        (text as NSString).draw(in: CGRect(x: 0, y: 0, width: 26, height: 26),
-                                withAttributes: [.font: UIFont.systemFont(ofSize: 21, weight: .bold), .paragraphStyle: p,
-                                                 .foregroundColor: UIColor.white])
+        UIColor.white.setStroke()
+        UIColor.white.setFill()
+        if symbol.hasPrefix("house") {
+            let roof = UIBezierPath()
+            roof.move(to: CGPoint(x: 3, y: 13))
+            roof.addLine(to: CGPoint(x: 13, y: 4))
+            roof.addLine(to: CGPoint(x: 23, y: 13))
+            roof.lineWidth = 2.4
+            roof.lineCapStyle = .round
+            roof.lineJoinStyle = .round
+            roof.stroke()
+            UIBezierPath(roundedRect: CGRect(x: 7, y: 12, width: 12, height: 11), cornerRadius: 2).fill()
+        } else {
+            let lens = UIBezierPath(ovalIn: CGRect(x: 4, y: 4, width: 13, height: 13))
+            lens.lineWidth = 2.4
+            lens.stroke()
+            let handle = UIBezierPath()
+            handle.move(to: CGPoint(x: 15.5, y: 15.5))
+            handle.addLine(to: CGPoint(x: 22, y: 22))
+            handle.lineWidth = 2.8
+            handle.lineCapStyle = .round
+            handle.stroke()
+        }
         return UIGraphicsGetImageFromCurrentImageContext()?.withRenderingMode(.alwaysTemplate)
     }
 }
