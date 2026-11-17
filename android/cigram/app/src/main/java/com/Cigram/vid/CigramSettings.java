@@ -290,10 +290,10 @@ public final class CigramSettings {
                     });
             notifSub[0] = (TextView) notifRow.getTag();
             app.addView(notifRow);
-            // 2026: Cigram Plus customisation lives here (was on the account page): the launcher icon picker
+            // customisation lives here: the launcher icon picker
             app.addView(divider(a));
             app.addView(row(a, CigramUI.ICON_IMAGE, CigramUI.TEAL, "أيقونة التطبيق",
-                    CigramPlus.isPlus(a) ? "اختر شكل Cigram على شاشتك الرئيسية" : "الكلاسيكية للجميع، والأشكال المميزة لمشتركي Plus",
+                    "اختر شكل Cigram على شاشتك الرئيسية",
                     false, new View.OnClickListener() {
                         @Override public void onClick(View v) { CigramAppIconUI.openDialog(a); }
                     }));

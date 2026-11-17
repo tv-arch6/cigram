@@ -399,7 +399,6 @@ public final class CigramStage1InitProvider extends ContentProvider {
                             } catch (Throwable ignored) { }
                             CigramTvMode.refresh(activity);   // v10.64: يثبّت تكبير التلفاز إن استبدل النظام الموارد
                             CigramTvMode.showCrashNotice(activity);   // v10.65: على التلفاز فقط، مرة واحدة بعد انهيار
-                            CigramPlusPromo.onResumed(activity);   // Plus pop-up: free users, Home only, max 3 per week
                             cigramHideAdTitleView(activity);
                             final Runnable bind = new Runnable() {
                                 @Override public void run() {

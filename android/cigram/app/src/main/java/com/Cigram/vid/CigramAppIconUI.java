@@ -19,7 +19,7 @@ import android.widget.Toast;
 
 /**
  * Account page section «أيقونة التطبيق»: the active icon in a warm glowing frame with a capsule, a horizontal list of all
- * icons, Plus-only ones covered with blur + PLUS crown for free accounts, and the apply button for Plus accounts.
+ * icons (all of them available) and the apply button.
  */
 final class CigramAppIconUI {
 
@@ -68,14 +68,6 @@ final class CigramAppIconUI {
                         ViewGroup.LayoutParams.WRAP_CONTENT);
             }
             d.show();
-            // the server may change the plan while the sheet is open: rebuild the section with the answer
-            CigramPlus.refresh(a, false, new Runnable() {
-                @Override public void run() {
-                    if (!a.isFinishing() && d.isShowing()) {
-                        try { install(a, host, 0); } catch (Throwable ignored) { }
-                    }
-                }
-            });
         } catch (Throwable error) {
             android.util.Log.w("CigramAppIcon", "picker dialog failed", error);
         }
@@ -97,7 +89,6 @@ final class CigramAppIconUI {
 
     private static View build(final Activity a, final LinearLayout host) {
         CigramAppIcon.enforce(a);
-        final boolean plus = CigramPlus.isPlus(a);
         final String active = CigramAppIcon.active(a);
         final String[] picked = {active};
 
@@ -113,7 +104,7 @@ final class CigramAppIconUI {
         TextView title = CigramUI.label(a, "أيقونة التطبيق", 16f, pal.text, true);
         title.setGravity(Gravity.RIGHT);
         card.addView(title, new LinearLayout.LayoutParams(-1, -2));
-        TextView sub = CigramUI.label(a, plus ? "اختر شكل Cigram على شاشتك الرئيسية" : "الأيقونات المميزة حصرية لمشتركي Cigram Plus", 12f, pal.text3, false);
+        TextView sub = CigramUI.label(a, "اختر شكل Cigram على شاشتك الرئيسية", 12f, pal.text3, false);
         sub.setGravity(Gravity.RIGHT);
         LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(-1, -2);
         sl.topMargin = CigramUI.dp(a, 2);
@@ -152,9 +143,8 @@ final class CigramAppIconUI {
                 renderHero(a, hero, CigramAppIcon.active(a));
                 list.removeAllViews();
                 for (final CigramAppIcon.Variant v : CigramAppIcon.ALL) {
-                    list.addView(tile(a, v, plus, v.id.equals(picked[0]), CigramAppIcon.active(a).equals(v.id), new View.OnClickListener() {
+                    list.addView(tile(a, v, v.id.equals(picked[0]), CigramAppIcon.active(a).equals(v.id), new View.OnClickListener() {
                         @Override public void onClick(View view) {
-                            if (!CigramAppIcon.canUse(a, v)) { showLocked(a); return; }
                             picked[0] = v.id;
                             render[0].run();
                         }
@@ -169,9 +159,7 @@ final class CigramAppIconUI {
         apply.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
                 CigramAppIcon.Variant t = CigramAppIcon.find(picked[0]);
-                if (!CigramAppIcon.canUse(a, t)) { showLocked(a); return; }
                 if (CigramAppIcon.apply(a, t.id)) {
-                    CigramPlus.syncAppIcon(a, t.id);
                     CigramSilent.toast(a, "تم تغيير الأيقونة ✓ (قد يتأخر ظهورها لثوانٍ حسب الشاشة الرئيسية)", android.widget.Toast.LENGTH_LONG);
                 } else {
                     CigramSilent.toast(a, "تعذّر تغيير الأيقونة على هذا الجهاز", android.widget.Toast.LENGTH_SHORT);
@@ -215,8 +203,7 @@ final class CigramAppIconUI {
         hero.addView(nm, nl);
     }
 
-    private static View tile(final Activity a, CigramAppIcon.Variant v, boolean plus, boolean picked, boolean isActive, View.OnClickListener click) {
-        final boolean locked = v.plus && !plus;
+    private static View tile(final Activity a, CigramAppIcon.Variant v, boolean picked, boolean isActive, View.OnClickListener click) {
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
         col.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -225,7 +212,7 @@ final class CigramAppIconUI {
         col.setLayoutParams(lp);
         col.setClickable(true);
         col.setOnClickListener(click);
-        col.setContentDescription(v.name + (locked ? " — حصرية لمشتركي Plus" : ""));
+        col.setContentDescription(v.name);
 
         FrameLayout f = new FrameLayout(a);
         final CigramPalette pal = CigramPalette.of(a);
@@ -238,78 +225,13 @@ final class CigramAppIconUI {
         iv.setBackground(box(0xFF000000, 15, 0, 0, a));
         iv.setClipToOutline(true);
         f.addView(iv, new FrameLayout.LayoutParams(-1, -1));
-        if (locked) {
-            if (Build.VERSION.SDK_INT >= 31) {
-                try { iv.setRenderEffect(RenderEffect.createBlurEffect(14f, 14f, Shader.TileMode.CLAMP)); } catch (Throwable ignored) { }
-            }
-            View shade = new View(a);
-            shade.setBackground(box(0xAA06141C, 15, 0, 0, a));
-            f.addView(shade, new FrameLayout.LayoutParams(-1, -1));
-            TextView badge = CigramUI.label(a, "👑 PLUS", 9.5f, 0xFF2B1A00, true);
-            badge.setGravity(Gravity.CENTER);
-            badge.setBackground(box(GOLD, 8, 0, 0, a));
-            badge.setPadding(CigramUI.dp(a, 5), CigramUI.dp(a, 2), CigramUI.dp(a, 5), CigramUI.dp(a, 2));
-            f.addView(badge, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
-        }
         col.addView(f, new LinearLayout.LayoutParams(CigramUI.dp(a, 72), CigramUI.dp(a, 72)));
-        TextView n = CigramUI.label(a, v.name, 10.5f, locked ? pal.text3 : pal.text, false);
+        TextView n = CigramUI.label(a, v.name, 10.5f, pal.text, false);
         n.setGravity(Gravity.CENTER);
         n.setMaxLines(2);
         LinearLayout.LayoutParams nl = new LinearLayout.LayoutParams(-2, -2);
         nl.topMargin = CigramUI.dp(a, 4);
         col.addView(n, nl);
         return col;
-    }
-
-    /** Locked icon tapped (or Plus expired): the exclusive-icon popup with the upgrade button. */
-    static void showLocked(final Activity a) {
-        try {
-            final Dialog d = new Dialog(a);
-            d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
-            LinearLayout box = new LinearLayout(a);
-            box.setOrientation(LinearLayout.VERTICAL);
-            box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-            box.setGravity(Gravity.CENTER_HORIZONTAL);
-            final CigramPalette pal = CigramPalette.of(a);
-            box.setBackground(box(pal.surface, 22, 0x66F5B83D, 1, a));
-            int p = CigramUI.dp(a, 20);
-            box.setPadding(p, p, p, p);
-            TextView crown = CigramUI.label(a, "👑", 34f, 0xFFFFFFFF, false);
-            crown.setGravity(Gravity.CENTER);
-            box.addView(crown, new LinearLayout.LayoutParams(-2, -2));
-            TextView msg = CigramUI.label(a, "هذه الأيقونة حصرية لمشتركي Cigram Plus 👑. اشترك الآن لتخصيص شكل التطبيق على شاشتك الرئيسية!", 14f, 0xFFFFFFFF, false);
-            msg.setGravity(Gravity.CENTER);
-            msg.setLineSpacing(0f, 1.2f);
-            LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(-1, -2);
-            ml.topMargin = CigramUI.dp(a, 8);
-            msg.setTextColor(pal.text);
-            box.addView(msg, ml);
-            if (CigramPlus.salesEnabled()) {
-                TextView go = CigramUI.label(a, "اشترك الآن", 14f, 0xFF1A1200, true);
-                go.setGravity(Gravity.CENTER);
-                go.setBackground(box(GOLD, 14, 0, 0, a));
-                go.setClickable(true);
-                go.setOnClickListener(new View.OnClickListener() {
-                    @Override public void onClick(View v) { d.dismiss(); CigramPlusUI.openPage(a, "pay"); }
-                });
-                LinearLayout.LayoutParams gl = new LinearLayout.LayoutParams(-1, CigramUI.dp(a, 46));
-                gl.topMargin = CigramUI.dp(a, 16);
-                box.addView(go, gl);
-            }
-            TextView later = CigramUI.label(a, "ليس الآن", 12.5f, pal.text3, false);
-            later.setGravity(Gravity.CENTER);
-            later.setPadding(0, CigramUI.dp(a, 10), 0, 0);
-            later.setClickable(true);
-            later.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { d.dismiss(); } });
-            box.addView(later, new LinearLayout.LayoutParams(-1, -2));
-            d.setContentView(box);
-            if (d.getWindow() != null) {
-                d.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
-                d.getWindow().setLayout(CigramUI.dp(a, 300), ViewGroup.LayoutParams.WRAP_CONTENT);
-            }
-            d.show();
-        } catch (Throwable t) {
-            CigramSilent.toast(a, "هذه الأيقونة حصرية لمشتركي Cigram Plus", android.widget.Toast.LENGTH_SHORT);
-        }
     }
 }

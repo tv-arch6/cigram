@@ -114,7 +114,7 @@ public final class CigramAccountUI {
         DONE.put(v, Boolean.TRUE);
     }
 
-    /** A custom box (app icons, Plus) sits on the page with the same side margins as the rows. */
+    /** A custom box (app icons) sits on the page with the same side margins as the rows. */
     static void sideMargins(Context c, View v) {
         ViewGroup.LayoutParams lp = v.getLayoutParams();
         if (lp instanceof ViewGroup.MarginLayoutParams) {

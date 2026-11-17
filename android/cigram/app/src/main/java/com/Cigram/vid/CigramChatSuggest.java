@@ -20,8 +20,8 @@ import android.widget.TextView;
  * Suggestion chips above the message field of the private conversation.
  *
  * A chip is a ready sentence: one tap writes it into the field (the user can still edit it before sending — nothing is
- * sent on his behalf). The conversation is for three subjects only — Cigram Plus prices, Cigram Plus features and
- * problems — so the row offers exactly those ({@link #forUser}). It hides itself while the user is typing.
+ * sent on his behalf). The conversation is for problems, suggestions and requests, so the row offers exactly those
+ * ({@link #forUser}). It hides itself while the user is typing.
  *
  * Look: black pills with a thin white ring and a white line icon from the app's own set ({@link AdsIcons}); no emoji,
  * no colours, no images, nothing loaded from the network.
@@ -131,30 +131,20 @@ final class CigramChatSuggest extends HorizontalScrollView {
 
     private static String ic(int kind) { return String.valueOf(kind); }
 
-    /** The viewer's side («الدعم والتواصل»): Cigram Plus prices, Cigram Plus features, problems. */
+    /** The viewer's side («الدعم والتواصل»): problems, suggestions and requests. */
     static String[][] forUser(boolean emptyConversation, String lastDeveloperType, boolean lastIsMine) {
-        if ("quote".equals(lastDeveloperType) && !lastIsMine) {
-            return new String[][]{
-                    {ic(AdsIcons.CHECK_CIRCLE), "موافق على السعر", "موافق على السعر، كيف أكمل الاشتراك؟"},
-                    {ic(AdsIcons.WALLET), "طرق الدفع", "ما طرق الدفع المتاحة لاشتراك Cigram Plus؟"},
-                    {ic(AdsIcons.CLOCK), "متى يتفعّل؟", "متى يتفعّل اشتراكي بعد الدفع؟"},
-            };
-        }
         if (emptyConversation) {
             return new String[][]{
-                    {ic(AdsIcons.TAG), "أسعار Cigram Plus", "مرحباً، ما أسعار اشتراك Cigram Plus والمدد المتوفرة؟"},
-                    {ic(AdsIcons.CROWN), "مزايا Cigram Plus", "ما المزايا التي أحصل عليها مع Cigram Plus؟"},
-                    {ic(AdsIcons.WALLET), "طرق الدفع", "ما طرق الدفع المتاحة لاشتراك Cigram Plus؟"},
                     {ic(AdsIcons.ALERT), "مشكلة في التشغيل", "أواجه مشكلة في تشغيل هذا العنوان: "},
                     {ic(AdsIcons.USER), "مشكلة في الحساب", "أواجه مشكلة في حسابي: "},
-                    {ic(AdsIcons.STAR), "مشكلة في الاشتراك", "اشتركت في Cigram Plus ولم يتفعّل، بريدي: "},
+                    {ic(AdsIcons.SEND), "طلب عنوان", "أرجو إضافة هذا العنوان: "},
+                    {ic(AdsIcons.STAR), "اقتراح", "لدي اقتراح لتحسين التطبيق: "},
             };
         }
         return new String[][]{
-                {ic(AdsIcons.TAG), "الأسعار", "ما أسعار اشتراك Cigram Plus والمدد المتوفرة؟"},
-                {ic(AdsIcons.CROWN), "المزايا", "ما المزايا التي أحصل عليها مع Cigram Plus؟"},
-                {ic(AdsIcons.REFRESH), "تجديد الاشتراك", "أريد تجديد اشتراكي في Cigram Plus."},
                 {ic(AdsIcons.ALERT), "مشكلة", "أواجه مشكلة وأحتاج مساعدة: "},
+                {ic(AdsIcons.SEND), "طلب عنوان", "أرجو إضافة هذا العنوان: "},
+                {ic(AdsIcons.STAR), "اقتراح", "لدي اقتراح لتحسين التطبيق: "},
                 {ic(AdsIcons.CHECK), "شكراً", "شكراً لكم"},
         };
     }
@@ -164,20 +154,16 @@ final class CigramChatSuggest extends HorizontalScrollView {
         if (emptyConversation) {
             return new String[][]{
                     {ic(AdsIcons.CHAT), "ترحيب", "أهلاً بك في Cigram، كيف أستطيع مساعدتك؟"},
-                    {ic(AdsIcons.TAG), "أسعار Plus", "أسعار Cigram Plus الحالية تجدها داخل صفحة Cigram Plus، وأي مدة تختارها أفعّلها لك فوراً."},
             };
         }
         if ("image".equals(lastUserType) || "video".equals(lastUserType) || "file".equals(lastUserType)) {
             return new String[][]{
                     {ic(AdsIcons.CHECK_CIRCLE), "تم الاستلام", "تم استلام الملف، سأراجعه وأعود إليك."},
-                    {ic(AdsIcons.RECEIPT), "وصل الدفع", "وصلني إثبات الدفع، سأفعّل اشتراكك الآن."},
                     {ic(AdsIcons.INFO), "أحتاج تفاصيل", "أرسل لي اسم العنوان ورقم الحلقة التي تظهر فيها المشكلة."},
             };
         }
         return new String[][]{
                 {ic(AdsIcons.CHAT), "ترحيب", "أهلاً بك، كيف أستطيع مساعدتك؟"},
-                {ic(AdsIcons.CROWN), "مزايا Plus", "Cigram Plus: مشاهدة بلا إعلانات، جودة أعلى، وأيقونات وخطوط خاصة."},
-                {ic(AdsIcons.STAR), "تم التفعيل", "تم تفعيل اشتراكك في Cigram Plus، مشاهدة ممتعة."},
                 {ic(AdsIcons.CLOCK), "قيد المراجعة", "طلبك قيد المراجعة وسأعود إليك قريباً."},
                 {ic(AdsIcons.CHECK), "تم الحل", "تم حل المشكلة، جرّب الآن وأخبرني."},
         };

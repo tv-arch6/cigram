@@ -24,7 +24,7 @@ import java.util.Random;
  * The app's small motion pieces, all drawn in code (white ink, no images, no emoji):
  *
  *   {@link #celebrate}  — shapes fly in from the left and the right edge of the screen and are gone at once
- *                          (Cigram Plus has just been activated);
+ *                          (a celebration moment);
  *   {@link #reaction}   — a big thumb springs up in the middle of the page with the new count under it
  *                          («أعجبني» / «لا يعجبني» on the details page);
  *   {@link Thumb}       — the like / dislike icon (one drawing, flipped);

@@ -20,8 +20,8 @@ import android.widget.TextView;
  * Suggestion chips above the message field of the private conversation.
  *
  * A chip is a ready sentence: one tap writes it into the field (the admin can still edit it before sending — nothing
- * is sent on his behalf). The row follows the conversation: an empty conversation offers the greeting and the Plus
- * prices, a file from the user offers the receipt answers, and so on ({@link #forDeveloper}). It hides itself while
+ * is sent on his behalf). The row follows the conversation: an empty conversation offers the greeting, a file from
+ * the user offers the receipt answers, and so on ({@link #forDeveloper}). It hides itself while
  * the admin is typing or recording.
  *
  * Look: black pills with a thin white ring and a white line icon from the admin's own set ({@link CgIcons}); no emoji,
@@ -139,20 +139,16 @@ final class CigramChatSuggest extends HorizontalScrollView {
         if (emptyConversation) {
             return new String[][]{
                     {ic(CgIcons.CHAT), "ترحيب", "أهلاً بك في Cigram، كيف أستطيع مساعدتك؟"},
-                    {ic(CgIcons.CHART), "أسعار Plus", "أسعار Cigram Plus الحالية تجدها داخل صفحة Cigram Plus، وأي مدة تختارها أفعّلها لك فوراً."},
             };
         }
         if ("image".equals(lastUserType) || "video".equals(lastUserType) || "file".equals(lastUserType)) {
             return new String[][]{
                     {ic(CgIcons.CHECK), "تم الاستلام", "تم استلام الملف، سأراجعه وأعود إليك."},
-                    {ic(CgIcons.FILE), "وصل الدفع", "وصلني إثبات الدفع، سأفعّل اشتراكك الآن."},
                     {ic(CgIcons.INFO), "أحتاج تفاصيل", "أرسل لي اسم العنوان ورقم الحلقة التي تظهر فيها المشكلة."},
             };
         }
         return new String[][]{
                 {ic(CgIcons.CHAT), "ترحيب", "أهلاً بك، كيف أستطيع مساعدتك؟"},
-                {ic(CgIcons.PLUS), "مزايا Plus", "Cigram Plus: مشاهدة بلا إعلانات، جودة أعلى، موقّت النوم، وأيقونات وخطوط خاصة."},
-                {ic(CgIcons.STAR), "تم التفعيل", "تم تفعيل اشتراكك في Cigram Plus، مشاهدة ممتعة."},
                 {ic(CgIcons.HISTORY), "قيد المراجعة", "طلبك قيد المراجعة وسأعود إليك قريباً."},
                 {ic(CgIcons.CHECK), "تم الحل", "تم حل المشكلة، جرّب الآن وأخبرني."},
         };

@@ -89,9 +89,8 @@ final class CigramPlayerLauncher {
             if (episodes.length() > 0 && episodes.length() <= 150000) i.putExtra("series_episodes_json", episodes);
             String skip = s(src, "skip_segments");
             if (skip.length() > 0 && skip.length() <= 2000) i.putExtra("skip_segments", skip);
-            boolean plus = CigramPlus.isPlus(a);
-            i.putExtra("ads", !plus);     // Cigram Plus = no ads in the companion player either
-            i.putExtra("plus", plus);     // the companion player applies the same Plus services (720p cap, no PiP) when this is false
+            i.putExtra("ads", !CigramAdConfig.adFreeUser(a));   // the companion player shows ads unless this account is ad-free (admin list)
+            i.putExtra("plus", true);     // no quality cap / PiP lock any more: the companion player treats everyone as unlocked
             long resume = CigramResume.position(a, isSeries, seriesTitle, title, id, season, episode);
             if (resume > 0L) i.putExtra("resume_ms", resume);
             a.startActivity(i);

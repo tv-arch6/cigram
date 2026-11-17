@@ -69,7 +69,7 @@
 			android:hardwareAccelerated="true"
 			android:screenOrientation="landscape"
 			android:exported="false" />
-		<!-- Launcher icons (Cigram Plus "app icon"): exactly one alias is enabled; CigramAppIcon switches them at runtime. -->
+		<!-- Launcher icons ("app icon"): exactly one alias is enabled; CigramAppIcon switches them at runtime. -->
 		<activity-alias
 			android:name=".IconClassic"
 			android:targetActivity=".MainActivity"
@@ -398,18 +398,6 @@
     android:noHistory="true"
     android:taskAffinity=""
     android:theme="@android:style/Theme.Translucent.NoTitleBar" />
-<activity
-    android:name="com.Cigram.vid.CigramPlusCodeActivity"
-    android:exported="false"
-    android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode"
-    android:theme="@android:style/Theme.Material.NoActionBar"
-    android:windowSoftInputMode="adjustResize|stateHidden" />
-<activity
-    android:name="com.Cigram.vid.CigramPlusActivity"
-    android:exported="false"
-    android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode"
-    android:theme="@android:style/Theme.Material.NoActionBar"
-    android:windowSoftInputMode="adjustResize|stateHidden" />
 <activity
     android:name="com.Cigram.vid.CigramDiscoverActivity"
     android:exported="false"

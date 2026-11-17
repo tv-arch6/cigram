@@ -619,21 +619,14 @@ public class PlayerActivity extends AppCompatActivity {
 			.setAllowAudioMixedMimeTypeAdaptiveness(true)
 			.setConstrainAudioChannelCountToDeviceCapabilities(true));
 		} catch (Throwable ignored) { }
-		try {
-			if (!CigramPlus.isPlus(PlayerActivity.this)) {
-				// Cigram Plus: 1080p-4K is a Plus service. Without Plus the automatic choice never goes above 720p
-				// (only titles that really offer several qualities can be capped; a single-quality file plays as it is).
-				trackSelector.setParameters(trackSelector.buildUponParameters()
-				.setMaxVideoSize(Integer.MAX_VALUE, CigramPlus.FREE_MAX_HEIGHT));
-			}
-		} catch (Throwable ignored) { }
+		// 19.6.1: no plan ceiling any more - every quality the title offers is available to everyone
 		
 		// 19.2 Smart Playback Intelligence: data saver on a metered network, battery saver, a low battery or a hot phone
 		// cap the AUTOMATIC quality (a manual choice still wins; the plan ceiling above still applies)
 		try {
 			CigramSmartPlayback.Decision cgSmart = CigramSmartPlayback.decide(CigramSmartPlayback.read(this));
 			if (cgSmart.maxHeight > 0) {
-				int cgPlanCap = CigramPlus.isPlus(PlayerActivity.this) ? Integer.MAX_VALUE : CigramPlus.FREE_MAX_HEIGHT;
+				int cgPlanCap = Integer.MAX_VALUE;
 				trackSelector.setParameters(trackSelector.buildUponParameters()
 				.setMaxVideoSize(Integer.MAX_VALUE, Math.min(cgPlanCap, cgSmart.maxHeight)));
 				android.content.SharedPreferences cgSmartPrefs = getSharedPreferences(CigramSmartPlayback.PREFS, MODE_PRIVATE);
@@ -2833,8 +2826,7 @@ public class PlayerActivity extends AppCompatActivity {
 				}
 				@Override public boolean setMaxVideoHeight(int height) {
 					try {
-						// never above what the account's plan allows (a free account stays at its own ceiling)
-						int plan = CigramPlus.isPlus(PlayerActivity.this) ? Integer.MAX_VALUE : CigramPlus.FREE_MAX_HEIGHT;
+						int plan = Integer.MAX_VALUE;
 						int cap = height <= 0 ? plan : Math.min(plan, height);
 						trackSelector.setParameters(trackSelector.buildUponParameters().setMaxVideoSize(Integer.MAX_VALUE, cap));
 						return true;
@@ -4240,7 +4232,7 @@ public class PlayerActivity extends AppCompatActivity {
 					if(cgNow!=null&&(cgNow.height>0||cgNow.width>0)&&!CigramQuality.isCopy(currentVideo[0])){
 						cgOriginUrl[0]=currentVideo[0];cgOriginSize[0]=cgNow.height;cgOriginSize[1]=cgNow.width;
 					}
-					int wanted=CigramPlus.clampQuality(PlayerActivity.this,cgPlayerPrefs.getInt("quality_height",0));
+					int wanted=cgPlayerPrefs.getInt("quality_height",0);
 					if(wanted>0&&cgQualityAppliedGen[0]!=mediaLoadGeneration[0]){
 						com.google.android.exoplayer2.trackselection.MappingTrackSelector.MappedTrackInfo mapped=trackSelector.getCurrentMappedTrackInfo();
 						if(mapped!=null){
@@ -4359,12 +4351,12 @@ public class PlayerActivity extends AppCompatActivity {
 								});
 								labels.add("تلقائي · موصى به (حسب سرعة الإنترنت)");tracks.add(new int[]{-1,-1,-1});urls.add(null);heights.add(0);
 								java.util.HashSet<String> seen=new java.util.HashSet<String>();
-								boolean cgLockedAny=false; for(int[] f:found){
+								for(int[] f:found){
 									if(!CigramQuality.offered(f[3],f[4]))continue;   // 2026: only 720p / 1080p / 2K / 4K are named
-									if(!CigramPlus.isPlus(PlayerActivity.this)&&CigramQuality.classify(f[3],f[4])>=1080){cgLockedAny=true;continue;} String l=CigramQuality.fullLabel(f[3],f[4]);
+									String l=CigramQuality.fullLabel(f[3],f[4]);
 									if(!seen.add(l))continue;   // نفس الدقة بمعدل بت أقل لا تُعرض مرتين
 									labels.add(l);tracks.add(new int[]{f[0],f[1],f[2]});urls.add(null);heights.add(f[3]);
-								} if(cgLockedAny){labels.add("🔒 1080p – 4K · ضمن Plus");tracks.add(new int[]{-2,-2,-2});urls.add(null);heights.add(-1);}
+								}
 								int selected=0;
 								for(int i=1;i<tracks.size();i++)if(java.util.Arrays.equals(tracks.get(i),cgQualitySelection))selected=i;
 								return new CigramPlayerSheet.Options(labels.toArray(new String[0]),selected);
@@ -4376,10 +4368,10 @@ public class PlayerActivity extends AppCompatActivity {
 						int originClass=CigramQuality.classify(cgOrigH,cgOrigW);
 						labels.add("الأصلية"+(cgOrigH>0||cgOrigW>0?" · "+CigramQuality.fullLabel(cgOrigH,cgOrigW):""));
 						tracks.add(null);urls.add(origin);heights.add(0);
-						boolean cgLocked2=false,cgLowerCopy=false; if(copies!=null)for(CigramQuality.Variant v:copies){
-							if(originClass>0&&v.height>=originClass)continue; if(!CigramQuality.offered(v.height,0))continue; if(v.height<1080)cgLowerCopy=true; if(!CigramPlus.isPlus(PlayerActivity.this)&&v.height>=1080){cgLocked2=true;continue;}   // لا نعرض دقة أعلى من الأصل أو مساوية له
+						boolean cgLowerCopy=false; if(copies!=null)for(CigramQuality.Variant v:copies){
+							if(originClass>0&&v.height>=originClass)continue; if(!CigramQuality.offered(v.height,0))continue; if(v.height<1080)cgLowerCopy=true;   // لا نعرض دقة أعلى من الأصل أو مساوية له
 							labels.add(CigramQuality.fullLabel(v.height,0));tracks.add(null);urls.add(v.url);heights.add(v.height);
-						} if(!CigramPlus.isPlus(PlayerActivity.this)&&originClass>=1080&&cgLowerCopy){labels.set(0,"🔒 "+labels.get(0));heights.set(0,Integer.valueOf(-1));} if(cgLocked2){labels.add("🔒 1080p – 4K · ضمن Plus");tracks.add(null);urls.add(null);heights.add(-1);}
+						}
 						int selected=0;
 						for(int i=0;i<urls.size();i++)if(urls.get(i)!=null&&urls.get(i).equals(currentVideo[0]))selected=i;
 						String hint="";
@@ -4392,7 +4384,7 @@ public class PlayerActivity extends AppCompatActivity {
 						return new CigramPlayerSheet.Options(labels.toArray(new String[0]),selected,hint);
 					}
 					@Override public String pick(int which){
-						if(which<0||which>=labels.size())return null; if(heights.get(which).intValue()==-1){CigramPlusUI.requirePlus(PlayerActivity.this,"جودة 1080p إلى 4K");return null;}
+						if(which<0||which>=labels.size())return null;
 						String url=urls.get(which);
 						if(url!=null){
 							// تبديل الملف مع الحفاظ على مكان المشاهدة والترجمة
@@ -4410,7 +4402,7 @@ public class PlayerActivity extends AppCompatActivity {
 						com.google.android.exoplayer2.trackselection.DefaultTrackSelector.Parameters.Builder builder=trackSelector.buildUponParameters();
 						// Clear constraints and only video overrides; leave audio/subtitle state intact.
 						for(int r=0;r<mapped.getRendererCount();r++)if(mapped.getRendererType(r)==com.google.android.exoplayer2.C.TRACK_TYPE_VIDEO)builder.clearSelectionOverrides(r);
-						builder.setMinVideoSize(0,0).setMaxVideoSize(Integer.MAX_VALUE,CigramPlus.maxVideoHeight(PlayerActivity.this))
+						builder.setMinVideoSize(0,0).setMaxVideoSize(Integer.MAX_VALUE,Integer.MAX_VALUE)
 						.setMinVideoBitrate(0).setMaxVideoBitrate(Integer.MAX_VALUE).setForceLowestBitrate(false).setForceHighestSupportedBitrate(false);
 						if(choice[0]>=0)builder.setSelectionOverride(choice[0],mapped.getTrackGroups(choice[0]),
 						new com.google.android.exoplayer2.trackselection.DefaultTrackSelector.SelectionOverride(choice[1],choice[2]));
@@ -5391,7 +5383,7 @@ public class PlayerActivity extends AppCompatActivity {
 						}
 					}
 					
-					void enter() { try { if (!CigramPlusUI.requirePlus(PlayerActivity.this, "الصورة داخل الصورة")) { return; }
+					void enter() { try {
 							
 							if (
 							android.os.Build.VERSION.SDK_INT
@@ -5576,7 +5568,7 @@ public class PlayerActivity extends AppCompatActivity {
 									9
 									)
 									)
-									.setAutoEnterEnabled( playing && CigramPlus.isPlus(PlayerActivity.this) )
+									.setAutoEnterEnabled( playing )
 									.setSeamlessResizeEnabled(
 									true
 									)

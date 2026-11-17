@@ -6,7 +6,7 @@ import android.os.Bundle;
 /**
  * «الشروط والأحكام» (2026): shown from the registration form (the consent link), the account page and Settings.
  *
- * The text describes how the app actually works (accounts, Plus codes, ads, chat uploads, requests). It is a plain
+ * The text describes how the app actually works (accounts, ads, chat uploads, requests). It is a plain
  * operating text written for the app; it has NOT been reviewed by a lawyer and does not claim compliance with any
  * specific law. Change {@link CigramTerms#VERSION} whenever its substance changes.
  */
@@ -21,12 +21,8 @@ public class CigramTermsActivity extends Activity {
             {"المحتوى والاستخدام",
                     "المحتوى المعروض في Cigram للمشاهدة الشخصية غير التجارية. لا يجوز نسخه أو إعادة بثه أو بيعه، "
                             + "ولا محاولة تعطيل الخدمة أو الوصول إلى أجزائها بطرق غير مسموح بها."},
-            {"Cigram Plus",
-                    "يُفعَّل اشتراك Cigram Plus بكود تفعيل لمدة محددة تظهر في حسابك، وينتهي تلقائياً بنهاية مدته دون تجديد آلي. "
-                            + "تحدد خوادم Cigram صلاحية الكود وأهليته، والكود المستخدم لا يُعاد استخدامه."},
             {"الإعلانات",
-                    "قد يعرض التطبيق إعلانات من Google AdMob فقط، وفق إعدادات الموافقة المعمول بها في بلدك. "
-                            + "مشتركو Cigram Plus لا تظهر لهم الإعلانات."},
+                    "قد يعرض التطبيق إعلانات من Google AdMob فقط، وفق إعدادات الموافقة المعمول بها في بلدك."},
             {"المحادثات والملفات",
                     "الرسائل والصور والفيديوهات والرسائل الصوتية التي ترسلها إلى فريق Cigram تُحفظ على خوادمنا للرد عليك ومتابعة طلبك. "
                             + "لا ترسل محتوى مخالفاً أو لا تملك حق نشره. الحد الأقصى لحجم الفيديو المرفوع 1 غيغابايت."},

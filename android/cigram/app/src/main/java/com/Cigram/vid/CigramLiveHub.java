@@ -909,7 +909,6 @@ final class CigramLiveHub implements CigramChannelStore.Listener, CigramChannelP
 
     private void choose(CigramChannelStore.Ch ch, boolean reveal) {
         if (ch == null || destroyed) return;
-        if (ch.plus && !CigramPlusUI.requirePlus(a, "قنوات 1080p – 4K")) return;      // Cigram Plus tier
         try {
             hideKeyboard();
             String before = activeKey;
@@ -1030,7 +1029,6 @@ final class CigramLiveHub implements CigramChannelStore.Listener, CigramChannelP
             for (int i = 0; i < catalog.all.size(); i++) {
                 CigramChannelStore.Ch c = catalog.all.get(i);
                 if (!c.available) continue;
-                if (c.plus && !CigramPlus.isPlus(a)) continue;     // next/previous in full screen never lands on a Plus channel
                 if (c == ch) at = queue.size();
                 queue.add(CigramLivePlayer.entry(c.key, c.name, c.url, c.image, c.section, null));
             }

@@ -8,7 +8,7 @@ import org.junit.Test;
 
 /**
  * The admin's ready replies carry no emoji (the monochrome identity), every chip names a real {@link CgIcons} glyph,
- * and the message sent to a Plus customer has none either. Plain JVM: only static helpers are touched.
+ * Plain JVM: only static helpers are touched.
  */
 public class CigramChatSuggestTest {
 
@@ -56,20 +56,5 @@ public class CigramChatSuggestTest {
         assertEquals(-1, CigramChatSuggest.iconOf(null));
         assertEquals(-1, CigramChatSuggest.iconOf(""));
         assertEquals(-1, CigramChatSuggest.iconOf("📌"));        // a leftover emoji cell draws nothing instead of crashing
-    }
-
-    @Test
-    public void plusCustomerMessageHasNoEmojiAndStillCarriesTheCode() {
-        String named = PlusMsg.message("علي", "ABCD-1234", 3, 7);
-        String anon = PlusMsg.message("", "ABCD-1234", 12, 0);
-        for (String m : new String[]{named, anon}) {
-            assertFalse(hasEmoji(m));
-            assertTrue(m.contains("ABCD-1234"));
-            assertTrue(m.contains("تم اعتماد اشتراكك في Cigram Plus"));
-        }
-        assertTrue(named.startsWith("أهلاً علي\n"));
-        assertTrue(anon.startsWith("أهلاً بك\n"));
-        assertTrue(named.contains("خلال 7 يوماً"));
-        assertFalse(anon.contains("يُفعَّل خلال"));
     }
 }

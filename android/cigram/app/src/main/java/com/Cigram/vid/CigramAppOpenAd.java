@@ -75,10 +75,10 @@ public final class CigramAppOpenAd {
      * No app-open ad for this launch (the in-house splash will show). Also stops a later
      * MainActivity re-creation in the same process from starting one in the middle of a session.
      */
-    /** App start: request the AdMob App Open ad and show it once it is ready (never for Cigram Plus). */
+    /** App start: request the AdMob App Open ad and show it once it is ready (never for ad-free accounts). */
     public static void onAppOpen(final Activity activity) {
         try {
-            if (activity == null || CigramPlus.isPlus(activity)) return;
+            if (activity == null) return;
             preload(activity);
             showOrSkip(activity, null);
         } catch (Throwable ignored) { }

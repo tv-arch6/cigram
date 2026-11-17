@@ -26,7 +26,6 @@ public final class CigramAccountExtras {
 
     private static final String TAG_UPDATE = "cigram_update_row";
     private static final String TAG_CONTACT = "cigram_contact_us";
-    private static final String TAG_PLUS_CODE = "cigram_plus_code";
     private static final String TAG_WIDGET = "cigram_widget_row";
 
     private CigramAccountExtras() { }
@@ -46,19 +45,6 @@ public final class CigramAccountExtras {
             View contact = host.findViewWithTag(TAG_CONTACT);
             View update = host.findViewWithTag(TAG_UPDATE);
             if (update == null) update = buildUpdateRow(activity);
-
-            // Cigram Plus (logged-in accounts only): the small comparison box + the "ضع كود التفعيل" row, last section above logout
-            View plusBox = host.findViewWithTag(CigramPlusUI.TAG_BOX);
-            View plusCode = host.findViewWithTag(TAG_PLUS_CODE);
-            if (plusBox != null && plusBox.getParent() instanceof ViewGroup) ((ViewGroup) plusBox.getParent()).removeView(plusBox);
-            if (plusCode != null && plusCode.getParent() instanceof ViewGroup) ((ViewGroup) plusCode.getParent()).removeView(plusCode);
-            // Play build: the box is only worth showing to someone who already has Plus (no selling there)
-            final boolean plusShown = CigramUserData.isLoggedIn(activity);
-            final boolean plusBoxShown = false;   // the period and the account are shown INSIDE the Cigram Plus page only
-            if (plusShown) {
-                if (plusCode == null) plusCode = buildPlusCodeRow(activity);
-                styleRow(activity, plusCode);
-            }
 
             // same look for both rows
             styleRow(activity, update);
@@ -82,18 +68,6 @@ public final class CigramAccountExtras {
 
             host.addView(update, at, rowParams(activity));
             if (contact != null) host.addView(contact, at + 1, rowParams(activity));
-            if (plusShown) {
-                int next = at + (contact != null ? 2 : 1);
-                LinearLayout.LayoutParams bp = rowParams(activity);
-                bp.height = -2;
-                bp.topMargin = CigramUI.dp(activity, 10);
-                if (plusBoxShown && plusBox != null) {
-                    host.addView(plusBox, next, bp);
-                    next++;
-                }
-                host.addView(plusCode, next, rowParams(activity));
-                CigramPlus.refresh(activity, false, null);
-            }
 
             // "add the Cigram widget to your home screen": optional, so a problem here can never remove the rows above
             try {
@@ -132,45 +106,6 @@ public final class CigramAccountExtras {
     private static void styleRow(Activity a, View row) {
         row.setBackground(CigramAccountUI.rowSurface(a));
         row.setElevation(0f);
-    }
-
-    /** "ضع كود التفعيل": opens the Plus page with the keyboard on the code field. */
-    private static View buildPlusCodeRow(final Activity a) {
-        LinearLayout row = new LinearLayout(a);
-        row.setTag(TAG_PLUS_CODE);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(CigramUI.dp(a, 10), 0, CigramUI.dp(a, 14), 0);
-        row.setClickable(true);
-        row.setFocusable(true);
-        row.setContentDescription("ضع كود التفعيل");
-
-        ImageView arrow = new ImageView(a);
-        int res = a.getResources().getIdentifier("hsi", "drawable", a.getPackageName());
-        if (res != 0) arrow.setImageResource(res);
-        arrow.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        arrow.setAlpha(0.82f);
-        row.addView(arrow, new LinearLayout.LayoutParams(CigramUI.dp(a, 30), CigramUI.dp(a, 30)));
-
-        TextView badge = CigramUI.label(a, "Plus", 12f, CigramPlusUI.GOLD_INK, true);
-        badge.setGravity(Gravity.CENTER);
-        badge.setPadding(CigramUI.dp(a, 10), CigramUI.dp(a, 3), CigramUI.dp(a, 10), CigramUI.dp(a, 3));
-        badge.setBackground(CigramPlusUI.goldBg(a, 10));
-        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(-2, -2);
-        bl.leftMargin = CigramUI.dp(a, 8);
-        bl.rightMargin = CigramUI.dp(a, 8);
-        row.addView(badge, bl);
-
-        TextView label = CigramUI.label(a, "ضع كود التفعيل", 18f, CigramUI.TEXT, false);
-        label.setTypeface(CigramUI.font(a), Typeface.NORMAL);
-        label.setPadding(CigramUI.dp(a, 8), 0, CigramUI.dp(a, 8), 0);
-        row.addView(label, new LinearLayout.LayoutParams(0, -1, 1f));
-
-        row.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { CigramPlusUI.openPage(a, "code"); }
-        });
-        return row;
     }
 
     /** "أضف ويدجت سيكرام لشاشتك": the moving carousel on the phone's home screen; a tap on a slide opens that title. */

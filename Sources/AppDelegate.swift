@@ -40,7 +40,6 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 
         CatalogStore.shared.start()
         ChannelStore.shared.start()
-        Ads.shared.start()
         Notifier.shared.openShow = { [weak self] key in self?.open(key) }
         Notifier.shared.setUp(application, ask: !ProcessInfo.processInfo.arguments.contains("-cigramNoPrompt"))
         if case .jailbroken = Integrity.check() {

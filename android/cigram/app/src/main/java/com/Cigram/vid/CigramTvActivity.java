@@ -27,7 +27,7 @@ import java.util.List;
  * A persistent right-edge sidebar (RTL) switches between bespoke TV panels (Home / Movies / Series /
  * Search) and hands the deeper, already-TV-ready screens to the existing activities (Channels,
  * My List, Discover, Account, Settings) so NOTHING is duplicated — the same catalogue, player,
- * accounts, Plus and channel systems are reused.
+ * accounts and channel systems are reused.
  *
  * Only reached on a television (see {@link #shouldRunTvEdition}); the phone app is untouched.
  */

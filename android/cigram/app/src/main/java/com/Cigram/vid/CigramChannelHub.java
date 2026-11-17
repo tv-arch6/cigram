@@ -849,7 +849,6 @@ final class CigramChannelHub implements CigramChannelStore.Listener, CigramChann
 
     private void choose(CigramChannelStore.Ch ch) {
         if (ch == null || destroyed) return;
-        if (ch.plus && !CigramPlusUI.requirePlus(a, "قنوات 1080p – 4K")) return;      // Cigram Plus tier
         try {
             hideKeyboard();
             activeKey = ch.key;
@@ -930,7 +929,6 @@ final class CigramChannelHub implements CigramChannelStore.Listener, CigramChann
             for (int i = 0; i < catalog.all.size(); i++) {
                 CigramChannelStore.Ch c = catalog.all.get(i);
                 if (!c.available) continue;
-                if (c.plus && !CigramPlus.isPlus(a)) continue;     // next/previous in full screen never lands on a Plus channel
                 if (c == ch) at = queue.size();
                 queue.add(CigramLivePlayer.entry(c.key, c.name, c.url, c.image, c.section, null));
             }
@@ -1127,7 +1125,7 @@ final class CigramChannelHub implements CigramChannelStore.Listener, CigramChann
                 boolean showSub = selKind == K_ALL || selKind == K_FAV || selKind == K_RECENT || selKind < 0;
                 if (showSub) {
                     h.sub.setText(ch.available
-                            ? (ch.plus ? "Plus · " + CigramQuality.label(ch.quality > 0 ? ch.quality : CigramChannelStore.PLUS_MIN_HEIGHT) + " · " + ch.section : ch.section)
+                            ? (ch.plus ? CigramQuality.label(ch.quality > 0 ? ch.quality : CigramChannelStore.PLUS_MIN_HEIGHT) + " · " + ch.section : ch.section)
                             : "غير متوفرة حالياً");
                     h.sub.setVisibility(View.VISIBLE);
                 } else if (!ch.available) {

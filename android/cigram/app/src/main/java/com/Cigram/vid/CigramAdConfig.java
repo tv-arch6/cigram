@@ -318,7 +318,6 @@ public final class CigramAdConfig {
         try {
             if (c == null) return false;
             Context app = c.getApplicationContext() != null ? c.getApplicationContext() : c;
-            if (CigramPlus.isPlus(app)) return true;      // Cigram Plus: no ads of any kind
             if (app.getSharedPreferences("cigram_ads_state", Context.MODE_PRIVATE)
                     .getBoolean("ad_free", false)) return true;
             String owner = CigramUserData.owner(app);

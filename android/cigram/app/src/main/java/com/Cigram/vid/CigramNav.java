@@ -75,7 +75,7 @@ final class CigramNav {
      */
     private static final String[] HIDE_BACK = {
             "ChannelsActivity", "AccountActivity", "SettingsActivity", "MyContentActivity", "CommunicationActivity",
-            "NotificationsActivity", "CigramTermsActivity", "CigramPlusActivity", "CigramPlusCodeActivity",
+            "NotificationsActivity", "CigramTermsActivity",
             "CigramWatchCalendarActivity", "AdsChatActivity", "CigramUpdateActivity", "CigramWatchlistMoreActivity"};
 
     static boolean hidesBack(String simpleName) {

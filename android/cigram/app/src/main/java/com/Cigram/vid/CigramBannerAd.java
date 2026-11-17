@@ -17,7 +17,7 @@ import com.google.android.gms.ads.LoadAdError;
  * The AdMob banner at the bottom of a page (first used by «قائمة المشاهدة»).
  *
  * An anchored adaptive banner in its own slot under the page's scrolling content. The slot has no height until an ad
- * has really loaded, so a page never shows an empty box or an error text; Cigram Plus and ad-free accounts get no slot
+ * has really loaded, so a page never shows an empty box or an error text; ad-free accounts get no slot
  * at all. The unit id comes from the remote ad config (key {@code banner_unit}) — see {@link CigramAdConfig#bannerUnit}.
  */
 final class CigramBannerAd {

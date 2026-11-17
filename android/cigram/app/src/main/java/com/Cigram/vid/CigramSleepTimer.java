@@ -9,9 +9,9 @@ import android.os.Looper;
 import java.lang.ref.WeakReference;
 
 /**
- * «موقّت النوم» — a Cigram Plus service.
+ * «موقّت النوم».
  *
- * The subscriber picks 15, 30, 45, 60 or 90 minutes (Cigram Plus page). From the moment a film or an episode starts,
+ * The viewer picks 15, 30, 45, 60 or 90 minutes (Settings). From the moment a film or an episode starts,
  * the clock runs; when it ends the player closes itself — the position is saved as usual, so the title continues from
  * there the next day — and the phone can sleep. It is a one-night switch: once it has fired it turns itself off.
  *
@@ -34,7 +34,7 @@ final class CigramSleepTimer {
     }
 
     static int minutes(Context c) {
-        try { return CigramPlus.isPlus(c) ? sp(c).getInt("minutes", 0) : 0; } catch (Throwable e) { return 0; }
+        try { return sp(c).getInt("minutes", 0); } catch (Throwable e) { return 0; }
     }
 
     static String label(Context c) {
@@ -43,7 +43,6 @@ final class CigramSleepTimer {
     }
 
     static void choose(final Activity a, final Runnable after) {
-        if (!CigramPlusUI.requirePlus(a, "موقّت النوم")) return;
         final String[] items = new String[MINUTES.length];
         int sel = 0, now = minutes(a);
         for (int i = 0; i < MINUTES.length; i++) {

@@ -6,12 +6,11 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 
 /**
- * Launcher icon choice (Cigram Plus perk). Each icon is an {@code <activity-alias>} in the manifest; exactly one is enabled.
+ * Launcher icon choice. Each icon is an {@code <activity-alias>} in the manifest; exactly one is enabled.
  * Switching = enable the chosen alias, disable the others, DONT_KILL_APP (no restart). Some launchers redraw the
  * icon a few seconds later; that is the launcher, not the app.
  *
- * Rules: "classic" is free for everyone; the others need active Plus. When Plus ends {@link #enforce} puts classic back.
- * The choice is kept locally and (while Plus is active) on the account server via {@link CigramPlus#syncAppIcon}.
+ * Every icon is available to everyone (19.6.1: there is no subscription any more). The choice is kept on the device.
  */
 public final class CigramAppIcon {
 
@@ -51,7 +50,7 @@ public final class CigramAppIcon {
     }
 
     public static boolean canUse(Context c, Variant v) {
-        return v != null && (!v.plus || CigramPlus.isPlus(c));
+        return v != null;
     }
 
     /** The active icon according to the package manager (falls back to the saved choice). */
@@ -66,7 +65,7 @@ public final class CigramAppIcon {
         return "classic".equals(saved(c)) ? "classic" : saved(c);
     }
 
-    /** Switches the launcher icon now. false = not allowed (Plus needed) or the system refused. */
+    /** Switches the launcher icon now. false = the system refused. */
     public static boolean apply(Context c, String id) {
         Variant target = find(id);
         if (!canUse(c, target)) return false;
@@ -90,22 +89,20 @@ public final class CigramAppIcon {
         return new ComponentName(c.getPackageName(), "com.Cigram.vid" + v.alias);
     }
 
-    /** Plus ended (or the account changed) while a Plus icon is on the home screen: back to classic. Safe to call often. */
+    /** Kept for callers; every icon is allowed, so there is nothing to put back. */
     public static void enforce(Context c) {
         try {
             if (c == null) return;
-            if (saved(c).equals("classic") && active(c).equals("classic")) return;
-            Variant cur = find(active(c));
-            if (cur.plus && !CigramPlus.isPlus(c)) apply(c, "classic");
+            // nothing to enforce any more: every icon is allowed
         } catch (Throwable ignored) { }
     }
 
-    /** Server told us which icon the account uses (other device): follow it while Plus is active. */
+    /** Server told us which icon the account uses (other device): follow it. */
     public static void onServerChoice(Context c, String id) {
         try {
             if (id == null || id.length() == 0) return;
             Variant v = find(id);
-            if (!v.id.equals(id) || !CigramPlus.isPlus(c)) return;
+            if (!v.id.equals(id)) return;
             if (!v.id.equals(active(c))) apply(c, v.id);
         } catch (Throwable ignored) { }
     }

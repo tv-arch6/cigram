@@ -3091,7 +3091,7 @@ public class MainActivity extends AppCompatActivity {
 			}
 		}
 		
-		// AdMob App Open (الإعلان الوحيد عند الفتح؛ لا يظهر لمشتركي Cigram Plus)
+		// AdMob App Open (الإعلان الوحيد عند الفتح؛ لا يظهر للحسابات المعفاة من الإعلانات)
 		CigramAppOpenAd.onAppOpen(MainActivity.this);
 		// كلمة «سيكرام»: خط عريض بتدرّج رصاصي ← أبيض، والألوان فقط تتحرّك ببطء من اليمين لليسار
 		try { CigramWordmark.install((android.widget.TextView) findViewById(R.id.textview4)); } catch (Throwable ignored) { }

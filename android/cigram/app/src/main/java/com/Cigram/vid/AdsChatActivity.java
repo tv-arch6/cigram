@@ -1336,7 +1336,7 @@ public class AdsChatActivity extends Activity {
                     String line = p != null ? (p.optString("title") + (p.optString("body").length() > 0 ? ": " + p.optString("body") : "")) : pol.optString(i);
                     if (line.trim().length() > 0) txt.append("• ").append(line.trim()).append("\n");
                 }
-                if (pol == null || pol.length() == 0) txt.append("• هذه المحادثة لأسعار Cigram Plus ومزاياه والمشاكل فقط.\n");
+                if (pol == null || pol.length() == 0) txt.append("• هذه المحادثة للمشاكل والاقتراحات والطلبات فقط.\n");
                 new android.app.AlertDialog.Builder(AdsChatActivity.this).setTitle("سياسة التواصل").setMessage(txt.toString())
                         .setNegativeButton("ليس الآن", new android.content.DialogInterface.OnClickListener() {
                             @Override public void onClick(android.content.DialogInterface d, int w) { consentAsked = false; }

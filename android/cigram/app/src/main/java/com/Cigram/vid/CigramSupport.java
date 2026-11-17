@@ -56,7 +56,7 @@ public final class CigramSupport {
     }
 
     static final String TITLE = "الدعم والتواصل";
-    static final String SUBTITLE_EN = "Cigram Plus · المزايا · المشاكل";
+    static final String SUBTITLE_EN = "المشاكل · الاقتراحات";
 
     // ------------------------------------------------------------------ entry
 

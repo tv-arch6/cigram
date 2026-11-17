@@ -22,7 +22,7 @@ import java.util.TimeZone;
  *   الاستوديو   what needs you now: the four daily actions, things to fix, the catalogue in numbers
  *   المحتوى     Content Studio: add · manage · subtitles (lab + centre) · what the app's home shows
  *   البث        who is watching right now, channels, Cigram Live Health
- *   التواصل     developer inbox, notifications, requests, advertising, Plus
+ *   التواصل     developer inbox, notifications, requests, advertising
  *   النظام      app update, maintenance, history / backups, statistics, errors, privacy, the admin token
  * </pre>
  * A workspace is built the first time it is opened (the first frame only pays for the first one), every row opens a
@@ -202,7 +202,7 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
                 StudioUi.deck(this, CgIcons.CHART, "النبض والأرباح", "رسم حي 24/7 · توقّعات AdMob", StudioUi.ORANGE, StudioUi.go(a, CgPulseActivity.class))));
         c.addView(StudioUi.pair(this,
                 StudioUi.deck(this, CgIcons.FLAG, "طلبات المستخدمين", "يريد فيلماً أو مسلسلاً · انسخ الاسم", StudioUi.SKY, StudioUi.go(a, NxRequestsActivity.class)),
-                StudioUi.deck(this, CgIcons.CHAT, "الدعم والتواصل", "محادثات المستخدمين: Plus والمشاكل", StudioUi.VIOLET, StudioUi.go(a, AdInboxActivity.class))));
+                StudioUi.deck(this, CgIcons.CHAT, "الدعم والتواصل", "محادثات المستخدمين: المشاكل والاقتراحات", StudioUi.VIOLET, StudioUi.go(a, AdInboxActivity.class))));
 
         // «ما الجديد؟»: cached discovery numbers (never calls TMDB) + the way into the discovery center
         whatsNew = new WnHomeCard(this);
@@ -299,7 +299,6 @@ public class DxHomeActivity extends CgBase implements NxLive.Listener {
         StudioUi.row(u, CgIcons.SEND, "إرسال إشعار", "إشعار فوري لكل المستخدمين", "", StudioUi.ORANGE, StudioUi.go(a, NxNotifyActivity.class));
         StudioUi.row(u, CgIcons.HISTORY, "الرسائل العامة", "رسائل تظهر داخل التطبيق بجدولة", "", StudioUi.SKY, StudioUi.go(a, CgAnnouncementsActivity.class));
         StudioUi.row(u, CgIcons.BELL, "طلبات المستخدمين", "أفلام ومسلسلات وقنوات طلبها المشاهدون", "", StudioUi.PINK, StudioUi.go(a, NxRequestsActivity.class));
-        StudioUi.row(u, CgIcons.STAR, "اشتراكات Plus", "أكواد التفعيل والمشتركون", "", StudioUi.GOLD, StudioUi.go(a, PlusCodesActivity.class));
         c.addView(u);
 
         c.addView(StudioUi.label(this, "الإعلانات"));

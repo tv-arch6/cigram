@@ -29,7 +29,7 @@ import java.util.WeakHashMap;
  *    faint translucent plate behind it, chosen from the logo's own brightness and the active palette. Pictures
  *    that already fill the tile never get one;
  *  - state is drawn, not styled: a thin brand ring and a play mark for the channel that is playing, a heart for a
- *    favourite, a gold "Plus" mark, and a dimmed picture with «غير متوفرة حالياً» for an entry the catalogue
+ *    favourite mark, and a dimmed picture with «غير متوفرة حالياً» for an entry the catalogue
  *    lists but that cannot be played right now.
  *
  * The same class draws the small logo in the "now playing" bar ({@link #setLogoOnly}).
@@ -319,7 +319,6 @@ final class CigramChannelCard extends View implements CigramLogos.Sink {
                 tile.inset(g - dp, g - dp);
                 drawPlayMark(c);
             }
-            if (ch.plus) drawPill(c, "Plus", tile.right - 6 * dp, tile.top + 6 * dp, true, pal.gold, pal.onGold);
             if (fav) drawHeart(c);
             if (!playable) {
                 drawPill(c, "غير متوفرة حالياً", tile.centerX(), tile.bottom - 12 * dp, false, 0xCC000000, 0xFFFFFFFF);

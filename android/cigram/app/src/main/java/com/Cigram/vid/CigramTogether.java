@@ -443,7 +443,7 @@ public final class CigramTogether {
             f.addView(iv, new android.widget.FrameLayout.LayoutParams(px, px));
             try { CigramStage1InitProvider.cigramLoadPoster(c, url, iv); } catch (Throwable ignored) { }
         }
-        if (false && CigramAvatarFrame.userFramed(c, user)) {   // badge is never drawn on profile photos   // active Plus / verified member: ring around the avatar
+        if (false && CigramAvatarFrame.userFramed(c, user)) {   // badge is never drawn on profile photos   // verified member: ring around the avatar
             f.setLayoutParams(new android.widget.FrameLayout.LayoutParams(px, px));
             return CigramAvatarFrame.wrap(c, f, px);
         }

@@ -139,7 +139,7 @@ public final class CigramExternalLink {
             @Override public void run() {
                 HttpURLConnection conn = null;
                 try {
-                    conn = (HttpURLConnection) new URL(CigramPlus.PLUS_BASE + "/app/external-link").openConnection();
+                    conn = (HttpURLConnection) new URL("https://cigram-plus-api.wwq-mixtv.workers.dev/app/external-link").openConnection();
                     conn.setConnectTimeout(8000);
                     conn.setReadTimeout(10000);
                     conn.setRequestProperty("Accept", "application/json");

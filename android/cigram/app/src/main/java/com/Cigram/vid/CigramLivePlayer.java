@@ -1658,7 +1658,6 @@ public final class CigramLivePlayer {
 
     private static void enterPip(S s) {
         if (Build.VERSION.SDK_INT < 26) return;
-        if (!CigramPlusUI.requirePlus(s.a, "الصورة داخل الصورة")) return;     // Cigram Plus service
         try {
             Format f = s.player.getVideoFormat();
             int w = f != null && f.width > 0 ? f.width : 16;

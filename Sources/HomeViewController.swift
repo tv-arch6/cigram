@@ -44,7 +44,6 @@ final class HomeViewController: UIViewController, UITableViewDataSource, UITable
         view.addSubview(empty)
         NotificationCenter.default.addObserver(self, selector: #selector(reload), name: .cigramCatalogChanged, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(reload), name: Library.changed, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(reload), name: Ads.changed, object: nil)   // the banner unit arrives with the admin's ad config
         if CatalogStore.shared.loaded { reload() } else { spinner.startAnimating() }
         DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in
             guard let self = self, !CatalogStore.shared.loaded else { return }
@@ -97,13 +96,9 @@ final class HomeViewController: UIViewController, UITableViewDataSource, UITable
         return box
     }
 
+    /// A little breathing room under the last row (there are no ads on the iPhone).
     private func footer() -> UIView {
-        let box = UIView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 80))
-        if let ad = Ads.shared.banner(in: self) {
-            ad.frame = CGRect(x: (view.bounds.width - 320) / 2, y: 12, width: 320, height: 50)
-            box.addSubview(ad)
-        }
-        return box
+        return UIView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 24))
     }
 
     private func chip(_ i: Int) {
@@ -284,7 +279,7 @@ final class SearchViewController: UIViewController, UISearchResultsUpdating {
     }
 }
 
-/// One place that opens a title: details, or the player (after an interstitial when the admin's rules allow one).
+/// One place that opens a title: details, or the player.
 enum Router {
     static func details(_ s: Show, from vc: UIViewController) {
         let d = DetailsViewController(show: s)
@@ -294,11 +289,9 @@ enum Router {
 
     static func play(_ s: Show, episode: CatalogItem?, from vc: UIViewController) {
         let ep = episode ?? (s.isSeries ? (Library.shared.lastEpisode(of: s) ?? s.episodes.first) : nil)
-        Ads.shared.beforePlay(from: vc) {
-            Library.shared.record(s, episode: ep)
-            let p = PlayerViewController(show: s, episode: ep)
-            p.modalPresentationStyle = .fullScreen
-            vc.present(p, animated: true)
-        }
+        Library.shared.record(s, episode: ep)
+        let p = PlayerViewController(show: s, episode: ep)
+        p.modalPresentationStyle = .fullScreen
+        vc.present(p, animated: true)
     }
 }

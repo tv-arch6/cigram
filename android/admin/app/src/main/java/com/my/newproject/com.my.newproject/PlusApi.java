@@ -4,7 +4,7 @@ import android.content.Context;
 
 import org.json.JSONObject;
 
-/** Calls to the Plus worker (cigram-plus-api) with the admin key: the key typed in "اشتراكات Plus" if any, else the admin token. */
+/** Calls to the cigram-plus-api worker with the admin token (it still serves the external link; there is no subscription any more). */
 final class PlusApi {
 
     static final String BASE = "https://cigram-plus-api.wwq-mixtv.workers.dev";
@@ -12,10 +12,6 @@ final class PlusApi {
     private PlusApi() { }
 
     static String key(Context c) {
-        try {
-            String k = c.getSharedPreferences(CgCfg.PREFS, Context.MODE_PRIVATE).getString("plus_admin_key", "");
-            if (k != null && k.length() > 0) return k;
-        } catch (Exception ignored) { }
         return CgCfg.TOKEN;
     }
 
@@ -26,7 +22,7 @@ final class PlusApi {
     /** An understandable Arabic reason for a failed call. */
     static String explain(CgHttp.Res r) {
         if (r.error != null) return r.message();
-        if (r.code == 401) return "مفتاح الإدارة غير صحيح. ادخل قيمة ADMIN_KEY من شاشة «اشتراكات Plus ← تغيير مفتاح Plus».";
+        if (r.code == 401) return "مفتاح الإدارة غير صحيح.";
         if (r.code == 429) return "محاولات كثيرة بمفتاح خاطئ. انتظر 10 دقائق.";
         if (r.code == 501) return "الـ worker غير مهيأ بعد (ADMIN_KEY ناقص).";
         if (r.code == 404) return "الـ worker cigram-plus-api غير منشور بعد، أو ينقصه التحديث الجديد (مسار /admin/app/external-link).";

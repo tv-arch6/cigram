@@ -40,7 +40,7 @@ final class CigramChannelStore {
     private static final String ENDPOINT = "https://sigram-channels-api.wwq-mixtv.workers.dev/channels";
     private static final long FRESH_MS = 3L * 60L * 1000L;
 
-    /** Channels of this height or more belong to the Plus tier (1080p - 4K). */
+    /** Channels of this height or more are flagged as high quality (1080p - 4K); open to everyone. */
     static final int PLUS_MIN_HEIGHT = 1080;
 
     /** "quality" | "height" | "resolution" | "res" of a catalogue entry: a number (1080) or text ("4K", "UHD", "2160p", "FHD"). */
@@ -67,7 +67,7 @@ final class CigramChannelStore {
         String key = "";
         /** Video height of the channel when the catalogue says so ("quality": 1080 | 2160 | "4K" ...), else 0. */
         int quality;
-        /** Plus tier: quality of 1080p-4K (or "plus": true). Only Cigram Plus accounts can play it. */
+        /** High quality: 1080p-4K (or "plus": true in the catalogue). Everyone can play it. */
         boolean plus;
         String name = "";
         String url = "";

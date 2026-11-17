@@ -42,16 +42,12 @@ final class CigramTvPanels {
         String name = "";
         try { name = a.getSharedPreferences("auth_session", Context.MODE_PRIVATE).getString("name", ""); } catch (Throwable ignored) { }
         String email = CigramUserData.email(a);
-        String plus = CigramPlus.isPlus(a) ? "Cigram Plus مفعّل · " + CigramPlus.periodText(a) : "الحساب المجاني";
         p.summary(logged ? (name == null || name.trim().length() == 0 ? "حسابي" : name.trim()) : "زائر",
-                logged ? (email + "  ·  " + plus) : "سجّل الدخول لحفظ قائمتك ومتابعة المشاهدة على كل أجهزتك");
+                logged ? email : "سجّل الدخول لحفظ قائمتك ومتابعة المشاهدة على كل أجهزتك");
 
         Grid g = p.grid();
         g.tile(AdsIcons.BOOKMARK, "قائمة المشاهدة", "المفضلة والمشاهدة لاحقاً", open(a, MyContentActivity.class));
-        g.tile(AdsIcons.CROWN, "Cigram Plus", CigramPlus.isPlus(a) ? "تفاصيل اشتراكك" : "اشترك أو أدخل كود التفعيل", new Runnable() {
-            @Override public void run() { CigramPlusUI.openPage(a, CigramPlus.salesEnabled() && !CigramPlus.isPlus(a) ? "pay" : "code"); }
-        });
-        g.tile(AdsIcons.CHAT, "الدعم والتواصل", "أسعار Plus والمزايا والمشاكل", open(a, AdsChatActivity.class));
+        g.tile(AdsIcons.CHAT, "الدعم والتواصل", "المشاكل والاقتراحات والتواصل مع المطوّر", open(a, AdsChatActivity.class));
         g.tile(AdsIcons.SEND, "أرسل طلبك أو مشكلتك", "اطلب عنواناً أو بلّغ عن مشكلة", open(a, CommunicationActivity.class));
         g.tile(AdsIcons.USER, logged ? "إدارة الحساب" : "تسجيل الدخول",
                 logged ? "الاسم والصورة والبريد" : "أو إنشاء حساب جديد", open(a, AccountActivity.class));

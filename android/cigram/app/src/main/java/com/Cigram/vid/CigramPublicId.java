@@ -78,7 +78,7 @@ public final class CigramPublicId {
             @Override public void run() {
                 HttpURLConnection conn = null;
                 try {
-                    conn = (HttpURLConnection) new URL(CigramPlus.AUTH_BASE + "/me").openConnection();
+                    conn = (HttpURLConnection) new URL("https://cigram-auth-api.wwq-mixtv.workers.dev/me").openConnection();
                     conn.setConnectTimeout(10000);
                     conn.setReadTimeout(15000);
                     conn.setRequestProperty("Accept", "application/json");

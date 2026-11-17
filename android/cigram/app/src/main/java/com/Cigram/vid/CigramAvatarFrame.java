@@ -18,10 +18,9 @@ import android.widget.ImageView;
 import org.json.JSONObject;
 
 /**
- * Verification badge (the blue seal with a check, res/drawable-nodpi/cigram_verified.png) for accounts whose Cigram Plus is
- * active: bottom corner of the round photo (bottom bar, account page, CigramTogether chat + room list) and next to the
- * account name. Nothing is stored: it is drawn only while {@link CigramPlus#isPlus} is true (own account) or while the server
- * marks another member as plus / vip / verified, so it disappears by itself when the subscription ends.
+ * Verification badge (the blue seal with a check, res/drawable-nodpi/cigram_verified.png) for members the SERVER marks as
+ * verified / vip: bottom corner of the round photo (CigramTogether chat + room list) and next to the account name.
+ * 19.6.1: there is no subscription any more, so the signed-in account itself never gets the badge from the app.
  */
 public final class CigramAvatarFrame {
 
@@ -33,10 +32,10 @@ public final class CigramAvatarFrame {
 
     /** The signed-in account itself. */
     public static boolean selfFramed(Context c) {
-        try { return c != null && CigramPlus.isPlus(c); } catch (Throwable t) { return false; }
+        return false;
     }
 
-    /** Another member: only what the server says (plus / vip / verified / is_vip / is_verified); the own entry also while the local Plus cache is active. */
+    /** Another member: only what the server says (plus / vip / verified / is_vip / is_verified (server flags)); the signed-in account never gets it from the app. */
     public static boolean userFramed(Context c, JSONObject user) {
         if (user == null) return false;
         if (user.optBoolean("plus", false) || user.optBoolean("vip", false) || user.optBoolean("verified", false)
@@ -145,7 +144,7 @@ public final class CigramAvatarFrame {
         if (view.getParent() instanceof android.view.ViewGroup) ((android.view.ViewGroup) view.getParent()).setClipChildren(false);
     }
 
-    /** Back to the plain look (Plus ended). */
+    /** Back to the plain look. */
     public static void clearImage(ImageView view) {
         if (android.os.Build.VERSION.SDK_INT >= 23) view.setForeground(null);
     }

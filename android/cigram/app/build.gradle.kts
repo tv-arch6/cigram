@@ -80,7 +80,6 @@ android {
         create("play") {
             dimension = "dist"
             buildConfigField("boolean", "SELF_UPDATE", "false")
-            buildConfigField("boolean", "PLUS_SALES", "false")
             buildConfigField("boolean", "EXTERNAL_PLAYER", "true")
             // Google Play re-signs the app with its own key (Play App Signing): pin THAT certificate, copied from
             // Play Console > Setup > App signing (SHA-256), or leave it empty and the signature check is skipped.
@@ -89,7 +88,6 @@ android {
         create("direct") {
             dimension = "dist"
             buildConfigField("boolean", "SELF_UPDATE", "true")
-            buildConfigField("boolean", "PLUS_SALES", "true")
             buildConfigField("boolean", "EXTERNAL_PLAYER", "true")
             // the APK handed out directly is signed with the owner's release key: pinned automatically
             resValue("string", "cigram_signer_sha256", releaseSignerSha256())

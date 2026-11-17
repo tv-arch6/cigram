@@ -32,7 +32,7 @@ import java.util.ArrayList;
  * only decides how they are grouped and drawn:
  *
  *   حسابي              تعديل الملف الشخصي · الإعدادات
- *   تجربتي             محتوياتي · خطوطي · المظهر · ويدجت · (أيقونة التطبيق · كود Plus)
+ *   تجربتي             محتوياتي · خطوطي · المظهر · ويدجت · (أيقونة التطبيق)
  *   الدعم والمعلومات   المساعدة والدعم · تواصل معنا · التحقق من التحديثات
  *   إجراءات الحساب     تسجيل الخروج
  *
@@ -52,9 +52,7 @@ final class CigramAccountDash {
     private static final String TAG_UPDATE = "cigram_update_row";
     private static final String TAG_CONTACT = "cigram_contact_us";
     private static final String TAG_WIDGET = "cigram_widget_row";
-    private static final String TAG_PLUS_CODE = "cigram_plus_code";
     // 2026 entries
-    private static final String TAG_PLUS = "cigram_row_plus";
     private static final String TAG_SWITCH = "cigram_row_switch";
     private static final String TAG_AD_REQUEST = "cigram_row_ad_request";
     private static final String TAG_TERMS = "cigram_row_terms";
@@ -100,9 +98,7 @@ final class CigramAccountDash {
         View update = host.findViewWithTag(TAG_UPDATE);
         View contact = host.findViewWithTag(TAG_CONTACT);
         View widget = host.findViewWithTag(TAG_WIDGET);
-        View plusCode = host.findViewWithTag(TAG_PLUS_CODE);
         View appIcon = host.findViewWithTag(CigramAppIconUI.TAG);
-        View plusBox = host.findViewWithTag(CigramPlusUI.TAG_BOX);
 
         // the rows that are not built by the old code: shortcuts into flows that already exist
         View edit = ensureRow(a, host, TAG_EDIT, "الحساب الشخصي", "الاسم والصورة والبريد الإلكتروني",
@@ -117,14 +113,8 @@ final class CigramAccountDash {
                 new View.OnClickListener() {
                     @Override public void onClick(View v) { CigramLogout.run(a); }
                 });
-        View plus = ensureRow(a, host, TAG_PLUS, "Cigram Plus", plusLabel(a), AdsIcons.CROWN, 0,
-                new View.OnClickListener() {
-                    @Override public void onClick(View v) {
-                        CigramPlusUI.openPage(a, CigramPlus.salesEnabled() && !CigramPlus.isPlus(a) ? "pay" : "code");
-                    }
-                });
         // 18.2: same entry, new experience — Cigram Private Support (the private conversation with the developer)
-        View adRequest = ensureRow(a, host, TAG_AD_REQUEST, "الدعم والتواصل", "أسعار Cigram Plus · المزايا · المشاكل",
+        View adRequest = ensureRow(a, host, TAG_AD_REQUEST, "الدعم والتواصل", "المشاكل · الاقتراحات · التواصل مع المطوّر",
                 AdsIcons.CHAT, 0, new View.OnClickListener() {
                     @Override public void onClick(View v) { CigramSupport.open(a); }
                 });
@@ -158,8 +148,6 @@ final class CigramAccountDash {
                     @Override public void onClick(View v) { CigramTelegram.open(a); }
                 });
         setSubtitle(theme, themeLabel(a));
-        setSubtitle(plus, plusLabel(a));
-        plus.setVisibility(logged ? View.VISIBLE : View.GONE);
         // the app-icon picker lives in Settings now (all customisation in one place)
         if (appIcon != null) { detach(appIcon); appIcon = null; }
         // a visitor has no profile to edit and nothing to sign out of; the appearance row is for the signed-in page
@@ -169,7 +157,6 @@ final class CigramAccountDash {
         theme.setVisibility(logged ? View.VISIBLE : View.GONE);
         // rows built by CigramAccountExtras have an arrow and a label only: give them the same face as the others
         if (widget != null) CigramAccountUI.restyleRow(a, widget, AdsIcons.IMAGE, 0, "على الشاشة الرئيسية");
-        if (plusCode != null) CigramAccountUI.restyleRowAs(a, plusCode, "ضع كود التفعيل", "Cigram Plus", AdsIcons.STAR, 0);
 
         // ---- group «حسابي»: lives inside the profile block, right under the stats
         ArrayList<View> accountRows = new ArrayList<View>();
@@ -192,8 +179,6 @@ final class CigramAccountDash {
         }
 
         // ---- the groups of the page itself, in this order, right before the external link (if any)
-        ArrayList<View> plusRows = new ArrayList<View>();
-        add(plusRows, plus, plusCode);
         ArrayList<View> experience = new ArrayList<View>();
         if (mine != null && !accountRows.contains(mine)) experience.add(mine);
         add(experience, profiles, calendar, theme, fonts, perf, widget);
@@ -208,9 +193,6 @@ final class CigramAccountDash {
 
         View link = host.findViewWithTag(CigramExternalLink.TAG);
         ArrayList<View> sequence = new ArrayList<View>();
-        sequence.add(title(a, "plus", "Cigram Plus"));
-        sequence.addAll(plusRows);
-        if (plusBox != null) sequence.add(plusBox);
         sequence.add(title(a, "experience", "التطبيق"));
         sequence.addAll(experience);
         sequence.add(title(a, "support", "الدعم والتواصل"));
@@ -240,18 +222,15 @@ final class CigramAccountDash {
         CigramNewBadge.attach(mine, "watchlist_2026");
         CigramNewBadge.attach(update, "update_page_2026");
         CigramNewBadge.attach(fonts, "fonts_2026");
-        CigramNewBadge.attach(plus, "plus_2026");
 
         // ---- shapes + visibility of every group
         style(a, pal, accountRows, host.findViewWithTag(TAG_TITLE + "account"));
-        style(a, pal, plusRows, host.findViewWithTag(TAG_TITLE + "plus"));
         style(a, pal, experience, host.findViewWithTag(TAG_TITLE + "experience"));
         style(a, pal, support, host.findViewWithTag(TAG_TITLE + "support"));
         style(a, pal, info, host.findViewWithTag(TAG_TITLE + "info"));
         style(a, pal, actions, host.findViewWithTag(TAG_TITLE + "actions"));
         style(a, pal, follow, host.findViewWithTag(TAG_TITLE + "follow"));
         // the custom boxes keep their own content, but sit on the page with the same margins and colours
-        if (plusBox != null) CigramAccountUI.sideMargins(a, plusBox);
     }
 
     /** Four graduated stops, top to bottom: the page brightens very slightly under the header and settles. */
@@ -260,15 +239,6 @@ final class CigramAccountDash {
                 ? new int[]{0xFFFFFFFF, 0xFFF7F7F9, 0xFFF1F1F4, 0xFFECECEF}
                 : new int[]{0xFF19191C, 0xFF131315, 0xFF0F0F11, 0xFF0B0B0C};
         return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, stops);
-    }
-
-    private static String plusLabel(Context c) {
-        try {
-            if (CigramPlus.isPlus(c)) return "مفعّل · افتح بطاقتك";
-            return CigramPlus.salesEnabled() ? "اشترك أو أدخل كود التفعيل" : "أدخل كود التفعيل";
-        } catch (Throwable t) {
-            return "مزايا المشتركين";
-        }
     }
 
     private static void openPage(Activity a, Class<?> page) {

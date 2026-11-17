@@ -579,17 +579,13 @@ public final class CigramAccountHeader {
             mail = mail == null ? "" : mail.trim();
             phoneEmail.setText(mail);
             phoneEmail.setVisibility(mail.length() == 0 ? View.GONE : View.VISIBLE);
-            boolean plus = false;
-            try { plus = CigramPlus.isPlus(a); } catch (Throwable ignored) { }
-            // a subscriber already carries the verification mark on the picture: no second "Cigram Plus" label here
-            statusChip.setVisibility(plus ? View.GONE : View.VISIBLE);
+            statusChip.setVisibility(View.VISIBLE);
             statusChip.setText("عضو في سيكرام");
-            statusChip.setTextColor(plus ? pal.gold : pal.text2);
-            statusChip.setBackground(CigramPalette.round(a, plus ? pal.goldSoft : pal.surfaceHi,
-                    plus ? CigramPalette.alpha(pal.gold, 0x66) : pal.stroke, 13));
+            statusChip.setTextColor(pal.text2);
+            statusChip.setBackground(CigramPalette.round(a, pal.surfaceHi, pal.stroke, 13));
         }
 
-        /** Verification ring while Plus is active; the plain white ring otherwise. */
+        /** The plain ring (no subscription badge any more). */
         private void applyFrame(Activity a) {
             try {
                 if (avatarRing == null) return;
@@ -600,7 +596,6 @@ public final class CigramAccountHeader {
                 android.graphics.drawable.Drawable seal = on ? CigramAvatarFrame.badgeDrawable(a, CigramUI.dp(a, 18)) : null;
                 name.setCompoundDrawablesRelative(null, null, seal, null);
                 name.setCompoundDrawablePadding(CigramUI.dp(a, 5));
-                CigramPlus.refresh(a, false, null);
             } catch (Throwable ignored) { }
         }
 
