@@ -3,10 +3,6 @@ options:
   bundleIdPrefix: com.cigram
   deploymentTarget:
     iOS: "13.0"
-packages:
-  GoogleMobileAds:
-    url: https://github.com/googleads/swift-package-manager-google-mobile-ads.git
-    from: "13.13.0"
 settings:
   base:
     SWIFT_VERSION: "5.0"
@@ -16,14 +12,11 @@ settings:
     CODE_SIGNING_REQUIRED: "NO"
     CODE_SIGN_IDENTITY: ""
     TARGETED_DEVICE_FAMILY: "1,2"
-    OTHER_LDFLAGS: ["-ObjC"]
 targets:
   Cigram:
     type: application
     platform: iOS
     sources: [Sources]
-    dependencies:
-      - package: GoogleMobileAds
     info:
       path: Sources/Info.plist
       properties:
@@ -41,10 +34,6 @@ targets:
         # new titles only once they are complete (see Notifier.swift)
         UIBackgroundModes: [audio, fetch]
         BGTaskSchedulerPermittedIdentifiers: [com.cigram.vid.refresh]
-        # AdMob: Google's TEST App ID. Replace it with the iOS App ID from your AdMob account (and the unit ids in Ads.swift)
-        GADApplicationIdentifier: ca-app-pub-7010031756978837~1229517223
-        SKAdNetworkItems:
-          - SKAdNetworkIdentifier: cstr6suwn9.skadnetwork
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         # App Transport Security stays ON for every Cigram server (HTTPS, valid certificate, TLS 1.2+).
