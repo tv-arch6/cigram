@@ -2,7 +2,7 @@
 
 | النسخة | الرقم | الملف |
 |---|---|---|
-| تطبيق سيكرام (جوال + تلفاز Android) | 19.6.1 (versionCode 99) | `android/cigram` |
+| تطبيق سيكرام (جوال + تلفاز Android) | 19.6.1 (versionCode 101) | `android/cigram` |
 | تطبيق الإدارة Cigram Studio | 3.1.0 (versionCode 15) | `android/admin` |
 | سيكرام للآيفون والآيباد | 1.1.0 (build 2) | `Sources/`, `project.yml` |
 

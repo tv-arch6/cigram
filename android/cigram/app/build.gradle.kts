@@ -24,7 +24,7 @@ android {
     defaultConfig {
         minSdk = 24
         targetSdk = 36
-        versionCode = 99
+        versionCode = 101
         versionName = "19.6.1"
     }
 
