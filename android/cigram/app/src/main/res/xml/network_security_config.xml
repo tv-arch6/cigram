@@ -15,5 +15,12 @@
         <domain includeSubdomains="true">tmdb.org</domain>
         <domain includeSubdomains="true">opensubtitles.com</domain>
         <domain includeSubdomains="true">subdl.com</domain>
+        <domain includeSubdomains="true">googleapis.com</domain>
+        <domain includeSubdomains="true">firebaseio.com</domain>
+        <!-- 19.6.1: the account / ads / admin back-ends only accept a certificate from a system authority, never one
+             the user installed (a capture proxy cannot read or change Cigram's own traffic) -->
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
     </domain-config>
 </network-security-config>

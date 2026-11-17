@@ -264,6 +264,7 @@ public final class CigramStage1InitProvider extends ContentProvider {
 
         appContext = context.getApplicationContext();
         CigramStability.init(appContext);   // v10.49: memory trimming + crash record, first of all
+        if (appContext instanceof Application) CigramIntegrity.install((Application) appContext);   // 19.6.1: tamper / re-sign / hook guard (release)
         CigramPerf.installDebugChecks(appContext);   // 18.3: StrictMode (log only) + main-thread watchdog, debuggable builds only
         CigramTypefaces.warm(appContext);   // app font parsed on a background thread, ready before the first label
         if (appContext instanceof Application) CigramFontGuard.install((Application) appContext);
