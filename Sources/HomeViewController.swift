@@ -44,6 +44,7 @@ final class HomeViewController: UIViewController, UITableViewDataSource, UITable
         view.addSubview(empty)
         NotificationCenter.default.addObserver(self, selector: #selector(reload), name: .cigramCatalogChanged, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(reload), name: Library.changed, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(reload), name: Ads.changed, object: nil)   // the banner unit arrives with the admin's ad config
         if CatalogStore.shared.loaded { reload() } else { spinner.startAnimating() }
         DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in
             guard let self = self, !CatalogStore.shared.loaded else { return }

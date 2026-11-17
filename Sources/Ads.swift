@@ -2,25 +2,39 @@ import UIKit
 import GoogleMobileAds
 
 /// AdMob on the iPhone.
-/// App ID: the real «Cigram» AdMob app (ca-app-pub-7010031756978837~1229517223) is set in project.yml (GADApplicationIdentifier).
-/// Ad UNITS below are still Google's TEST units (they always fill, they pay nothing, and they are safe on any app). The units of the
-/// Android app must NOT be copied here: an ad unit belongs to ONE app and one platform. In AdMob → Apps, add the iPhone app
-/// (iOS, bundle id com.cigram.vid), create a Banner unit and an Interstitial unit under it, and paste their two ids below.
+/// App ID: the «Cigram» AdMob app (ca-app-pub-7010031756978837~1229517223), set in project.yml (GADApplicationIdentifier).
+/// Units — taken from the Android app (CigramAdConfig.java), exactly like Android:
+///   • interstitial before a title starts  = REAL_PLAYER_INTERSTITIAL (…/3504326778);
+///   • banner                              = the admin's remote ad config key "banner_unit" (empty = no banner, as on Android).
+/// Debug builds (the simulator check) use Google's test units, so testing never touches the real ones.
+/// If AdMob reports no fill for these (they were created for the Android app), create an iOS app + units in AdMob and swap `real…` below.
 enum AdIDs {
-    static let banner = "ca-app-pub-3940256099942544/2934735716"
-    static let interstitial = "ca-app-pub-3940256099942544/4411468910"
+    static let testBanner = "ca-app-pub-3940256099942544/2934735716"
+    static let testInterstitial = "ca-app-pub-3940256099942544/4411468910"
+    static let realInterstitial = "ca-app-pub-7010031756978837/3504326778"
+
+    static var interstitial: String {
+        #if DEBUG
+        return testInterstitial
+        #else
+        return realInterstitial
+        #endif
+    }
 }
 
 /// Same switches as the Android app: the admin's /ads/config (ads on/off, player ads, cooldown, per-hour cap,
 /// ad-free accounts). An interstitial may show before a title starts; a banner sits at the end of Home.
 final class Ads: NSObject, FullScreenContentDelegate {
     static let shared = Ads()
+    static let changed = Notification.Name("cigram.ads.changed")
 
     private(set) var enabled = true
     private var playerAds = true
     private var cooldownMin = 10
     private var maxPerHour = 4
     private var adFreeIds: [String] = []
+    private var remoteBannerUnit = ""
+    private var bannerView: BannerView?
     private var interstitial: InterstitialAd?
     private var loading = false
     private var shown: [Date] = []
@@ -44,7 +58,10 @@ final class Ads: NSObject, FullScreenContentDelegate {
                 self.cooldownMin = (o["cooldown_min"] as? NSNumber)?.intValue ?? 10
                 self.maxPerHour = (o["max_ads_per_hour"] as? NSNumber)?.intValue ?? 4
                 self.adFreeIds = (o["ad_free_user_ids"] as? [Any])?.map { String(describing: $0) } ?? []
+                let unit = ((o["banner_unit"] as? String) ?? "").trimmingCharacters(in: .whitespaces)
+                self.remoteBannerUnit = (unit.hasPrefix("ca-app-pub-") && unit.contains("/")) ? unit : ""
                 self.loadInterstitial()
+                NotificationCenter.default.post(name: Ads.changed, object: nil)
             }
         }.resume()
     }
@@ -98,13 +115,28 @@ final class Ads: NSObject, FullScreenContentDelegate {
         loadInterstitial()
     }
 
-    /// A standard banner for the end of Home (nil when ads are off for this viewer).
+    /// The banner unit for this build: the admin's `banner_unit` (like Android); Debug builds use Google's test banner.
+    private var bannerUnit: String {
+        #if DEBUG
+        return AdIDs.testBanner
+        #else
+        return remoteBannerUnit
+        #endif
+    }
+
+    /// A standard banner for the end of Home (nil when ads are off for this viewer or the admin set no banner unit).
+    /// One instance is reused, so a screen refresh never asks AdMob for a new ad.
     func banner(in vc: UIViewController) -> UIView? {
-        guard active else { return nil }
+        guard active, !bannerUnit.isEmpty else { return nil }
+        if let b = bannerView, b.adUnitID == bannerUnit {
+            b.rootViewController = vc
+            return b
+        }
         let b = BannerView(adSize: AdSizeBanner)
-        b.adUnitID = AdIDs.banner
+        b.adUnitID = bannerUnit
         b.rootViewController = vc
         b.load(Request())
+        bannerView = b
         return b
     }
 }
