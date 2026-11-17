@@ -1,12 +1,19 @@
 import UIKit
 
-/// Details: backdrop, poster, «2025 ¦ كوميديا | دراما», IMDb, story, «شاهد الآن», and for a series its seasons + episodes.
+/// Details — the Android layout: backdrop, poster, title, «2025 ¦ كوميديا | دراما», IMDb, «شاهد الآن» (or «أكمل الحلقة …»),
+/// the action row («قائمتي», «أعجبني», «لم يعجبني», «مشاركة»), the story, seasons + episodes, «أعمال مشابهة».
 final class DetailsViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
     private let show: Show
     private let table = UITableView(frame: .zero, style: .plain)
     private var season = 0
     private var episodes: [CatalogItem] = []
+    private var related: [Show] = []
     private let seasonControl = UISegmentedControl()
+    private let listButton = ActionButton(title: "قائمتي", symbol: "plus")
+    private let likeButton = ActionButton(title: "أعجبني", symbol: "hand.thumbsup")
+    private let dislikeButton = ActionButton(title: "لم يعجبني", symbol: "hand.thumbsdown")
+    private let shareButton = ActionButton(title: "مشاركة", symbol: "square.and.arrow.up")
+    private let playButton = UIButton(type: .system)
 
     init(show: Show) {
         self.show = show
@@ -24,14 +31,22 @@ final class DetailsViewController: UIViewController, UITableViewDataSource, UITa
         table.delegate = self
         table.frame = view.bounds
         table.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        table.register(UITableViewCell.self, forCellReuseIdentifier: "ep")
+        table.register(EpisodeCell.self, forCellReuseIdentifier: EpisodeCell.id)
+        table.register(RowCell.self, forCellReuseIdentifier: RowCell.id)
         view.addSubview(table)
         if show.isSeries {
-            let seasons = show.seasons
-            season = seasons.last ?? 0
+            let current = Library.shared.lastEpisode(of: show)
+            season = current?.season ?? (show.seasons.first ?? 0)
             episodes = show.episodes.filter { $0.season == season }
         }
+        related = show.related()
+        listButton.addTarget(self, action: #selector(toggleList), for: .touchUpInside)
+        likeButton.addTarget(self, action: #selector(like), for: .touchUpInside)
+        dislikeButton.addTarget(self, action: #selector(dislike), for: .touchUpInside)
+        shareButton.addTarget(self, action: #selector(share), for: .touchUpInside)
         table.tableHeaderView = header()
+        refreshActions()
+        NotificationCenter.default.addObserver(self, selector: #selector(refreshActions), name: Library.changed, object: nil)
     }
 
     private func header() -> UIView {
@@ -48,54 +63,63 @@ final class DetailsViewController: UIViewController, UITableViewDataSource, UITa
         fade.locations = [0.45, 1.0]
         back.layer.addSublayer(fade)
 
-        let pw: CGFloat = min(140, w * 0.32)
+        let pw: CGFloat = min(130, w * 0.3)
         let poster = UIImageView(frame: CGRect(x: w - pw - 16, y: back.frame.maxY - pw * 0.9, width: pw, height: pw * 1.5))
         poster.contentMode = .scaleAspectFill
         poster.clipsToBounds = true
         poster.layer.cornerRadius = 12
+        poster.layer.borderWidth = 1
+        poster.layer.borderColor = UIColor.white.withAlphaComponent(0.12).cgColor
         poster.backgroundColor = Theme.surface
         ImageLoader.shared.load(show.posterURL) { poster.image = $0 }
         box.addSubview(poster)
 
-        let textX: CGFloat = 16
         let textW = w - pw - 44
-        let name = UILabel(frame: CGRect(x: textX, y: back.frame.maxY - pw * 0.6, width: textW, height: 60))
+        let name = UILabel(frame: CGRect(x: 16, y: back.frame.maxY - pw * 0.55, width: textW, height: 58))
         name.text = show.title
         name.font = Theme.font(22, .heavy)
         name.textColor = .white
         name.numberOfLines = 2
         name.textAlignment = .right
         box.addSubview(name)
-        let meta = UILabel(frame: CGRect(x: textX, y: name.frame.maxY + 2, width: textW, height: 18))
+        let meta = UILabel(frame: CGRect(x: 16, y: name.frame.maxY + 2, width: textW, height: 18))
         meta.text = show.meta
         meta.font = Theme.font(13)
         meta.textColor = Theme.text3
         meta.textAlignment = .right
         box.addSubview(meta)
-        let imdb = UILabel(frame: CGRect(x: textX, y: meta.frame.maxY + 4, width: textW, height: 18))
-        imdb.text = show.head.imdb.isEmpty ? "" : "IMDb " + show.head.imdb
-        imdb.font = Theme.font(13, .bold)
-        imdb.textColor = Theme.imdb
-        imdb.textAlignment = .right
-        box.addSubview(imdb)
+        let badges = UILabel(frame: CGRect(x: 16, y: meta.frame.maxY + 4, width: textW, height: 18))
+        var b: [String] = []
+        if !show.head.imdb.isEmpty && !show.head.imdb.hasPrefix("tt") { b.append("IMDb " + show.head.imdb) }
+        b.append(show.isSeries ? "مسلسل · " + String(show.seasons.count) + " مواسم · " + String(show.episodes.count) + " حلقة" : "فيلم")
+        badges.text = b.joined(separator: "   ")
+        badges.font = Theme.font(13, .bold)
+        badges.textColor = Theme.imdb
+        badges.textAlignment = .right
+        box.addSubview(badges)
 
         var y = poster.frame.maxY + 16
-        let play = UIButton(type: .system)
-        play.frame = CGRect(x: 16, y: y, width: w - 32, height: 50)
-        play.backgroundColor = Theme.red
-        play.layer.cornerRadius = 12
-        play.setTitleColor(.white, for: .normal)
-        play.titleLabel?.font = Theme.font(17, .bold)
-        if show.isSeries, let last = show.episodes.last {
-            play.setTitle("▶  شاهد الحلقة " + String(last.episode) + " (الموسم " + String(last.season) + ")", for: .normal)
-        } else {
-            play.setTitle("▶  شاهد الآن", for: .normal)
-        }
-        play.isEnabled = !show.watchLink.isEmpty
-        play.alpha = play.isEnabled ? 1 : 0.4
-        play.addTarget(self, action: #selector(playMain), for: .touchUpInside)
-        box.addSubview(play)
-        y = play.frame.maxY + 14
+        playButton.frame = CGRect(x: 16, y: y, width: w - 32, height: 52)
+        playButton.backgroundColor = Theme.red
+        playButton.layer.cornerRadius = 12
+        playButton.setTitleColor(.white, for: .normal)
+        playButton.tintColor = .white
+        playButton.titleLabel?.font = Theme.font(17, .bold)
+        playButton.setImage(UIImage(systemName: "play.fill"), for: .normal)
+        playButton.semanticContentAttribute = .forceRightToLeft
+        playButton.isEnabled = !show.watchLink.isEmpty || !show.episodes.isEmpty
+        playButton.alpha = playButton.isEnabled ? 1 : 0.4
+        playButton.addTarget(self, action: #selector(playMain), for: .touchUpInside)
+        box.addSubview(playButton)
+        y = playButton.frame.maxY + 14
+
+        let actions = UIStackView(arrangedSubviews: [listButton, likeButton, dislikeButton, shareButton])
+        actions.axis = .horizontal
+        actions.distribution = .fillEqually
+        actions.semanticContentAttribute = .forceRightToLeft
+        actions.frame = CGRect(x: 8, y: y, width: w - 16, height: 58)
+        box.addSubview(actions)
+        y = actions.frame.maxY + 12
 
         let story = UILabel(frame: CGRect(x: 16, y: y, width: w - 32, height: 10))
         story.text = show.head.overview
@@ -108,17 +132,24 @@ final class DetailsViewController: UIViewController, UITableViewDataSource, UITa
         box.addSubview(story)
         y = story.frame.maxY + 16
 
+        if !show.genres.isEmpty {
+            let g = UILabel(frame: CGRect(x: 16, y: y, width: w - 32, height: 18))
+            g.text = "التصنيف: " + show.genres.joined(separator: " | ")
+            g.font = Theme.font(13)
+            g.textColor = Theme.text3
+            g.textAlignment = .right
+            box.addSubview(g)
+            y = g.frame.maxY + 14
+        }
+
         if show.isSeries {
             let seasons = show.seasons
             seasonControl.removeAllSegments()
             for (i, s) in seasons.enumerated() { seasonControl.insertSegment(withTitle: "الموسم " + String(s), at: i, animated: false) }
             seasonControl.selectedSegmentIndex = max(0, seasons.firstIndex(of: season) ?? 0)
             seasonControl.addTarget(self, action: #selector(seasonChanged), for: .valueChanged)
-            seasonControl.tintColor = Theme.red
-            if #available(iOS 13.0, *) {
-                seasonControl.selectedSegmentTintColor = Theme.red
-                seasonControl.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .normal)
-            }
+            seasonControl.selectedSegmentTintColor = Theme.red
+            seasonControl.setTitleTextAttributes([.foregroundColor: UIColor.white, .font: Theme.font(13.5, .bold)], for: .normal)
             let scroll = UIScrollView(frame: CGRect(x: 0, y: y, width: w, height: 36))
             scroll.showsHorizontalScrollIndicator = false
             let segW = max(w - 32, CGFloat(seasons.count) * 92)
@@ -126,10 +157,46 @@ final class DetailsViewController: UIViewController, UITableViewDataSource, UITa
             scroll.addSubview(seasonControl)
             scroll.contentSize = CGSize(width: segW + 32, height: 36)
             box.addSubview(scroll)
-            y = scroll.frame.maxY + 8
+            y = scroll.frame.maxY + 6
         }
         box.frame.size.height = y
         return box
+    }
+
+    @objc private func refreshActions() {
+        let inList = Library.shared.inMyList(show.key)
+        listButton.set(title: "قائمتي", symbol: inList ? "checkmark" : "plus", active: inList)
+        let r = Library.shared.reaction(show.key)
+        likeButton.set(title: "أعجبني", symbol: r == 1 ? "hand.thumbsup.fill" : "hand.thumbsup", active: r == 1)
+        dislikeButton.set(title: "لم يعجبني", symbol: r == -1 ? "hand.thumbsdown.fill" : "hand.thumbsdown", active: r == -1)
+        if show.isSeries {
+            if let e = Library.shared.lastEpisode(of: show) {
+                playButton.setTitle("  أكمل الحلقة " + String(e.episode) + " · الموسم " + String(e.season), for: .normal)
+            } else if let f = show.episodes.first {
+                playButton.setTitle("  شاهد الحلقة " + String(f.episode) + " · الموسم " + String(f.season), for: .normal)
+            }
+        } else {
+            playButton.setTitle("  شاهد الآن", for: .normal)
+        }
+    }
+
+    @objc private func toggleList() { Library.shared.toggleMyList(show.key) }
+
+    @objc private func like() { react(1) }
+    @objc private func dislike() { react(-1) }
+
+    private func react(_ v: Int) {
+        let now = Library.shared.reaction(show.key) == v ? 0 : v
+        Library.shared.setReaction(show.key, now)
+        Account.shared.react(contentId: show.contentId, value: now)
+        refreshActions()
+    }
+
+    @objc private func share() {
+        let text = "شاهد «" + show.title + "» على سيكرام" + (show.meta.isEmpty ? "" : "\n" + show.meta)
+        let a = UIActivityViewController(activityItems: [text], applicationActivities: nil)
+        a.popoverPresentationController?.sourceView = shareButton
+        present(a, animated: true)
     }
 
     @objc private func seasonChanged() {
@@ -138,31 +205,95 @@ final class DetailsViewController: UIViewController, UITableViewDataSource, UITa
         guard i >= 0 && i < seasons.count else { return }
         season = seasons[i]
         episodes = show.episodes.filter { $0.season == season }
-        table.reloadData()
+        table.reloadSections(IndexSet(integer: 0), with: .none)
     }
 
     @objc private func playMain() { Router.play(show, episode: nil, from: self) }
 
-    func tableView(_ t: UITableView, numberOfRowsInSection s: Int) -> Int { return show.isSeries ? episodes.count : 0 }
+    // MARK: table — 0 episodes, 1 «أعمال مشابهة»
 
-    func tableView(_ t: UITableView, heightForRowAt ip: IndexPath) -> CGFloat { return 64 }
+    func numberOfSections(in t: UITableView) -> Int { return 2 }
+
+    func tableView(_ t: UITableView, numberOfRowsInSection s: Int) -> Int {
+        if s == 0 { return show.isSeries ? episodes.count : 0 }
+        return related.isEmpty ? 0 : 1
+    }
+
+    func tableView(_ t: UITableView, heightForRowAt ip: IndexPath) -> CGFloat {
+        return ip.section == 0 ? 74 : RowCell.height(cardWidth: Theme.cardWidth(for: view.bounds.width))
+    }
 
     func tableView(_ t: UITableView, cellForRowAt ip: IndexPath) -> UITableViewCell {
-        let c = t.dequeueReusableCell(withIdentifier: "ep", for: ip)
+        if ip.section == 1 {
+            let c = t.dequeueReusableCell(withIdentifier: RowCell.id, for: ip) as! RowCell
+            c.configure(HomeSection(id: "related", name: "أعمال مشابهة", shows: related), cardWidth: Theme.cardWidth(for: view.bounds.width))
+            c.onOpen = { [weak self] s in if let self = self { Router.details(s, from: self) } }
+            c.onMore = { [weak self] _ in
+                guard let self = self else { return }
+                self.navigationController?.pushViewController(GridViewController(title: "أعمال مشابهة", shows: self.related), animated: true)
+            }
+            return c
+        }
+        let c = t.dequeueReusableCell(withIdentifier: EpisodeCell.id, for: ip) as! EpisodeCell
         let e = episodes[ip.row]
-        c.backgroundColor = Theme.bg
-        c.textLabel?.text = "▶  الحلقة " + String(e.episode) + (e.title.isEmpty || e.title.contains("الحلقة") ? "" : " · " + e.title)
-        c.textLabel?.textColor = .white
-        c.textLabel?.font = Theme.font(15.5, .semibold)
-        c.textLabel?.textAlignment = .right
-        let sel = UIView()
-        sel.backgroundColor = Theme.surfaceHi
-        c.selectedBackgroundView = sel
+        let last = Library.shared.lastEpisode(of: show)
+        c.configure(e, poster: show.posterURL, current: last?.season == e.season && last?.episode == e.episode)
         return c
     }
 
     func tableView(_ t: UITableView, didSelectRowAt ip: IndexPath) {
         t.deselectRow(at: ip, animated: true)
+        guard ip.section == 0 else { return }
         Router.play(show, episode: episodes[ip.row], from: self)
+    }
+}
+
+/// One episode row: thumbnail, «الحلقة 4», its title / duration, a play glyph, the one being watched highlighted.
+final class EpisodeCell: UITableViewCell {
+    static let id = "EpisodeCell"
+    private let thumb = UIImageView()
+    private let title = UILabel()
+    private let sub = UILabel()
+    private let glyph = UIImageView(image: UIImage(systemName: "play.circle.fill"))
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        backgroundColor = Theme.bg
+        let sel = UIView()
+        sel.backgroundColor = Theme.surfaceHi
+        selectedBackgroundView = sel
+        thumb.contentMode = .scaleAspectFill
+        thumb.clipsToBounds = true
+        thumb.layer.cornerRadius = 8
+        thumb.backgroundColor = Theme.surface
+        title.font = Theme.font(15.5, .semibold)
+        title.textColor = .white
+        title.textAlignment = .right
+        sub.font = Theme.font(12.5)
+        sub.textColor = Theme.text3
+        sub.textAlignment = .right
+        glyph.tintColor = .white
+        [thumb, title, sub, glyph].forEach { contentView.addSubview($0) }
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let w = contentView.bounds.width
+        thumb.frame = CGRect(x: w - 16 - 96, y: 9, width: 96, height: 56)
+        title.frame = CGRect(x: 52, y: 14, width: w - 52 - 124, height: 22)
+        sub.frame = CGRect(x: 52, y: 38, width: w - 52 - 124, height: 18)
+        glyph.frame = CGRect(x: 16, y: 23, width: 28, height: 28)
+    }
+
+    func configure(_ e: CatalogItem, poster: URL?, current: Bool) {
+        title.text = "الحلقة " + String(e.episode)
+        let name = e.title.contains("الحلقة") ? "" : e.title
+        sub.text = [name, e.year].filter { !$0.isEmpty }.joined(separator: " · ")
+        title.textColor = current ? Theme.red : .white
+        glyph.tintColor = current ? Theme.red : .white
+        let url = Show.image(e.backdrop.isEmpty ? e.poster : e.backdrop, size: "w300") ?? poster
+        thumb.image = nil
+        ImageLoader.shared.load(url) { [weak self] img in self?.thumb.image = img }
     }
 }

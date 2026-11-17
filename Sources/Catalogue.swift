@@ -131,6 +131,14 @@ final class Show {
     var meta: String { return MetaLine.line(year: head.year, category: head.category) }
     var sectionId: String { return head.sectionId.isEmpty ? (episodes.first?.sectionId ?? "") : head.sectionId }
     var sectionName: String { return head.sectionName.isEmpty ? (episodes.first?.sectionName ?? "") : head.sectionName }
+    var contentId: String { return isSeries ? key : head.id }
+    var genres: [String] { return MetaLine.genres(head.category) }
+
+    /// «أعمال مشابهة»: titles that share this one's first genre (newest first), at most one home row.
+    func related() -> [Show] {
+        guard let g = genres.first else { return [] }
+        return Array(CatalogStore.shared.shows.filter { $0.key != key && $0.genres.contains(g) }.prefix(Backend.homeRowMax))
+    }
     var seasons: [Int] { return Array(Set(episodes.map { $0.season })).sorted() }
 
     /// The link the player opens first: the film's own, or the newest episode's.
@@ -293,10 +301,45 @@ final class CatalogStore {
             if let d = try? Data(contentsOf: self.cacheFile) { self.install(CatalogueParser.records(d)) }
             self.refresh(force: false, completion: nil)
             self.refreshSections()
+            DispatchQueue.main.async { self.refreshCarousel() }
         }
     }
 
     func show(forKey key: String) -> Show? { return shows.first { $0.key == key } }
+
+    // MARK: the admin's carousel (/carousel-active), the big slides at the top of Home
+
+    struct Slide {
+        let show: Show
+        let image: URL?
+    }
+
+    private(set) var carousel: [Slide] = []
+    private var carouselItems: [[String: Any]] = []
+
+    func refreshCarousel() {
+        guard let url = URL(string: Backend.admin + "/carousel-active") else { return }
+        URLSession.shared.dataTask(with: URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)) { d, _, _ in
+            guard let d = d, let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
+                  (o["enabled"] as? Bool) ?? true, let items = o["items"] as? [[String: Any]] else { return }
+            DispatchQueue.main.async {
+                self.carouselItems = items
+                self.rebuildCarousel()
+                NotificationCenter.default.post(name: .cigramCatalogChanged, object: nil)
+            }
+        }.resume()
+    }
+
+    private func rebuildCarousel() {
+        var out: [Slide] = []
+        for it in carouselItems {
+            let id = (it["content_id"] as? String) ?? ""
+            guard let found = self.show(forKey: id) ?? self.show(forKey: "m:" + id) else { continue }
+            let raw = (it["landscape_poster"] as? String) ?? (it["source_backdrop"] as? String) ?? ""
+            out.append(Slide(show: found, image: Show.image(raw, size: "w1280") ?? found.backdropURL))
+        }
+        carousel = out
+    }
 
     func search(_ query: String) -> [Show] {
         let q = CatalogueParser.normalize(query)
@@ -316,6 +359,7 @@ final class CatalogStore {
             self.shows = list
             self.sections = secs
             self.loaded = true
+            self.rebuildCarousel()
             NotificationCenter.default.post(name: .cigramCatalogChanged, object: nil)
         }
     }
@@ -446,6 +490,11 @@ final class ImageLoader {
     }()
 
     init() { cache.totalCostLimit = 60 * 1024 * 1024 }
+
+    func clear() {
+        cache.removeAllObjects()
+        session.configuration.urlCache?.removeAllCachedResponses()
+    }
 
     @discardableResult
     func load(_ url: URL?, _ done: @escaping (UIImage?) -> Void) -> URLSessionDataTask? {

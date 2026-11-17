@@ -20,9 +20,9 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     private let pendingKey = "cg.notify.pending"
     var openShow: ((String) -> Void)?
 
-    func setUp(_ app: UIApplication) {
+    func setUp(_ app: UIApplication, ask: Bool = true) {
         UNUserNotificationCenter.current().delegate = self
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+        if ask { UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in } }
         #if canImport(BackgroundTasks)
         if #available(iOS 13.0, *) {
             BGTaskScheduler.shared.register(forTaskWithIdentifier: Notifier.taskId, using: nil) { task in

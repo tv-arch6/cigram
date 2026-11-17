@@ -27,17 +27,17 @@ jobs:
           [ -d "$APP" ] || { echo "::error::Cigram.app not found"; exit 1; }
           /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Info.plist"
           rm -rf Payload && mkdir Payload && cp -R "$APP" Payload/
-          zip -qry Cigram-1.1.0-unsigned.ipa Payload
-          ls -lh Cigram-1.1.0-unsigned.ipa
+          zip -qry Cigram-1.1.1-unsigned.ipa Payload
+          ls -lh Cigram-1.1.1-unsigned.ipa
       - uses: actions/upload-artifact@v4
         with:
           name: Cigram-ipa
-          path: Cigram-1.1.0-unsigned.ipa
+          path: Cigram-1.1.1-unsigned.ipa
 
   # Launches the app in the iOS Simulator against the live catalogue and keeps screenshots (proof that it starts and loads).
   simulator-check:
     runs-on: macos-latest
-    timeout-minutes: 40
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
       - name: Tools
@@ -50,8 +50,8 @@ jobs:
           xcodebuild -project Cigram.xcodeproj -scheme Cigram -configuration Debug -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' -derivedDataPath simbuild CODE_SIGNING_ALLOWED=NO \
             build > sim.log 2>&1 || { grep -E "error:" sim.log | head -60; tail -n 40 sim.log; exit 1; }
-      - name: Run and screenshot
-        timeout-minutes: 15
+      - name: Run and screenshot every screen
+        timeout-minutes: 25
         run: |
           set -x
           APP=$(find simbuild/Build/Products -name "Cigram.app" -maxdepth 3 | head -1)
@@ -70,19 +70,21 @@ jobs:
           done
           sleep 20
           xcrun simctl install "$DEV" "$APP"
-          xcrun simctl launch "$DEV" com.cigram.vid
           mkdir -p shots
-          sleep 40
-          xcrun simctl io "$DEV" screenshot shots/01-home.png
-          xcrun simctl terminate "$DEV" com.cigram.vid || true
-          xcrun simctl launch "$DEV" com.cigram.vid -cigramOpenFirst
-          sleep 25
-          xcrun simctl io "$DEV" screenshot shots/02-details.png
-          xcrun simctl spawn "$DEV" log show --last 4m --predicate 'process == "Cigram"' --style compact > shots/app-log.txt 2>&1 || true
+          shoot() {
+            xcrun simctl terminate "$DEV" com.cigram.vid || true
+            xcrun simctl launch "$DEV" com.cigram.vid -cigramNoPrompt -cigramScreen "$1"
+            sleep "$2"
+            xcrun simctl io "$DEV" screenshot "shots/$1.png"
+          }
+          shoot home 45
+          for s in rows details movie player channels channelplayer search account login terms; do shoot "$s" 16; done
+          xcrun simctl spawn "$DEV" log show --last 12m --predicate 'process == "Cigram"' --style compact > shots/app-log.txt 2>&1 || true
           ls -la shots
-          grep "CIGRAM_CHECK" shots/app-log.txt | tail -n 8 || true
-          for f in 01-home 02-details; do
-            sips -Z 640 -s format jpeg -s formatOptions 40 "shots/$f.png" --out "shots/$f-small.jpg" >/dev/null
+          grep "CIGRAM_CHECK" shots/app-log.txt | tail -n 12 || true
+          grep -iE "fatal|crash|exception" shots/app-log.txt | tail -n 8 || true
+          for f in home rows details movie player channels channelplayer search account login terms; do
+            sips -Z 560 -s format jpeg -s formatOptions 38 "shots/$f.png" --out "shots/$f-small.jpg" >/dev/null
             echo "SHOT_BEGIN $f"; base64 -i "shots/$f-small.jpg"; echo "SHOT_END $f"
           done
       - uses: actions/upload-artifact@v4
