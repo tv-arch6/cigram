@@ -43,7 +43,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
                   let nav = self.tabs?.viewControllers?.first as? UINavigationController else { return }
             if let o = self.firstObserver { NotificationCenter.default.removeObserver(o) }
             self.firstObserver = nil
-            NSLog("CIGRAM_CHECK details title=%@ meta=%@ episodes=%d link=%@", first.title, first.meta, first.episodes.count, first.watchLink)
+            NSLog("CIGRAM_CHECK details title=%@ meta=%@ episodes=%ld link=%@", first.title, first.meta, first.episodes.count, first.watchLink)
             nav.pushViewController(DetailsViewController(show: first), animated: false)
         }
     }
