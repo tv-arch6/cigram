@@ -9,6 +9,7 @@ struct Channel {
     let name: String
     let image: URL?
     let url: String
+    let backup: String          // the admin's «رابط احتياطي» (channels-config backup_url), tried when the main link fails
     let section: String
     var isDash: Bool { return url.lowercased().contains(".mpd") }
 }
@@ -81,7 +82,8 @@ final class ChannelStore {
                 let url = (ch["url"] as? String) ?? (ch["link"] as? String) ?? ""
                 if url.isEmpty { continue }
                 let img = (ch["image"] as? String).flatMap { URL(string: $0) }
-                list.append(Channel(key: key, name: (ch["name"] as? String) ?? "قناة", image: img, url: url, section: name))
+                let backup = ((meta[key]?["backup_url"] as? String) ?? "").trimmingCharacters(in: .whitespaces)
+                list.append(Channel(key: key, name: (ch["name"] as? String) ?? "قناة", image: img, url: url, backup: backup, section: name))
             }
             list.sort { a, b in
                 let oa = (meta[a.key]?["order"] as? NSNumber)?.intValue ?? Int.max
@@ -367,19 +369,21 @@ final class ChannelPlayerViewController: UIViewController {
         report.frame = CGRect(x: (w - 180) / 2, y: view.bounds.midY + 18, width: 180, height: 44)
     }
 
-    private func play() {
+    private func play(backup: Bool = false) {
         let ch = channels[index]
+        let link = backup ? ch.backup : ch.url
         name.text = ch.name
         status.isHidden = true
         report.isHidden = true
         prevButton.isEnabled = index > 0
         nextButton.isEnabled = index + 1 < channels.count
         observation = nil
-        if ch.isDash {
+        if link.lowercased().contains(".mpd") {
+            if !backup && !ch.backup.isEmpty { play(backup: true); return }
             fail("هذه القناة بصيغة لا يدعمها الآيفون (DASH).")
             return
         }
-        let parts = ch.url.components(separatedBy: "|")
+        let parts = link.components(separatedBy: "|")
         guard let url = URL(string: parts[0].trimmingCharacters(in: .whitespaces)) else { fail("رابط القناة غير صالح."); return }
         var headers: [String: String] = [:]
         if parts.count > 1 {
@@ -391,7 +395,15 @@ final class ChannelPlayerViewController: UIViewController {
         let asset = AVURLAsset(url: url, options: headers.isEmpty ? nil : ["AVURLAssetHTTPHeaderFieldsKey": headers])
         let item = AVPlayerItem(asset: asset)
         observation = item.observe(\.status, options: [.new]) { [weak self] it, _ in
-            DispatchQueue.main.async { if it.status == .failed { self?.fail("القناة متوقفة حالياً.") } }
+            DispatchQueue.main.async {
+                guard it.status == .failed, let self = self else { return }
+                if !backup && !ch.backup.isEmpty && ch.backup != ch.url {
+                    NSLog("CIGRAM_CHECK channel %@ main link failed, trying the backup", ch.name)
+                    self.play(backup: true)
+                } else {
+                    self.fail("القناة متوقفة حالياً.")
+                }
+            }
         }
         let player = AVPlayer(playerItem: item)
         player.automaticallyWaitsToMinimizeStalling = true
