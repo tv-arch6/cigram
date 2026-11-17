@@ -51,13 +51,24 @@ jobs:
             -destination 'generic/platform=iOS Simulator' -derivedDataPath simbuild CODE_SIGNING_ALLOWED=NO \
             build > sim.log 2>&1 || { grep -E "error:" sim.log | head -60; tail -n 40 sim.log; exit 1; }
       - name: Run and screenshot
+        timeout-minutes: 15
         run: |
           set -x
           APP=$(find simbuild/Build/Products -name "Cigram.app" -maxdepth 3 | head -1)
-          DEV=$(xcrun simctl list devices available | grep -E "iPhone 1[5-7]( Pro)? \(" | head -1 | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
-          [ -n "$DEV" ] || DEV=$(xcrun simctl list devices available | grep iPhone | head -1 | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
+          DEV=$(xcrun simctl list devices available -j | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)['devices']
+          c=[x for k,v in d.items() if 'iOS' in k for x in v if x.get('isAvailable') and x['name'].startswith('iPhone')]
+          c.sort(key=lambda x: ('Pro' in x['name'], x['name']))
+          print(c[-1]['udid'] if c else '')")
+          echo "device: $DEV"
+          [ -n "$DEV" ] || { echo "::error::no iPhone simulator"; exit 1; }
           xcrun simctl boot "$DEV" || true
-          xcrun simctl bootstatus "$DEV" -b
+          for i in $(seq 1 90); do
+            xcrun simctl list devices | grep "$DEV" | grep -q Booted && break
+            sleep 2
+          done
+          sleep 20
           xcrun simctl install "$DEV" "$APP"
           xcrun simctl launch "$DEV" com.cigram.vid
           mkdir -p shots
@@ -75,6 +86,7 @@ jobs:
             echo "SHOT_BEGIN $f"; base64 -i "shots/$f-small.jpg"; echo "SHOT_END $f"
           done
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: Cigram-ios-simulator-check
           path: shots
