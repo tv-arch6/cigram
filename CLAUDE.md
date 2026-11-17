@@ -19,7 +19,5 @@
 - لا ميزة تنزيل أفلام/مسلسلات، ولا استخراج روابط بث من VidBolt (الآيفون يشغّل داخل صفحة VidBolt).
 
 ## ملفات iOS المحذوفة (مهم)
-- المالك يرفع محتوى «Cigram ios.zip» فوق فرع `main` يدوياً، والرفع **لا يمسح** الملفات المحذوفة من الزيب.
-- لذلك `.github/workflows/ios.yml` فيه خطوة تحذف الملفات القديمة (حالياً `Ads.swift` و`CatalogueViewController.swift`).
-  **كلما حذفت ملف Swift من `Sources/` أضف اسمه لتلك الخطوة**، وإلا يفشل بناء `main` بخطأ redeclaration/missing module.
-
+- المالك يرفع محتوى «Cigram ios.zip» فوق فرع `main` يدوياً، والرفع **لا يمسح** الملفات المحذوفة. ولا يريد منك تشغيل ios.yml (لا تعمل dispatch إلا بطلبه).
+- لذلك أي ملف Swift يُحذف يبقى في `Sources/` **كملف فارغ (تعليق فقط)** بنفس الاسم ليكتب فوق القديم (حالياً `Ads.swift` و`CatalogueViewController.swift`).
