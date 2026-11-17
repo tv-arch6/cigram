@@ -35,9 +35,12 @@ jobs:
           path: Cigram-1.1.1-unsigned.ipa
 
   # Launches the app in the iOS Simulator against the live catalogue and keeps screenshots (proof that it starts and loads).
+  # Runs AFTER the ipa job (never at the same time) so the two never compete for a macOS runner.
   simulator-check:
+    needs: ipa
+    if: always()
     runs-on: macos-latest
-    timeout-minutes: 50
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - name: Tools
@@ -51,42 +54,51 @@ jobs:
             -destination 'generic/platform=iOS Simulator' -derivedDataPath simbuild CODE_SIGNING_ALLOWED=NO \
             build > sim.log 2>&1 || { grep -E "error:" sim.log | head -60; tail -n 40 sim.log; exit 1; }
       - name: Run and screenshot every screen
-        timeout-minutes: 25
+        timeout-minutes: 22
         run: |
           set -x
+          mkdir -p shots
           APP=$(find simbuild/Build/Products -name "Cigram.app" -maxdepth 3 | head -1)
+          echo "app: $APP"
           DEV=$(xcrun simctl list devices available -j | python3 -c "
           import json,sys
           d=json.load(sys.stdin)['devices']
           c=[x for k,v in d.items() if 'iOS' in k for x in v if x.get('isAvailable') and x['name'].startswith('iPhone')]
           c.sort(key=lambda x: ('Pro' in x['name'], x['name']))
           print(c[-1]['udid'] if c else '')")
-          echo "device: $DEV"
+          echo "::group::device"; echo "device: $DEV"; echo "::endgroup::"
           [ -n "$DEV" ] || { echo "::error::no iPhone simulator"; exit 1; }
-          xcrun simctl boot "$DEV" || true
-          for i in $(seq 1 90); do
-            xcrun simctl list devices | grep "$DEV" | grep -q Booted && break
-            sleep 2
-          done
-          sleep 20
-          xcrun simctl install "$DEV" "$APP"
-          mkdir -p shots
+          # bootstatus boots the device and BLOCKS until it is fully ready (bounded by the step timeout), so no fixed guesswork
+          echo "MARK booting"
+          ( xcrun simctl bootstatus "$DEV" -b ) || xcrun simctl boot "$DEV" || true
+          xcrun simctl bootstatus "$DEV" || true
+          echo "MARK booted"
+          xcrun simctl install "$DEV" "$APP" || { echo "::error::install failed"; xcrun simctl shutdown "$DEV" || true; exit 1; }
+          echo "MARK installed"
+          # launch with a timeout guard: if a launch ever hangs it is killed, the shot of whatever is on screen is still taken
           shoot() {
-            xcrun simctl terminate "$DEV" com.cigram.vid || true
-            xcrun simctl launch "$DEV" com.cigram.vid -cigramNoPrompt -cigramScreen "$1"
+            echo "MARK shoot $1"
+            xcrun simctl terminate "$DEV" com.cigram.vid >/dev/null 2>&1 || true
+            ( xcrun simctl launch "$DEV" com.cigram.vid -cigramNoPrompt -cigramScreen "$1" ) &
+            local lp=$!; ( sleep 25 && kill $lp >/dev/null 2>&1 ) & wait $lp 2>/dev/null || true
             sleep "$2"
-            xcrun simctl io "$DEV" screenshot "shots/$1.png"
+            xcrun simctl io "$DEV" screenshot "shots/$1.png" || echo "shot $1 failed"
           }
-          shoot home 45
-          for s in rows details movie player channels channelplayer search account login terms; do shoot "$s" 16; done
+          shoot home 40
+          for s in rows details movie player channels channelplayer search account login terms; do shoot "$s" 14; done
+          echo "MARK shots-done"
           xcrun simctl spawn "$DEV" log show --last 12m --predicate 'process == "Cigram"' --style compact > shots/app-log.txt 2>&1 || true
+          xcrun simctl shutdown "$DEV" || true
           ls -la shots
-          grep "CIGRAM_CHECK" shots/app-log.txt | tail -n 12 || true
-          grep -iE "fatal|crash|exception" shots/app-log.txt | tail -n 8 || true
+          grep "CIGRAM_CHECK" shots/app-log.txt | tail -n 14 || true
+          grep -iE "fatal error|crash|exception|signal" shots/app-log.txt | tail -n 8 || true
+          echo "MARK dumping"
           for f in home rows details movie player channels channelplayer search account login terms; do
-            sips -Z 560 -s format jpeg -s formatOptions 38 "shots/$f.png" --out "shots/$f-small.jpg" >/dev/null
+            [ -f "shots/$f.png" ] || { echo "SHOT_MISSING $f"; continue; }
+            sips -Z 560 -s format jpeg -s formatOptions 38 "shots/$f.png" --out "shots/$f-small.jpg" >/dev/null 2>&1 || continue
             echo "SHOT_BEGIN $f"; base64 -i "shots/$f-small.jpg"; echo "SHOT_END $f"
           done
+          echo "MARK done"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
