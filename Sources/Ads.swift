@@ -1,8 +1,11 @@
 import UIKit
 import GoogleMobileAds
 
-/// AdMob on the iPhone. The IDs below are Google's TEST ids (they always fill, they pay nothing): create the iOS app in
-/// AdMob (Apps → Add app → iOS), then put its App ID in project.yml (GADApplicationIdentifier) and its ad unit ids here.
+/// AdMob on the iPhone.
+/// App ID: the real «Cigram» AdMob app (ca-app-pub-7010031756978837~1229517223) is set in project.yml (GADApplicationIdentifier).
+/// Ad UNITS below are still Google's TEST units (they always fill, they pay nothing, and they are safe on any app). The units of the
+/// Android app must NOT be copied here: an ad unit belongs to ONE app and one platform. In AdMob → Apps, add the iPhone app
+/// (iOS, bundle id com.cigram.vid), create a Banner unit and an Interstitial unit under it, and paste their two ids below.
 enum AdIDs {
     static let banner = "ca-app-pub-3940256099942544/2934735716"
     static let interstitial = "ca-app-pub-3940256099942544/4411468910"

@@ -2,9 +2,11 @@ name: Build Cigram iOS (IPA)
 on:
   workflow_dispatch:
 jobs:
+  # ONE job on purpose: the macOS runner pool is small, a second job could wait for a runner and be cancelled.
+  # It builds the unsigned IPA first (always uploaded), then runs the Simulator and photographs every screen.
   ipa:
     runs-on: macos-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: Tools
@@ -34,19 +36,6 @@ jobs:
           name: Cigram-ipa
           path: Cigram-1.1.1-unsigned.ipa
 
-  # Launches the app in the iOS Simulator against the live catalogue and keeps screenshots (proof that it starts and loads).
-  # Runs AFTER the ipa job (never at the same time) so the two never compete for a macOS runner.
-  simulator-check:
-    needs: ipa
-    if: always()
-    runs-on: macos-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-      - name: Tools
-        run: brew install xcodegen
-      - name: Generate Xcode project
-        run: xcodegen generate
       - name: Build for the simulator
         run: |
           set -o pipefail
