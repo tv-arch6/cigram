@@ -10,15 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
       - name: SDK 36
         run: yes | sdkmanager "platforms;android-36" "build-tools;36.0.0" >/dev/null
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: "8.13"
       - name: Signing key (optional)
@@ -43,7 +43,7 @@ jobs:
           if [ -n "$CIGRAM_ADMIN_TOKEN" ]; then printf '%s' "$CIGRAM_ADMIN_TOKEN" > app/src/main/assets/cigram_admin_token.txt; fi
           gradle --no-daemon :app:assembleRelease
           rm -f app/src/main/assets/cigram_admin_token.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: cigram-android
           path: |

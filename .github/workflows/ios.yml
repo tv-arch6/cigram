@@ -1,14 +1,20 @@
 name: Build Cigram iOS (IPA)
 on:
   workflow_dispatch:
+    inputs:
+      screenshots:
+        description: "Also run the app in the Simulator and photograph every screen (adds ~6 min). Off = IPA only (~2 min)."
+        type: boolean
+        default: false
 jobs:
   # ONE job on purpose: the macOS runner pool is small, a second job could wait for a runner and be cancelled.
-  # It builds the unsigned IPA first (always uploaded), then runs the Simulator and photographs every screen.
+  # It builds the unsigned IPA first (always uploaded). Only when "screenshots" is ticked does it go on to run the
+  # Simulator and photograph every screen (QA); a normal run ends right after the IPA.
   ipa:
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Tools
         run: brew install xcodegen
       - name: Generate Xcode project
@@ -31,18 +37,20 @@ jobs:
           rm -rf Payload && mkdir Payload && cp -R "$APP" Payload/
           zip -qry Cigram-1.1.1-unsigned.ipa Payload
           ls -lh Cigram-1.1.1-unsigned.ipa
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: Cigram-ipa
           path: Cigram-1.1.1-unsigned.ipa
 
       - name: Build for the simulator
+        if: ${{ inputs.screenshots }}
         run: |
           set -o pipefail
           xcodebuild -project Cigram.xcodeproj -scheme Cigram -configuration Debug -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' -derivedDataPath simbuild CODE_SIGNING_ALLOWED=NO \
             build > sim.log 2>&1 || { grep -E "error:" sim.log | head -60; tail -n 40 sim.log; exit 1; }
       - name: Run and screenshot every screen
+        if: ${{ inputs.screenshots }}
         timeout-minutes: 22
         run: |
           set -x
@@ -73,8 +81,8 @@ jobs:
             sleep "$2"
             xcrun simctl io "$DEV" screenshot "shots/$1.png" || echo "shot $1 failed"
           }
-          shoot home 40
-          for s in rows details movie player channels channelplayer search account login terms; do shoot "$s" 14; done
+          shoot home 30
+          for s in rows details movie player channels channelplayer search account login terms; do shoot "$s" 9; done
           echo "MARK shots-done"
           xcrun simctl spawn "$DEV" log show --last 12m --predicate 'process == "Cigram"' --style compact > shots/app-log.txt 2>&1 || true
           xcrun simctl shutdown "$DEV" || true
@@ -88,8 +96,8 @@ jobs:
             echo "SHOT_BEGIN $f"; base64 -i "shots/$f-small.jpg"; echo "SHOT_END $f"
           done
           echo "MARK done"
-      - uses: actions/upload-artifact@v4
-        if: always()
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() && inputs.screenshots }}
         with:
           name: Cigram-ios-simulator-check
           path: shots
