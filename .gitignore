@@ -8,3 +8,4 @@ android/*/.gradle/
 android/*/local.properties
 android/*/docs/screenshots-*/
 dist/
+android/admin/app/src/main/assets/cigram_admin_token.txt

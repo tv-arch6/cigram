@@ -6,20 +6,6 @@ plugins {
     id("com.android.application")
 }
 
-/** The owner's admin token for a build with zero prompts (see defaultConfig). Never printed, never committed. */
-fun adminToken(): String {
-    val env = System.getenv("CIGRAM_ADMIN_TOKEN")
-    if (!env.isNullOrBlank()) return env.trim()
-    val f = rootProject.file("local.properties")
-    if (f.isFile) {
-        val p = Properties()
-        f.inputStream().use { p.load(it) }
-        val v = p.getProperty("cigram.admin.token")
-        if (!v.isNullOrBlank()) return v.trim()
-    }
-    return ""
-}
-
 /** 19.6: release signing from env (CI secrets) or keystore.properties; without them the debug key signs (installable test build). */
 fun signingValue(key: String, env: String): String? {
     val e = System.getenv(env)
@@ -40,10 +26,10 @@ android {
         targetSdk = 34
         versionCode = 15
         versionName = "3.1.0"
-        // 19.6 (owner's request): no token to type. The admin token is BUILT IN when the build has it:
-        //   env CIGRAM_ADMIN_TOKEN (GitHub Actions secret) or `cigram.admin.token=...` in local.properties (never committed).
-        // Without it the app asks once, on the first start only, and keeps it on this phone.
-        buildConfigField("String", "ADMIN_TOKEN", "\"" + adminToken().replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
+        // 19.6 (owner's request): no token to type. Put the admin token in app/src/main/assets/cigram_admin_token.txt
+        // (never committed; the GitHub workflow writes it from the CIGRAM_ADMIN_TOKEN secret) and the app never asks.
+        // A plain literal here: CodeAssist reads this line as text.
+        buildConfigField("String", "ADMIN_TOKEN", "\"\"")
     }
 
     signingConfigs {

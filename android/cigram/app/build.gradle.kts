@@ -80,6 +80,13 @@ android {
     }
 }
 
+// The source tree carries its own androidx.viewbinding.ViewBinding (CodeAssist builds need it: it does not add the
+// library). Gradle's viewBinding feature adds the same class from androidx.databinding:viewbinding, which made the
+// release dex merge fail with a duplicate class; the library copy is left out so both build systems work.
+configurations.all {
+    exclude(group = "androidx.databinding", module = "viewbinding")
+}
+
 dependencies {
     implementation(platform("org.jetbrains.kotlin:kotlin-bom:1.9.24"))
     implementation("androidx.appcompat:appcompat:1.7.1")

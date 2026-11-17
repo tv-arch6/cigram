@@ -39,7 +39,10 @@ jobs:
         working-directory: android/admin
         env:
           CIGRAM_ADMIN_TOKEN: ${{ secrets.CIGRAM_ADMIN_TOKEN }}
-        run: gradle --no-daemon :app:assembleRelease
+        run: |
+          if [ -n "$CIGRAM_ADMIN_TOKEN" ]; then printf '%s' "$CIGRAM_ADMIN_TOKEN" > app/src/main/assets/cigram_admin_token.txt; fi
+          gradle --no-daemon :app:assembleRelease
+          rm -f app/src/main/assets/cigram_admin_token.txt
       - uses: actions/upload-artifact@v4
         with:
           name: cigram-android

@@ -10,7 +10,7 @@
 - **Build Cigram iOS (IPA)** → `Cigram-ipa` (unsigned: sign it on the phone with Sideloadly / AltStore / TrollStore).
 - **Build Cigram Android** → `cigram-android` (APK of the app + APK of the admin).
   Optional secrets: `KEYSTORE_B64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` (sign with your own key so the APK
-  installs as an update over the one your users have) and `CIGRAM_ADMIN_TOKEN` (built into the admin app: it then never asks
+  installs as an update over the one your users have) and `CIGRAM_ADMIN_TOKEN` (written into the admin app as assets/cigram_admin_token.txt: it then never asks
   for anything).
 
 See `CIGRAM-19.6-REPORT.md` for what changed.

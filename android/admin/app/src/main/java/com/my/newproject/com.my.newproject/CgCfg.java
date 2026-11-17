@@ -25,7 +25,8 @@ final class CgCfg {
      * once and its plain copy removed. Where sealing is impossible (Android 5.x) the previous behaviour stays.
      */
     static void loadToken(android.content.Context c) {
-        // 19.6: a build made with the owner's token (CIGRAM_ADMIN_TOKEN) never asks for anything
+        // 19.6: a build that carries the owner's token (assets/cigram_admin_token.txt) never asks for anything
+        readAssetToken(c);
         String built = builtToken();
         if (built.length() > 0) {
             TOKEN = built;
@@ -66,8 +67,32 @@ final class CgCfg {
         return TOKEN != null && TOKEN.length() > 0;
     }
 
-    /** The token built into this APK ("" when the build had none). */
+    /** Read once from assets/cigram_admin_token.txt ("" when the APK has no such file). */
+    private static volatile String ASSET_TOKEN = null;
+
+    private static void readAssetToken(android.content.Context c) {
+        if (ASSET_TOKEN != null || c == null) return;
+        String t = "";
+        java.io.InputStream in = null;
+        try {
+            in = c.getApplicationContext().getAssets().open("cigram_admin_token.txt");
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[512];
+            int n;
+            while ((n = in.read(buf)) > 0 && out.size() < 4096) out.write(buf, 0, n);
+            t = out.toString("UTF-8").trim();
+        } catch (Throwable ignored) {
+            t = "";                               // no file in this build: the one-time link sheet is used
+        } finally {
+            try { if (in != null) in.close(); } catch (Throwable ignored) { }
+        }
+        ASSET_TOKEN = t;
+    }
+
+    /** The token built into this APK: assets/cigram_admin_token.txt, else BuildConfig ("" when the build had none). */
     static String builtToken() {
+        String a = ASSET_TOKEN;
+        if (a != null && a.length() > 0) return a;
         try {
             String t = BuildConfig.ADMIN_TOKEN;
             return t == null ? "" : t.trim();
