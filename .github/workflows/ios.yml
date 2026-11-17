@@ -2,9 +2,11 @@ name: Build Cigram iOS (IPA)
 on:
   workflow_dispatch:
 jobs:
+  # ONE job on purpose: the macOS runner pool is small, a second job could wait for a runner and be cancelled.
+  # It builds the unsigned IPA first (always uploaded), then runs the Simulator and photographs every screen.
   ipa:
     runs-on: macos-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: Tools
@@ -13,20 +15,81 @@ jobs:
         run: xcodegen generate
       - name: Build (unsigned, device SDK)
         run: |
-          set -euo pipefail
+          set -o pipefail
           xcodebuild -project Cigram.xcodeproj -scheme Cigram -configuration Release \
             -sdk iphoneos -destination 'generic/platform=iOS' \
             -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            clean build | tee build.log | tail -n 40
+            clean build > build.log 2>&1 || { grep -E "error:|warning: unre" build.log | head -80; tail -n 60 build.log; exit 1; }
+          grep -c "warning:" build.log || true
+          tail -n 15 build.log
       - name: Package IPA
         run: |
           set -euo pipefail
           APP=$(find build/Build/Products -name "Cigram.app" -maxdepth 3 | head -1)
           [ -d "$APP" ] || { echo "::error::Cigram.app not found"; exit 1; }
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Info.plist"
           rm -rf Payload && mkdir Payload && cp -R "$APP" Payload/
-          zip -qry Cigram-unsigned.ipa Payload
-          ls -lh Cigram-unsigned.ipa
+          zip -qry Cigram-1.1.1-unsigned.ipa Payload
+          ls -lh Cigram-1.1.1-unsigned.ipa
       - uses: actions/upload-artifact@v4
         with:
           name: Cigram-ipa
-          path: Cigram-unsigned.ipa
+          path: Cigram-1.1.1-unsigned.ipa
+
+      - name: Build for the simulator
+        run: |
+          set -o pipefail
+          xcodebuild -project Cigram.xcodeproj -scheme Cigram -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath simbuild CODE_SIGNING_ALLOWED=NO \
+            build > sim.log 2>&1 || { grep -E "error:" sim.log | head -60; tail -n 40 sim.log; exit 1; }
+      - name: Run and screenshot every screen
+        timeout-minutes: 22
+        run: |
+          set -x
+          mkdir -p shots
+          APP=$(find simbuild/Build/Products -name "Cigram.app" -maxdepth 3 | head -1)
+          echo "app: $APP"
+          DEV=$(xcrun simctl list devices available -j | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)['devices']
+          c=[x for k,v in d.items() if 'iOS' in k for x in v if x.get('isAvailable') and x['name'].startswith('iPhone')]
+          c.sort(key=lambda x: ('Pro' in x['name'], x['name']))
+          print(c[-1]['udid'] if c else '')")
+          echo "::group::device"; echo "device: $DEV"; echo "::endgroup::"
+          [ -n "$DEV" ] || { echo "::error::no iPhone simulator"; exit 1; }
+          # bootstatus boots the device and BLOCKS until it is fully ready (bounded by the step timeout), so no fixed guesswork
+          echo "MARK booting"
+          ( xcrun simctl bootstatus "$DEV" -b ) || xcrun simctl boot "$DEV" || true
+          xcrun simctl bootstatus "$DEV" || true
+          echo "MARK booted"
+          xcrun simctl install "$DEV" "$APP" || { echo "::error::install failed"; xcrun simctl shutdown "$DEV" || true; exit 1; }
+          echo "MARK installed"
+          # launch with a timeout guard: if a launch ever hangs it is killed, the shot of whatever is on screen is still taken
+          shoot() {
+            echo "MARK shoot $1"
+            xcrun simctl terminate "$DEV" com.cigram.vid >/dev/null 2>&1 || true
+            ( xcrun simctl launch "$DEV" com.cigram.vid -cigramNoPrompt -cigramScreen "$1" ) &
+            local lp=$!; ( sleep 25 && kill $lp >/dev/null 2>&1 ) & wait $lp 2>/dev/null || true
+            sleep "$2"
+            xcrun simctl io "$DEV" screenshot "shots/$1.png" || echo "shot $1 failed"
+          }
+          shoot home 40
+          for s in rows details movie player channels channelplayer search account login terms; do shoot "$s" 14; done
+          echo "MARK shots-done"
+          xcrun simctl spawn "$DEV" log show --last 12m --predicate 'process == "Cigram"' --style compact > shots/app-log.txt 2>&1 || true
+          xcrun simctl shutdown "$DEV" || true
+          ls -la shots
+          grep "CIGRAM_CHECK" shots/app-log.txt | tail -n 14 || true
+          grep -iE "fatal error|crash|exception|signal" shots/app-log.txt | tail -n 8 || true
+          echo "MARK dumping"
+          for f in home rows details movie player channels channelplayer search account login terms; do
+            [ -f "shots/$f.png" ] || { echo "SHOT_MISSING $f"; continue; }
+            sips -Z 560 -s format jpeg -s formatOptions 38 "shots/$f.png" --out "shots/$f-small.jpg" >/dev/null 2>&1 || continue
+            echo "SHOT_BEGIN $f"; base64 -i "shots/$f-small.jpg"; echo "SHOT_END $f"
+          done
+          echo "MARK done"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Cigram-ios-simulator-check
+          path: shots
