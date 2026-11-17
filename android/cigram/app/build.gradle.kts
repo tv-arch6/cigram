@@ -24,8 +24,8 @@ android {
     defaultConfig {
         minSdk = 24
         targetSdk = 36
-        versionCode = 98
-        versionName = "18.6.1"
+        versionCode = 99
+        versionName = "19.6.1"
     }
 
     signingConfigs {
