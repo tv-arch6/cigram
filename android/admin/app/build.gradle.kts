@@ -20,6 +20,17 @@ fun adminToken(): String {
     return ""
 }
 
+/** 19.6: release signing from env (CI secrets) or keystore.properties; without them the debug key signs (installable test build). */
+fun signingValue(key: String, env: String): String? {
+    val e = System.getenv(env)
+    if (!e.isNullOrBlank()) return e
+    val f = rootProject.file("keystore.properties")
+    if (!f.isFile) return null
+    val p = Properties()
+    f.inputStream().use { p.load(it) }
+    return p.getProperty(key)?.takeIf { it.isNotBlank() }
+}
+
 android {
     namespace = "com.my.newproject"
     compileSdk = 36
@@ -35,8 +46,21 @@ android {
         buildConfigField("String", "ADMIN_TOKEN", "\"" + adminToken().replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
     }
 
+    signingConfigs {
+        val store = signingValue("storeFile", "CIGRAM_STORE_FILE")
+        if (store != null && file(store).isFile) {
+            create("release") {
+                storeFile = file(store)
+                storePassword = signingValue("storePassword", "CIGRAM_STORE_PASSWORD")
+                keyAlias = signingValue("keyAlias", "CIGRAM_KEY_ALIAS")
+                keyPassword = signingValue("keyPassword", "CIGRAM_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         getByName("release") {
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

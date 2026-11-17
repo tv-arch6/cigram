@@ -14,7 +14,7 @@ final class PlayerViewController: UIViewController, WKNavigationDelegate, WKUIDe
     private let bar = UIView()
     private let close = UIButton(type: .system)
     private let titleLabel = UILabel()
-    private let next = UIButton(type: .system)
+    private let nextButton = UIButton(type: .system)
     private let server = UIButton(type: .system)
     private let spinner = UIActivityIndicatorView(style: .whiteLarge)
     private var hideTimer: Timer?
@@ -67,15 +67,15 @@ final class PlayerViewController: UIViewController, WKNavigationDelegate, WKUIDe
         titleLabel.textColor = .white
         titleLabel.font = Theme.font(15, .bold)
         titleLabel.textAlignment = .center
-        next.setTitle("الحلقة التالية ›", for: .normal)
-        next.setTitleColor(.white, for: .normal)
-        next.titleLabel?.font = Theme.font(14, .bold)
-        next.addTarget(self, action: #selector(nextTapped), for: .touchUpInside)
+        nextButton.setTitle("الحلقة التالية ›", for: .normal)
+        nextButton.setTitleColor(.white, for: .normal)
+        nextButton.titleLabel?.font = Theme.font(14, .bold)
+        nextButton.addTarget(self, action: #selector(nextTapped), for: .touchUpInside)
         server.setTitle("مصدر آخر", for: .normal)
         server.setTitleColor(Theme.text2, for: .normal)
         server.titleLabel?.font = Theme.font(13, .semibold)
         server.addTarget(self, action: #selector(serverTapped), for: .touchUpInside)
-        [close, titleLabel, next, server].forEach { bar.addSubview($0) }
+        [close, titleLabel, nextButton, server].forEach { bar.addSubview($0) }
         let tap = UITapGestureRecognizer(target: self, action: #selector(showBar))
         tap.cancelsTouchesInView = false
         view.addGestureRecognizer(tap)
@@ -90,7 +90,7 @@ final class PlayerViewController: UIViewController, WKNavigationDelegate, WKUIDe
         var right: CGFloat = 8
         if #available(iOS 11.0, *) { left = max(8, view.safeAreaInsets.left); right = max(8, view.safeAreaInsets.right) }
         close.frame = CGRect(x: left, y: 7, width: 44, height: 40)
-        next.frame = CGRect(x: w - right - 130, y: 7, width: 130, height: 40)
+        nextButton.frame = CGRect(x: w - right - 130, y: 7, width: 130, height: 40)
         server.frame = CGRect(x: left + 48, y: 7, width: 80, height: 40)
         titleLabel.frame = CGRect(x: left + 132, y: 7, width: max(40, w - left - right - 132 - 136), height: 40)
     }
@@ -99,7 +99,7 @@ final class PlayerViewController: UIViewController, WKNavigationDelegate, WKUIDe
         var text = show.title
         if let e = episode { text += " · م" + String(e.season) + " ح" + String(e.episode) }
         titleLabel.text = text
-        next.isHidden = nextEpisode() == nil
+        nextButton.isHidden = nextEpisode() == nil
         sources = buildSources()
         index = 0
         load()
