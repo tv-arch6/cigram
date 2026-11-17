@@ -31,7 +31,21 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         CatalogStore.shared.start()
         Notifier.shared.openShow = { [weak self] key in self?.open(key) }
         Notifier.shared.setUp(application)
+        if ProcessInfo.processInfo.arguments.contains("-cigramOpenFirst") { openFirstWhenLoaded() }
         return true
+    }
+
+    /// CI check (simulator): opens the details page of the first title once the catalogue is in.
+    private var firstObserver: NSObjectProtocol?
+    private func openFirstWhenLoaded() {
+        firstObserver = NotificationCenter.default.addObserver(forName: .cigramCatalogChanged, object: nil, queue: .main) { [weak self] _ in
+            guard let self = self, let first = CatalogStore.shared.sections.first?.shows.first ?? CatalogStore.shared.shows.first,
+                  let nav = self.tabs?.viewControllers?.first as? UINavigationController else { return }
+            if let o = self.firstObserver { NotificationCenter.default.removeObserver(o) }
+            self.firstObserver = nil
+            NSLog("CIGRAM_CHECK details title=%@ meta=%@ episodes=%d link=%@", first.title, first.meta, first.episodes.count, first.watchLink)
+            nav.pushViewController(DetailsViewController(show: first), animated: false)
+        }
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {

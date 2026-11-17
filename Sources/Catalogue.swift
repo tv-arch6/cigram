@@ -310,6 +310,8 @@ final class CatalogStore {
         let list = CatalogueParser.shows(records)
         guard !list.isEmpty else { return }
         let secs = CatalogueParser.sections(list, registry: registry)
+        NSLog("CIGRAM_CHECK catalogue shows=%d series=%d sections=%d rowMax=%d", list.count, list.filter { $0.isSeries }.count,
+              secs.count, secs.map { $0.shows.count }.max() ?? 0)
         DispatchQueue.main.async {
             self.shows = list
             self.sections = secs

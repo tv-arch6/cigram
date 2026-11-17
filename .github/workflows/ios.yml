@@ -61,12 +61,19 @@ jobs:
           xcrun simctl install "$DEV" "$APP"
           xcrun simctl launch "$DEV" com.cigram.vid
           mkdir -p shots
-          sleep 35
+          sleep 40
           xcrun simctl io "$DEV" screenshot shots/01-home.png
-          sleep 20
-          xcrun simctl io "$DEV" screenshot shots/02-home-later.png
-          xcrun simctl spawn "$DEV" log show --last 3m --predicate 'process == "Cigram"' --style compact > shots/app-log.txt 2>&1 || true
+          xcrun simctl terminate "$DEV" com.cigram.vid || true
+          xcrun simctl launch "$DEV" com.cigram.vid -cigramOpenFirst
+          sleep 25
+          xcrun simctl io "$DEV" screenshot shots/02-details.png
+          xcrun simctl spawn "$DEV" log show --last 4m --predicate 'process == "Cigram"' --style compact > shots/app-log.txt 2>&1 || true
           ls -la shots
+          grep "CIGRAM_CHECK" shots/app-log.txt | tail -n 8 || true
+          for f in 01-home 02-details; do
+            sips -Z 640 -s format jpeg -s formatOptions 40 "shots/$f.png" --out "shots/$f-small.jpg" >/dev/null
+            echo "SHOT_BEGIN $f"; base64 -i "shots/$f-small.jpg"; echo "SHOT_END $f"
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: Cigram-ios-simulator-check
