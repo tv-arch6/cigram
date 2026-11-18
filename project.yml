@@ -6,8 +6,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "1.1.1"
-    CURRENT_PROJECT_VERSION: "4"
+    MARKETING_VERSION: "1.1.2"
+    CURRENT_PROJECT_VERSION: "5"
     CODE_SIGNING_ALLOWED: "NO"
     CODE_SIGNING_REQUIRED: "NO"
     CODE_SIGN_IDENTITY: ""
@@ -22,14 +22,20 @@ targets:
       properties:
         CFBundleDisplayName: Cigram
         CFBundleDevelopmentRegion: ar
-        CFBundleShortVersionString: "1.1.1"
-        CFBundleVersion: "4"
+        CFBundleShortVersionString: "1.1.2"
+        CFBundleVersion: "5"
         UILaunchStoryboardName: LaunchScreen
         UIRequiresFullScreen: true
         UIUserInterfaceStyle: Dark
         UIStatusBarStyle: UIStatusBarStyleLightContent
         UIViewControllerBasedStatusBarAppearance: true
         ITSAppUsesNonExemptEncryption: false
+        # «الدعم والتواصل»: photos / videos / voice messages to the Cigram team (asked only when the viewer uses them;
+        # without these strings iOS closes the app the moment the camera, the microphone or "Save Image" is touched)
+        NSCameraUsageDescription: "لتصوير صورة أو فيديو وإرساله لفريق الدعم في «الدعم والتواصل»."
+        NSMicrophoneUsageDescription: "لتسجيل رسالة صوتية لفريق الدعم في «الدعم والتواصل»."
+        NSPhotoLibraryUsageDescription: "لإرسال صورة أو فيديو من صورك لفريق الدعم في «الدعم والتواصل»."
+        NSPhotoLibraryAddUsageDescription: "لحفظ الصور التي يرسلها لك فريق الدعم في صورك."
         # audio: the players keep sound with the silent switch on; fetch: the background catalogue check that announces
         # new titles only once they are complete (see Notifier.swift)
         UIBackgroundModes: [audio, fetch]

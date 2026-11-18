@@ -19,6 +19,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     private let knownKey = "cg.notify.known"
     private let pendingKey = "cg.notify.pending"
     var openShow: ((String) -> Void)?
+    var openSupport: (() -> Void)?
 
     func setUp(_ app: UIApplication, ask: Bool = true) {
         UNUserNotificationCenter.current().delegate = self
@@ -59,11 +60,17 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 
     /// iOS 12 background fetch and iOS 13+ refresh task: catalogue check, then the gated alerts.
     func backgroundRefresh(_ done: @escaping (Bool) -> Void) {
+        let group = DispatchGroup()
+        group.enter()
         CatalogStore.shared.refresh(force: false) { _ in
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                self.check { done(true) }
+                self.check { group.leave() }
             }
         }
+        // «رد جديد من الدعم»: the team answered while the app was closed
+        group.enter()
+        DispatchQueue.main.async { SupportCenter.shared.backgroundCheck { group.leave() } }
+        group.notify(queue: .main) { done(true) }
     }
 
     @objc private func catalogChanged() { check(nil) }
@@ -165,8 +172,11 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
-        if let key = response.notification.request.content.userInfo["show"] as? String {
+        let info = response.notification.request.content.userInfo
+        if let key = info["show"] as? String {
             DispatchQueue.main.async { self.openShow?(key) }
+        } else if (info["support"] as? Bool) == true {
+            DispatchQueue.main.async { self.openSupport?() }
         }
         completionHandler()
     }

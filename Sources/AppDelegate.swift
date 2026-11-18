@@ -40,7 +40,11 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 
         CatalogStore.shared.start()
         ChannelStore.shared.start()
+        SupportCenter.shared.start()
+        WebShield.prepare()                        // the player's ad shield is compiled before the first film
+        NotificationCenter.default.addObserver(self, selector: #selector(supportBadge), name: SupportCenter.changed, object: nil)
         Notifier.shared.openShow = { [weak self] key in self?.open(key) }
+        Notifier.shared.openSupport = { [weak self] in self?.openSupport() }
         Notifier.shared.setUp(application, ask: !ProcessInfo.processInfo.arguments.contains("-cigramNoPrompt"))
         if case .jailbroken = Integrity.check() {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.warnJailbreak() }
@@ -51,6 +55,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func applicationDidBecomeActive(_ application: UIApplication) {
         CatalogStore.shared.startPulse()          // a title the admin adds appears within ~20 s
+        RequestsStore.shared.refresh()
         if case .tampered = Integrity.check(), !(window?.rootViewController is BlockedViewController) {
             window?.rootViewController = BlockedViewController()
         }
@@ -67,6 +72,23 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         let a = UIAlertController(title: "تنبيه أمني", message: "جهازك معدّل (Jailbreak). قد لا يكون حسابك آمناً بالكامل على هذا الجهاز.", preferredStyle: .alert)
         a.addAction(UIAlertAction(title: "حسناً", style: .default))
         root.present(a, animated: true)
+    }
+
+    /// The red count on «حسابي» when the Cigram team answered in «الدعم والتواصل».
+    @objc private func supportBadge() {
+        let n = SupportCenter.shared.unread
+        let item = tabs?.viewControllers?.last?.tabBarItem
+        item?.badgeValue = n > 0 ? (n > 99 ? "99+" : String(n)) : nil
+        item?.badgeColor = Theme.red
+        UIApplication.shared.applicationIconBadgeNumber = n
+    }
+
+    /// A «رد جديد من الدعم» notification opens the conversation (or the sign-in when the account signed out meanwhile).
+    private func openSupport() {
+        guard let t = tabs, let nav = t.viewControllers?.last as? UINavigationController else { return }
+        t.selectedIndex = (t.viewControllers?.count ?? 1) - 1
+        nav.popToRootViewController(animated: false)
+        (nav.viewControllers.first as? AccountViewController)?.openSupport()
     }
 
     private func open(_ key: String) {
@@ -157,6 +179,15 @@ enum ScreenRouter {
         case "terms":
             tabs.selectedIndex = 3
             navs[3].pushViewController(TermsViewController(), animated: false)
+        case "register":
+            tabs.selectedIndex = 3
+            navs[3].pushViewController(LoginViewController(register: true), animated: false)
+        case "support":
+            tabs.selectedIndex = 3
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { (navs[3].viewControllers.first as? AccountViewController)?.openSupport() }
+        case "requests":
+            tabs.selectedIndex = 3
+            navs[3].pushViewController(RequestsViewController(), animated: false)
         case "details":
             if let s = series { navs[0].pushViewController(DetailsViewController(show: s), animated: false) }
         case "movie":

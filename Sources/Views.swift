@@ -8,7 +8,6 @@ final class PosterCell: UICollectionViewCell {
     private let name = UILabel()
     private let meta = UILabel()
     private let badge = UILabel()
-    private var task: URLSessionDataTask?
     private var shownURL: URL?
 
     override init(frame: CGRect) {
@@ -51,7 +50,6 @@ final class PosterCell: UICollectionViewCell {
 
     override func prepareForReuse() {
         super.prepareForReuse()
-        task?.cancel()
         img.image = nil
         shownURL = nil
     }
@@ -68,9 +66,11 @@ final class PosterCell: UICollectionViewCell {
         accessibilityLabel = s.title + "، " + s.meta
         let url = s.posterURL
         shownURL = url
-        task = ImageLoader.shared.load(url) { [weak self] i in
+        if let hit = ImageLoader.shared.cached(url, maxPixel: 300) { img.image = hit; return }
+        ImageLoader.shared.load(url, maxPixel: 300) { [weak self] i in
             guard let self = self, self.shownURL == url else { return }
             self.img.image = i
+            if i != nil { self.img.alpha = 0; UIView.animate(withDuration: 0.18) { self.img.alpha = 1 } }
         }
     }
 }

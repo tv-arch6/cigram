@@ -55,7 +55,7 @@ final class CarouselView: UIView, UIScrollViewDelegate {
         img.clipsToBounds = true
         img.tag = 1
         v.addSubview(img)
-        ImageLoader.shared.load(s.image) { img.image = $0 }
+        ImageLoader.shared.load(s.image, maxPixel: 900) { img.image = $0 }
         let shade = CAGradientLayer()
         shade.colors = [UIColor.clear.cgColor, Theme.bg.withAlphaComponent(0.55).cgColor, Theme.bg.cgColor]
         shade.locations = [0.3, 0.72, 1.0]
