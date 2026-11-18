@@ -180,6 +180,7 @@ GEMINI_MODELS = (("gemini-3.5-flash", '[1,null,null,null,"35609594dbe934d8"]'),
 PRIMARY_SKIP_SECONDS = _env("PRIMARY_SKIP_SECONDS", 45.0, float)       # بعد نجاح الاحتياطي يبدأ به البوت هذه المدة بدل انتظار فشل OmniRoute كل مرة
 # --- تدوير مفتاح OmniRoute (عند انتهائه أو رفضه) ----------------------------------------------
 OMNIROUTE_ADMIN_TOKEN = os.environ.get("OMNIROUTE_ADMIN_TOKEN", "")   # توكن واجهة الإدارة إن اختلف عن المفتاح
+OMNIROUTE_DASH_PASSWORD = os.environ.get("OMNIROUTE_DASH_PASSWORD", "")   # (اختياري) كلمة سر لوحة OmniRoute: تخلّي البوت يسوي توكن الإدارة بنفسه بلا ما تكتبها بتيليجرام
 OMNIROUTE_KEYS_URL = os.environ.get("OMNIROUTE_KEYS_URL", "")         # الافتراضي: <عنوان OmniRoute بلا /v1>/api/keys
 KEY_APPROVAL_SECONDS = _env("KEY_APPROVAL_SECONDS", 30.0, float)       # مهلة موافقة المشرف، وبعدها يوافق البوت تلقائياً
 KEY_REJECT_COOLDOWN = _env("KEY_REJECT_COOLDOWN", 900.0, float)       # بعد رفض المشرف لا نعيد الطلب قبل هذه المدة
@@ -1814,8 +1815,62 @@ async def _probe_key(key):
     return False, "المفتاح مرفوض" if r.status_code in (401, 403) else f"HTTP {r.status_code}"
 
 
-async def create_omni_key():
-    """ينشئ مفتاحاً عبر واجهة إدارة OmniRoute. يرجع (المفتاح، None) أو (None، سبب الفشل)."""
+def omni_root():
+    return re.sub(r"/v1$", "", _omni_base())
+
+
+async def make_admin_token(password=""):
+    """يسوي توكن الإدارة (oma_...) بنفسه عبر واجهة OmniRoute، بدل أمر  omniroute tokens  اللي ما يشتغل بتريمكس.
+    يجرّب بالترتيب: بلا مصادقة، ثم المفتاح الحالي، ثم تسجيل دخول اللوحة بكلمة السر (والكلمة ما تنحفظ أبداً).
+    يرجع (التوكن، None) أو (None، (رمز، سبب)). الرموز: need_password | bad_password | blocked | down | other."""
+    root = omni_root()
+    body = {"name": "wamda-bot-" + time.strftime("%y%m%d-%H%M", time.gmtime()), "scope": "admin"}
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(20.0, connect=8.0), trust_env=False) as c:
+            async def create(headers=None):
+                r = await c.post(f"{root}/api/cli/tokens", json=body, headers=headers or {})
+                if r.status_code in (200, 201):
+                    try:
+                        tok = (r.json() or {}).get("token")
+                    except ValueError:
+                        tok = None
+                    if isinstance(tok, str) and tok.startswith("oma_"):
+                        return tok, None
+                    return None, ("other", "ما لكيت التوكن بالرد (شكل الرد غير متوقع)")
+                if r.status_code in (401, 403):
+                    return None, ("need_password", "")
+                return None, ("other", f"HTTP {r.status_code}: {_err_text(r, 100)}")
+
+            tok, err = await create()
+            if tok or err[0] != "need_password":
+                return tok, err
+            if _omni_key:
+                tok, _e = await create({"Authorization": f"Bearer {_omni_key}"})
+                if tok:
+                    return tok, None
+            if not password:
+                return None, ("need_password", "")
+            r = await c.post(f"{root}/api/auth/login", json={"password": password})
+            if r.status_code == 429:
+                return None, ("blocked", "حماية الدخول بلوحة OmniRoute (محاولات كثيرة): انتظر دقيقة وجرّب")
+            if r.status_code in (400, 401, 403):
+                return None, ("bad_password", "")
+            if r.status_code != 200:
+                return None, ("other", f"تسجيل الدخول رجّع HTTP {r.status_code}")
+            cookie = c.cookies.get("auth_token") or (re.search(r"auth_token=([^;]+)", r.headers.get("set-cookie", "")) or [None, None])[1]
+            if not cookie:
+                return None, ("other", "نجح تسجيل الدخول بس ما انعطيت جلسة (غالباً التحقق بخطوتين مفعّل): سوّ التوكن يدوياً من اللوحة")
+            tok, err = await create({"Cookie": f"auth_token={cookie}"})
+            if tok:
+                return tok, None
+            return None, err if err[0] != "need_password" else ("other", "الجلسة انرفضت (غالباً التحقق بخطوتين): سوّ التوكن يدوياً من اللوحة")
+    except httpx.HTTPError as e:
+        return None, ("down", f"ما كدرت أوصل لـ OmniRoute ({type(e).__name__})")
+
+
+async def create_omni_key(_retry=True):
+    """ينشئ مفتاحاً عبر واجهة إدارة OmniRoute. يرجع (المفتاح، None) أو (None، سبب الفشل).
+    إذا انرفضت الصلاحية يحاول مرة وحدة يسوي توكن الإدارة بنفسه (يحتاج OMNIROUTE_DASH_PASSWORD أو لوحة بلا كلمة سر) ويكمل."""
     token = S("omni_admin_token") or OMNIROUTE_ADMIN_TOKEN or _omni_key
     name = "prompt-bot-" + time.strftime("%Y%m%d-%H%M%S", time.gmtime())
     try:
@@ -1824,7 +1879,13 @@ async def create_omni_key():
     except httpx.HTTPError as e:
         return None, f"تعذّر الاتصال بواجهة إدارة المفاتيح ({type(e).__name__})"
     if r.status_code in (401, 403):
-        return None, "واجهة إدارة المفاتيح رفضت الصلاحية (أحتاج توكن الإدارة)"
+        if _retry:
+            tok, _err = await make_admin_token(OMNIROUTE_DASH_PASSWORD)
+            if tok:
+                D().set("omni_admin_token", tok)
+                logger.info("أنشأ البوت توكن إدارة OmniRoute وحفظه تلقائياً")
+                return await create_omni_key(_retry=False)
+        return None, "واجهة إدارة المفاتيح رفضت الصلاحية (أحتاج توكن الإدارة: /live ← مفتاح OmniRoute ← إنشاء توكن الإدارة)"
     if r.status_code >= 400:
         return None, f"واجهة إدارة المفاتيح رجّعت HTTP {r.status_code}: {_err_text(r, 120)}"
     try:
@@ -2048,7 +2109,7 @@ async def a_gem(ctx, q, args, act):
                               [btn("تبديل النموذج", "a:gem:m", "primary"), btn("فحص الآن", "a:gem:p", "success")]])
 
 
-def okey_screen():
+def okey_screen(flash=""):
     on = SB("key_auto")
     ts = S("omni_key_ts")
     lines = [
@@ -2061,8 +2122,9 @@ def okey_screen():
     ]
     note = (f"إذا انتهى المفتاح أو انرفض يرسل البوت للمشرفين طلب موافقة. إذا ما رد أحد خلال {int(KEY_APPROVAL_SECONDS)} ثانية "
             "يوافق البوت تلقائياً وينشئ مفتاحاً جديداً ويفعّله، كي يبقى شغّالاً دائماً.")
-    text = "<b>مفتاح OmniRoute</b>\n<blockquote>" + esc_html("\n".join(lines)) + "</blockquote>\n<blockquote>" + esc_html(note) + "</blockquote>"
-    rows = [[btn(f"التجديد التلقائي: {_onoff(on, 'شغّال', 'متوقف')}", "a:okey:t", "success" if on else "danger")],
+    text = "<b>مفتاح OmniRoute</b>\n" + (f"<b>{esc_html(flash)}</b>\n" if flash else "") + "<blockquote>" + esc_html("\n".join(lines)) + "</blockquote>\n<blockquote>" + esc_html(note) + "</blockquote>"
+    rows = [[btn("إنشاء توكن الإدارة تلقائياً", "a:okey:g", "success")],
+            [btn(f"التجديد التلقائي: {_onoff(on, 'شغّال', 'متوقف')}", "a:okey:t", "success" if on else "danger")],
             [btn("فحص المفتاح", "a:okey:p", "primary"), btn("إنشاء مفتاح الآن", "a:okey:n", "success")],
             [btn("إدخال مفتاح يدوياً", "a:okey:s", "primary"), btn("توكن الإدارة", "a:okey:a", "primary")]]
     return text, rows
@@ -2077,7 +2139,23 @@ async def a_okey(ctx, q, args, act):
         await view(ctx, q, "<b>مفتاح OmniRoute</b>\n<blockquote>" + esc_html(prompt) + "</blockquote>",
                    [[btn("إلغاء", "a:okey", "danger")]], back=False)
         return
-    if sub == "t":
+    if sub == "g":
+        tok, err = await make_admin_token(OMNIROUTE_DASH_PASSWORD)
+        if tok:
+            D().set("omni_admin_token", tok)
+            _key["result"] = "تم حفظ توكن الإدارة"
+            text, rows = okey_screen(flash="تم حفظ التوكن ✓")
+            await view(ctx, q, text, rows)
+            return
+        if err[0] == "need_password":
+            set_await(ctx.user_data, "okey_pw")
+            await view(ctx, q, "<b>توكن الإدارة</b>\n<blockquote>" + esc_html(
+                "أحتاج كلمة سر لوحة OmniRoute مرة وحدة (نفس اللي تدخل بيها http://localhost:20128). ابعثها هسه، "
+                "وراح أحذف رسالتك مباشرة وما أحفظها، أحفظ التوكن بس.") + "</blockquote>",
+                       [[btn("إلغاء", "a:okey", "danger")]], back=False)
+            return
+        _key["result"] = "فشل إنشاء توكن الإدارة: " + err[1]
+    elif sub == "t":
         D().set("key_auto", "0" if SB("key_auto") else "1")
     elif sub == "p":
         ok, bad = await _probe_key(_omni_key)
@@ -2125,6 +2203,27 @@ async def w_okey_tok(ctx, msg, aw, text):
         return False
     D().set("omni_admin_token", tok)
     await _say(ctx, msg, "انحفظ توكن الإدارة. هسه ضغطة «إنشاء مفتاح الآن» تستعمله.", _back_kb())
+    return True
+
+
+async def w_okey_pw(ctx, msg, aw, text):
+    """كلمة سر لوحة OmniRoute (تُحذف رسالتها فوراً ولا تُحفظ): يسجّل دخول، يسوي التوكن، يحفظه، ويبلّغ."""
+    pw = text.strip()
+    await _drop_secret(ctx, msg)
+    if not pw or len(pw) > 200:
+        await _say(ctx, msg, "ابعث كلمة سر اللوحة أو اكتب /cancel.")
+        return False
+    tok, err = await make_admin_token(pw)
+    if tok:
+        D().set("omni_admin_token", tok)
+        _key["result"] = "تم حفظ توكن الإدارة"
+        await _say(ctx, msg, "تم حفظ التوكن ✓ هسه التجديد التلقائي و«إنشاء مفتاح الآن» يستعملونه.", _back_kb())
+        return True
+    if err[0] == "bad_password":
+        await _say(ctx, msg, "كلمة السر غلط. ابعثها مرة ثانية أو اكتب /cancel.")
+        return False
+    _key["result"] = "فشل إنشاء توكن الإدارة: " + err[1]
+    await _say(ctx, msg, "ما كدرت أسوّي التوكن: " + err[1], _back_kb())
     return True
 
 
@@ -6185,7 +6284,7 @@ NEW_ADMIN_ACTIONS = {
 }
 NEW_AWAIT = {"cb_label": w_cb_label, "cb_content": w_cb_content, "sch_msg": w_sch_msg, "sch_time": w_sch_time,
              "code_new": w_code_new, "ref_days": w_ref_days, "spam_cfg": w_spam_cfg,
-             "okey_set": w_okey_set, "okey_tok": w_okey_tok}
+             "okey_set": w_okey_set, "okey_tok": w_okey_tok, "okey_pw": w_okey_pw}
 
 
 ADMIN_ACTIONS.update(NEW_ADMIN_ACTIONS)

@@ -57,11 +57,22 @@ An existing folder on the host is renamed to `.omniroute.bak-<time>`, never dele
 credentials: handle it like a password, and delete it from the host after the first start (it is renamed to `.restored-<time>`).
 The data lives in the host's `$HOME/.omniroute` (or `$DATA_DIR`): make sure that folder survives restarts on your host.
 
+## Admin token (for automatic key rotation)
+
+`omniroute tokens create` does **not** work on Termux: Node reports `process.platform === "android"`, and the machine-id
+library OmniRoute uses has no Android command, so the CLI disables its own auth. The bot therefore talks to OmniRoute's HTTP API instead:
+
+`/live` → «مفتاح OmniRoute» → **«إنشاء توكن الإدارة تلقائياً»**. The bot logs in to the OmniRoute dashboard
+(`POST /api/auth/login`), creates an `admin` access token (`POST /api/cli/tokens`), saves **only the token** and answers "تم حفظ التوكن ✓".
+If it needs the dashboard password it asks once (the message is deleted immediately; the password is never stored).
+Set `OMNIROUTE_DASH_PASSWORD` to make it a single click, and key rotation will also create the token by itself when it is rejected.
+Forgot the dashboard password? OmniRoute ships `omniroute-reset-password` (not tested here).
+
 ## Settings (environment variables, all optional)
 
 `OMNIROUTE_AUTOSTART` `OMNIROUTE_AUTO_NODE` `OMNIROUTE_AUTO_INSTALL` `OMNIROUTE_NODE_MAJOR` `OMNIROUTE_NODE_MIRROR`
 `OMNIROUTE_HEAP_MB` `OMNIROUTE_MAX_RSS_MB` `OMNIROUTE_BIND` `OMNIROUTE_DATA_ARCHIVE` `OMNIROUTE_GUARD_DIR` `OMNIROUTE_CMD`
-`OMNIROUTE_ARGS` `OMNIROUTE_CWD` `OMNIROUTE_EXTRA_ENV` — see the header of `omniroute_guardian.py`.
+`OMNIROUTE_ARGS` `OMNIROUTE_CWD` `OMNIROUTE_EXTRA_ENV` `OMNIROUTE_DASH_PASSWORD` `OMNIROUTE_ADMIN_TOKEN` — see the header of `omniroute_guardian.py`.
 
 ## Termux (phone)
 
