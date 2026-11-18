@@ -10,6 +10,7 @@ final class HomeViewController: UIViewController, UITableViewDataSource, UITable
     private let empty = UILabel()
     private let refresher = UIRefreshControl()
     private var rows: [HomeSection] = []
+    private var carouselSignature = ""
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -89,7 +90,13 @@ final class HomeViewController: UIViewController, UITableViewDataSource, UITable
         var slides = CatalogStore.shared.carousel
         if slides.isEmpty, let top = CatalogStore.shared.shows.first { slides = [CatalogStore.Slide(show: top, image: top.backdropURL)] }
         carousel.frame = CGRect(x: 0, y: 0, width: w, height: ch)
-        carousel.configure(slides)
+        // the carousel is rebuilt only when its slides change (a «شاهد الآن» that records the history used to reset it
+        // to the first slide and reload every picture)
+        let sig = slides.map { $0.show.key + "|" + ($0.image?.absoluteString ?? "") }.joined(separator: ",")
+        if sig != carouselSignature {
+            carouselSignature = sig
+            carousel.configure(slides)
+        }
         box.addSubview(carousel)
         chips.frame = CGRect(x: 0, y: ch + 10, width: w, height: 40)
         box.addSubview(chips)

@@ -14,6 +14,7 @@ final class DetailsViewController: UIViewController, UITableViewDataSource, UITa
     private let dislikeButton = ActionButton(title: "لم يعجبني", symbol: "hand.thumbsdown")
     private let shareButton = ActionButton(title: "مشاركة", symbol: "square.and.arrow.up")
     private let playButton = UIButton(type: .system)
+    private var headerWidth: CGFloat = 0
 
     init(show: Show) {
         self.show = show
@@ -44,18 +45,29 @@ final class DetailsViewController: UIViewController, UITableViewDataSource, UITa
         likeButton.addTarget(self, action: #selector(like), for: .touchUpInside)
         dislikeButton.addTarget(self, action: #selector(dislike), for: .touchUpInside)
         shareButton.addTarget(self, action: #selector(share), for: .touchUpInside)
-        table.tableHeaderView = header()
+        playButton.addTarget(self, action: #selector(playMain), for: .touchUpInside)
+        seasonControl.addTarget(self, action: #selector(seasonChanged), for: .valueChanged)
         refreshActions()
         NotificationCenter.default.addObserver(self, selector: #selector(refreshActions), name: Library.changed, object: nil)
     }
 
+    /// The header is built for the page's real width, and again when it changes (rotation, iPad split view).
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        let w = table.bounds.width
+        guard w > 0, abs(w - headerWidth) > 0.5 else { return }
+        headerWidth = w
+        table.tableHeaderView = header()
+        table.reloadData()
+    }
+
     private func header() -> UIView {
-        let w = view.bounds.width
+        let w = headerWidth > 0 ? headerWidth : view.bounds.width
         let box = UIView(frame: CGRect(x: 0, y: 0, width: w, height: 10))
         let back = UIImageView(frame: CGRect(x: 0, y: 0, width: w, height: w * 0.62))
         back.contentMode = .scaleAspectFill
         back.clipsToBounds = true
-        ImageLoader.shared.load(show.backdropURL ?? show.posterURL) { back.image = $0 }
+        ImageLoader.shared.load(show.backdropURL ?? show.posterURL, maxPixel: max(w, 400)) { back.image = $0 }
         box.addSubview(back)
         let fade = CAGradientLayer()
         fade.frame = back.bounds
@@ -71,7 +83,7 @@ final class DetailsViewController: UIViewController, UITableViewDataSource, UITa
         poster.layer.borderWidth = 1
         poster.layer.borderColor = UIColor.white.withAlphaComponent(0.12).cgColor
         poster.backgroundColor = Theme.surface
-        ImageLoader.shared.load(show.posterURL) { poster.image = $0 }
+        ImageLoader.shared.load(show.posterURL, maxPixel: 300) { poster.image = $0 }
         box.addSubview(poster)
 
         let textW = w - pw - 44
@@ -109,7 +121,6 @@ final class DetailsViewController: UIViewController, UITableViewDataSource, UITa
         playButton.semanticContentAttribute = .forceRightToLeft
         playButton.isEnabled = !show.watchLink.isEmpty || !show.episodes.isEmpty
         playButton.alpha = playButton.isEnabled ? 1 : 0.4
-        playButton.addTarget(self, action: #selector(playMain), for: .touchUpInside)
         box.addSubview(playButton)
         y = playButton.frame.maxY + 14
 
@@ -147,7 +158,6 @@ final class DetailsViewController: UIViewController, UITableViewDataSource, UITa
             seasonControl.removeAllSegments()
             for (i, s) in seasons.enumerated() { seasonControl.insertSegment(withTitle: "الموسم " + String(s), at: i, animated: false) }
             seasonControl.selectedSegmentIndex = max(0, seasons.firstIndex(of: season) ?? 0)
-            seasonControl.addTarget(self, action: #selector(seasonChanged), for: .valueChanged)
             seasonControl.selectedSegmentTintColor = Theme.red
             seasonControl.setTitleTextAttributes([.foregroundColor: UIColor.white, .font: Theme.font(13.5, .bold)], for: .normal)
             let scroll = UIScrollView(frame: CGRect(x: 0, y: y, width: w, height: 36))
@@ -255,6 +265,7 @@ final class EpisodeCell: UITableViewCell {
     private let title = UILabel()
     private let sub = UILabel()
     private let glyph = UIImageView(image: UIImage(systemName: "play.circle.fill"))
+    private var shown: URL?
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -294,6 +305,10 @@ final class EpisodeCell: UITableViewCell {
         glyph.tintColor = current ? Theme.red : .white
         let url = Show.image(e.backdrop.isEmpty ? e.poster : e.backdrop, size: "w300") ?? poster
         thumb.image = nil
-        ImageLoader.shared.load(url) { [weak self] img in self?.thumb.image = img }
+        shown = url
+        ImageLoader.shared.load(url, maxPixel: 120) { [weak self] img in
+            guard let self = self, self.shown == url else { return }
+            self.thumb.image = img
+        }
     }
 }

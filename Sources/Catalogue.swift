@@ -1,5 +1,6 @@
 import UIKit
 import Foundation
+import ImageIO
 
 /// Same backend the Android app uses.
 enum Backend {
@@ -479,34 +480,145 @@ final class CatalogStore {
 
 // MARK: - Images
 
+/// Every picture of the app (posters, backdrops, channel logos, support-chat photos):
+///  - one download per link at a time (several cells asking for the same poster share it);
+///  - only a real 2xx image is accepted: an error page (404 HTML) is never decoded, cached or kept in the disk cache;
+///  - decoded and down-sampled OFF the main thread (ImageIO), so scrolling never stutters on a big JPEG;
+///  - a link on a bucket host that moved is retried once on the other host (the channel logos moved buckets: the
+///    channels API still writes the old host — the Android app does the same rewrite, see CigramLogos.alternate);
+///  - a link that failed is not asked again for a short while (no hammering of a dead host from every cell).
 final class ImageLoader {
     static let shared = ImageLoader()
-    private let cache = NSCache<NSURL, UIImage>()
-    private let session: URLSession = {
-        let c = URLSessionConfiguration.default
-        c.urlCache = URLCache(memoryCapacity: 24 * 1024 * 1024, diskCapacity: 220 * 1024 * 1024, diskPath: "cigram-images")
-        c.requestCachePolicy = .returnCacheDataElseLoad
-        return URLSession(configuration: c)
-    }()
 
-    init() { cache.totalCostLimit = 60 * 1024 * 1024 }
+    /// Buckets that moved: (old, new). A link on either host is tried on the other one when it fails.
+    static let movedHosts: [(String, String)] = [
+        ("https://pub-eabe41d14a0644e5800344c99ef4d971.r2.dev/channels/", "https://pub-6ce52a4bbf2543ee88ad9883ae42a806.r2.dev/channels/"),
+    ]
+
+    /// The other host of a moved bucket, or nil.
+    static func alternate(_ url: URL) -> URL? {
+        let s = url.absoluteString
+        for (old, new) in movedHosts {
+            if s.hasPrefix(old) { return URL(string: new + s.dropFirst(old.count)) }
+            if s.hasPrefix(new) { return URL(string: old + s.dropFirst(new.count)) }
+        }
+        return nil
+    }
+
+    /// The link to ask first: a channel logo on the old bucket goes straight to the new one.
+    static func preferred(_ url: URL) -> URL {
+        let s = url.absoluteString
+        for (old, new) in movedHosts where s.hasPrefix(old) {
+            return URL(string: new + s.dropFirst(old.count)) ?? url
+        }
+        return url
+    }
+
+    private let cache = NSCache<NSString, UIImage>()
+    private let lock = NSLock()
+    private var waiting: [String: [(UIImage?) -> Void]] = [:]
+    private var failedAt: [String: Date] = [:]
+    private let screenScale: CGFloat = UIScreen.main.scale
+    private let urlCache: URLCache
+    private let session: URLSession
+
+    init() {
+        let disk = URLCache(memoryCapacity: 24 * 1024 * 1024, diskCapacity: 260 * 1024 * 1024, diskPath: "cigram-images")
+        urlCache = disk
+        let c = URLSessionConfiguration.default
+        c.urlCache = disk
+        c.requestCachePolicy = .returnCacheDataElseLoad
+        c.timeoutIntervalForRequest = 25
+        c.httpMaximumConnectionsPerHost = 6
+        session = URLSession(configuration: c)
+        cache.totalCostLimit = 80 * 1024 * 1024
+        cache.countLimit = 900
+        NotificationCenter.default.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil,
+                                               queue: nil) { [weak self] _ in self?.cache.removeAllObjects() }
+    }
 
     func clear() {
         cache.removeAllObjects()
-        session.configuration.urlCache?.removeAllCachedResponses()
+        urlCache.removeAllCachedResponses()
+        lock.lock(); failedAt.removeAll(); lock.unlock()
     }
 
+    /// The image already in memory (no network), for a cell that wants to paint synchronously.
+    func cached(_ url: URL?, maxPixel: CGFloat = 0, key: String? = nil) -> UIImage? {
+        guard let url = url else { return nil }
+        return cache.object(forKey: cacheKey(url, maxPixel, key) as NSString)
+    }
+
+    private func cacheKey(_ url: URL, _ maxPixel: CGFloat, _ key: String?) -> String {
+        return (key ?? ImageLoader.preferred(url).absoluteString) + "@" + String(Int(maxPixel))
+    }
+
+    /// Loads a picture. `maxPixel` (points, longest side) down-samples it for a small view; 0 keeps the full size.
+    /// `key` replaces the link as the memory-cache key (signed chat links change on every fetch, their media id does not).
+    /// The result always arrives on the main queue. The return value is kept for source compatibility (always nil:
+    /// a shared download is never cancelled by one of the cells waiting for it).
     @discardableResult
-    func load(_ url: URL?, _ done: @escaping (UIImage?) -> Void) -> URLSessionDataTask? {
-        guard let url = url else { done(nil); return nil }
-        if let img = cache.object(forKey: url as NSURL) { done(img); return nil }
-        let t = session.dataTask(with: url) { [weak self] d, _, _ in
-            let img = d.flatMap { UIImage(data: $0) }
-            if let img = img, let d = d { self?.cache.setObject(img, forKey: url as NSURL, cost: d.count) }
-            DispatchQueue.main.async { done(img) }
+    func load(_ url: URL?, maxPixel: CGFloat = 0, key: String? = nil, _ done: @escaping (UIImage?) -> Void) -> URLSessionDataTask? {
+        guard let original = url else { done(nil); return nil }
+        let k = cacheKey(original, maxPixel, key)
+        if let img = cache.object(forKey: k as NSString) { done(img); return nil }
+        lock.lock()
+        if let t = failedAt[k], Date().timeIntervalSince(t) < 90 { lock.unlock(); done(nil); return nil }
+        if waiting[k] != nil { waiting[k]?.append(done); lock.unlock(); return nil }
+        waiting[k] = [done]
+        lock.unlock()
+        fetch(ImageLoader.preferred(original), maxPixel: maxPixel, key: k, triedAlternate: false)
+        return nil
+    }
+
+    private func fetch(_ url: URL, maxPixel: CGFloat, key: String, triedAlternate: Bool) {
+        var req = URLRequest(url: url)
+        req.setValue("image/webp,image/png,image/jpeg,image/*;q=0.8", forHTTPHeaderField: "Accept")
+        session.dataTask(with: req) { [weak self] data, resp, _ in
+            guard let self = self else { return }
+            let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            var image: UIImage?
+            if (200..<300).contains(status), let d = data, !d.isEmpty {
+                image = ImageLoader.decode(d, maxPixel: maxPixel, scale: self.screenScale)
+            }
+            if image == nil {
+                // never keep an error page / a broken file in the disk cache: the next try must reach the network
+                self.urlCache.removeCachedResponse(for: req)
+                if !triedAlternate, let alt = ImageLoader.alternate(url) {
+                    self.fetch(alt, maxPixel: maxPixel, key: key, triedAlternate: true)
+                    return
+                }
+            }
+            if let img = image {
+                let cost = Int(img.size.width * img.size.height * img.scale * img.scale * 4)
+                self.cache.setObject(img, forKey: key as NSString, cost: cost)
+            }
+            self.lock.lock()
+            let callbacks = self.waiting.removeValue(forKey: key) ?? []
+            if image == nil { self.failedAt[key] = Date() } else { self.failedAt.removeValue(forKey: key) }
+            self.lock.unlock()
+            DispatchQueue.main.async { callbacks.forEach { $0(image) } }
+        }.resume()
+    }
+
+    /// Decodes on the calling (background) queue: ImageIO thumbnail = decoded once, rotated by its EXIF, down-sampled.
+    static func decode(_ data: Data, maxPixel: CGFloat, scale: CGFloat) -> UIImage? {
+        guard let src = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
+              CGImageSourceGetCount(src) > 0 else { return nil }
+        var longest: CGFloat = 0
+        if let p = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any] {
+            let w = (p[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue ?? 0
+            let h = (p[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue ?? 0
+            longest = CGFloat(max(w, h))
         }
-        t.resume()
-        return t
+        if longest <= 0 { return UIImage(data: data) }
+        let target = maxPixel > 0 ? min(longest, maxPixel * scale) : min(longest, 2600)
+        let opts: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
+                                     kCGImageSourceCreateThumbnailWithTransform: true,
+                                     kCGImageSourceShouldCacheImmediately: true,
+                                     kCGImageSourceThumbnailMaxPixelSize: Int(target.rounded(.up))]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) else { return UIImage(data: data) }
+        return UIImage(cgImage: cg, scale: maxPixel > 0 ? scale : 1, orientation: .up)
     }
 
     /// Blocking download for the notification gate (background queue only).
@@ -521,5 +633,39 @@ final class ImageLoader {
         }.resume()
         _ = sem.wait(timeout: .now() + timeout + 2)
         return out
+    }
+}
+
+extension UIImage {
+    /// True when the picture has an alpha channel (a transparent PNG logo).
+    var cgHasAlpha: Bool {
+        guard let a = cgImage?.alphaInfo else { return false }
+        return a == .first || a == .last || a == .premultipliedFirst || a == .premultipliedLast
+    }
+
+    /// Average luminance (0…1) of the visible pixels, weighted by their opacity. Tiny 8×8 draw: cheap on the main thread.
+    var visibleLuminance: CGFloat {
+        guard let cg = cgImage else { return 0.5 }
+        let n = 8
+        var px = [UInt8](repeating: 0, count: n * n * 4)
+        let drawn: Bool = px.withUnsafeMutableBytes { raw -> Bool in
+            guard let ctx = CGContext(data: raw.baseAddress, width: n, height: n, bitsPerComponent: 8, bytesPerRow: n * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            ctx.draw(cg, in: CGRect(x: 0, y: 0, width: n, height: n))
+            return true
+        }
+        if !drawn { return 0.5 }
+        var sum: CGFloat = 0
+        var weight: CGFloat = 0
+        for i in stride(from: 0, to: px.count, by: 4) {
+            let a = CGFloat(px[i + 3]) / 255
+            if a < 0.05 { continue }
+            // premultiplied: divide by alpha to get the real colour
+            let r = CGFloat(px[i]) / 255 / a, g = CGFloat(px[i + 1]) / 255 / a, b = CGFloat(px[i + 2]) / 255 / a
+            sum += (0.2126 * r + 0.7152 * g + 0.0722 * b) * a
+            weight += a
+        }
+        return weight > 0 ? min(1, sum / weight) : 0.5
     }
 }

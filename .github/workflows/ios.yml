@@ -35,12 +35,12 @@ jobs:
           [ -d "$APP" ] || { echo "::error::Cigram.app not found"; exit 1; }
           /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Info.plist"
           rm -rf Payload && mkdir Payload && cp -R "$APP" Payload/
-          zip -qry Cigram-1.1.1-unsigned.ipa Payload
-          ls -lh Cigram-1.1.1-unsigned.ipa
+          zip -qry Cigram-1.1.2-unsigned.ipa Payload
+          ls -lh Cigram-1.1.2-unsigned.ipa
       - uses: actions/upload-artifact@v6
         with:
           name: Cigram-ipa
-          path: Cigram-1.1.1-unsigned.ipa
+          path: Cigram-1.1.2-unsigned.ipa
 
       - name: Build for the simulator
         if: ${{ inputs.screenshots }}
@@ -82,7 +82,7 @@ jobs:
             xcrun simctl io "$DEV" screenshot "shots/$1.png" || echo "shot $1 failed"
           }
           shoot home 30
-          for s in rows details movie player channels channelplayer search account login terms; do shoot "$s" 9; done
+          for s in rows details movie player channels channelplayer search account login register support requests terms; do shoot "$s" 9; done
           echo "MARK shots-done"
           xcrun simctl spawn "$DEV" log show --last 12m --predicate 'process == "Cigram"' --style compact > shots/app-log.txt 2>&1 || true
           xcrun simctl shutdown "$DEV" || true
@@ -90,7 +90,7 @@ jobs:
           grep "CIGRAM_CHECK" shots/app-log.txt | tail -n 14 || true
           grep -iE "fatal error|crash|exception|signal" shots/app-log.txt | tail -n 8 || true
           echo "MARK dumping"
-          for f in home rows details movie player channels channelplayer search account login terms; do
+          for f in home rows details movie player channels channelplayer search account login register support requests terms; do
             [ -f "shots/$f.png" ] || { echo "SHOT_MISSING $f"; continue; }
             sips -Z 560 -s format jpeg -s formatOptions 38 "shots/$f.png" --out "shots/$f-small.jpg" >/dev/null 2>&1 || continue
             echo "SHOT_BEGIN $f"; base64 -i "shots/$f-small.jpg"; echo "SHOT_END $f"
