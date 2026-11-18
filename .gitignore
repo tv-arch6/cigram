@@ -1,3 +1,11 @@
 build/
 *.xcodeproj
 .DS_Store
+
+# omniroute-247
+bot.env
+__pycache__/
+*.db
+.omniroute-guardian/
+.bot-loop.sh
+bot-loop.log
