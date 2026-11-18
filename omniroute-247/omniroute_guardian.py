@@ -36,6 +36,10 @@
 #    OMNIROUTE_EXTRA_ENV     "KEY=VAL,KEY2=VAL2" متغيرات إضافية لـ OmniRoute
 #    OMNIROUTE_GUARD_DIR     مجلد الحالة والسجل (الافتراضي ~/.omniroute-guardian)
 #    OMNIROUTE_STOP_WITH_BOT 1 = يوقف OmniRoute إذا انطفى البوت نظيف (الافتراضي 0: يبقى شغّال)
+#    OMNIROUTE_AUTO_NODE     1/0  ينزّل Node (لينكس) إذا ناقص أو أقدم من 22، ويثبّت OmniRoute بمجلد الحارس بدون root (الافتراضي 1)
+#    OMNIROUTE_NODE_MAJOR    رقم Node المطلوب (الافتراضي 22) | OMNIROUTE_NODE_MIRROR  مصدر التنزيل (الافتراضي https://nodejs.org/dist)
+#    OMNIROUTE_BIND          عنوان استماع OmniRoute (الافتراضي 127.0.0.1 للأمان؛ مثلاً 0.0.0.0 لفتح اللوحة عبر منفذ الاستضافة)
+#    OMNIROUTE_DATA_ARCHIVE  أرشيف بيانات OmniRoute من جهاز ثاني (الافتراضي omniroute-data.tgz بجنب البوت): يُفكّ مرة وحدة ببيت المستخدم
 # ============================================================================
 from __future__ import annotations
 
@@ -47,12 +51,16 @@ import logging
 import os
 import random
 import re
+import hashlib
+import platform
 import shlex
 import shutil
 import signal
 import subprocess
 import sys
+import tarfile
 import time
+import urllib.request
 from urllib.parse import urlparse
 
 try:                                     # قفل الملفات (لينكس/أندرويد). على ويندوز نشتغل بدون قفل.
@@ -63,6 +71,7 @@ except ImportError:                      # pragma: no cover
 log = logging.getLogger("omniroute.guardian")
 
 DEFAULT_PORT = 20128
+_EXTRA_BIN_DIRS = ("/usr/local/bin",)          # مجلدات تنضاف لـ PATH إذا كان PATH الاستضافة فقيراً (الاختبارات تفرّغها)
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0", ""}
 TERMUX_PREFIX = os.environ.get("PREFIX") or "/data/data/com.termux/files/usr"
 
@@ -103,6 +112,91 @@ def _first_local_base(base_url):
     if first is None:
         return "127.0.0.1", DEFAULT_PORT, True
     return first
+
+
+def _read_int(path):
+    try:
+        with open(path) as f:
+            raw = f.read().strip()
+        return None if raw in ("", "max") else int(raw)
+    except (OSError, ValueError):
+        return None
+
+
+_CGROUP_LIMIT_FILES = ("/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes")
+
+
+def mem_limit_mb():
+    """سقف ذاكرة الحاوية (cgroup v2/v1) أو ذاكرة الجهاز، بالميغا. None إذا ما كدرنا نعرف."""
+    best = None
+    for p in _CGROUP_LIMIT_FILES:
+        v = _read_int(p)
+        if v and v < (1 << 50):                            # القيم الضخمة جداً تعني «بلا حد»
+            best = v // 1048576 if best is None else min(best, v // 1048576)
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemTotal:"):
+                    total = int(line.split()[1]) // 1024
+                    best = total if best is None else min(best, total)
+                    break
+    except (OSError, ValueError, IndexError):
+        pass
+    return best
+
+
+def _auto_limits(limit_mb):
+    """(سقف ذاكرة Node، حد إعادة التشغيل الهادئ) بالميغا حسب الذاكرة المتاحة: الحاوية الصغيرة تاخذ نسبة منها."""
+    if not limit_mb:
+        return 1536, 2200
+    return max(384, min(1536, int(limit_mb * 0.40))), max(900, min(2200, int(limit_mb * 0.65)))
+
+
+def _default_state_dir():
+    """Termux: بالبيت. الاستضافات: بجنب الملف (مجلد البوت مضمون الدوام)، وإلا البيت، وإلا tmp."""
+    home = os.path.expanduser("~")
+    if os.path.isdir(TERMUX_PREFIX):
+        return os.path.join(home, ".omniroute-guardian")
+    here = os.path.dirname(os.path.abspath(globals().get("__file__") or "."))
+    for base in (here, home, os.environ.get("TMPDIR", "/tmp")):
+        d = os.path.join(base, ".omniroute-guardian")
+        try:
+            os.makedirs(d, exist_ok=True)
+            if os.access(d, os.W_OK):
+                return d
+        except OSError:
+            continue
+    return os.path.join("/tmp", ".omniroute-guardian")
+
+
+def _is_musl():
+    import glob
+    return bool(glob.glob("/lib/ld-musl-*") or glob.glob("/usr/lib/ld-musl-*"))
+
+
+def _safe_extract(tar, dest, strip=0):
+    """استخراج آمن: يرفض المسارات المطلقة و .. والروابط اللي تطلع خارج الوجهة، ويتجاوز hardlink وملفات الأجهزة."""
+    dest_real = os.path.realpath(dest)
+    os.makedirs(dest_real, exist_ok=True)
+    kw = {"filter": "tar"} if hasattr(tarfile, "tar_filter") else {}
+
+    def inside(path):
+        return path == dest_real or path.startswith(dest_real + os.sep)
+    for m in tar.getmembers():
+        parts = [p for p in m.name.split("/") if p not in ("", ".")][strip:]
+        if not parts:
+            continue
+        if ".." in parts:
+            raise ValueError(f"مسار مرفوض داخل الأرشيف: {m.name}")
+        name = "/".join(parts)
+        if not inside(os.path.realpath(os.path.join(dest_real, name))):
+            raise ValueError(f"مسار مرفوض داخل الأرشيف: {m.name}")
+        if m.islnk() or m.isdev() or m.isfifo():
+            continue
+        if m.issym() and not inside(os.path.realpath(os.path.join(dest_real, os.path.dirname(name), m.linkname))):
+            raise ValueError(f"رابط مرفوض داخل الأرشيف: {m.name}")
+        m.name = name
+        tar.extract(m, dest_real, **kw)
 
 
 def _tail(path, lines=20, max_bytes=24000):
@@ -148,32 +242,43 @@ def _is_omniroute_argv(argv):
     if not argv:
         return False
     base = os.path.basename(argv[0])
-    if base == "omniroute":
+    if base == "omniroute" or base.startswith("omniroute ("):      # الخادم الابن يغيّر عنوان عمليته إلى  omniroute (v16.4.2)
         return True
     if base.startswith("node") or base in ("npm", "npx"):
         return any(_OMNI_ARG_RE.search(a) for a in argv[1:])
     return False
 
 
+def _ppid_of(pid):
+    try:
+        with open(f"/proc/{pid}/stat", "rb") as f:
+            raw = f.read().decode("utf-8", "replace")
+        return int(raw[raw.rindex(")") + 2:].split()[1])
+    except (OSError, ValueError, IndexError):
+        return 0
+
+
 def scan_omniroute_pids(exclude=()):
-    """كل عمليات OmniRoute (node ... omniroute) من /proc. يشتغل لنفس المستخدم (وكل عمليات Termux نفس المستخدم)."""
-    out = []
+    """كل عمليات OmniRoute من /proc (المشغّل + الخادم الابن + أحفادهم). يشتغل لنفس المستخدم (وكل عمليات Termux/الحاوية نفس المستخدم)."""
     if not os.path.isdir("/proc"):
-        return out
+        return []
     skip = set(exclude) | {os.getpid(), os.getppid()}
     try:
-        names = os.listdir("/proc")
+        pids = [int(n) for n in os.listdir("/proc") if n.isdigit()]
     except OSError:
-        return out
-    for name in names:
-        if not name.isdigit():
-            continue
-        pid = int(name)
-        if pid in skip:
-            continue
-        if _is_omniroute_argv(_argv_of(pid)) and _alive(pid):
-            out.append(pid)
-    return out
+        return []
+    out = {p for p in pids if p not in skip and _is_omniroute_argv(_argv_of(p)) and _alive(p)}
+    if out:
+        kids = {}
+        for p in pids:
+            kids.setdefault(_ppid_of(p), []).append(p)
+        stack = list(out)
+        while stack:
+            for c in kids.get(stack.pop(), []):
+                if c not in out and c not in skip and _alive(c):
+                    out.add(c)
+                    stack.append(c)
+    return sorted(out)
 
 
 def _rss_mb(pids):
@@ -284,9 +389,18 @@ class Config:
         self.extra_env = g("extra_env", "OMNIROUTE_EXTRA_ENV", "")
         self.auto_install = ov.get("auto_install", _flag("OMNIROUTE_AUTO_INSTALL", True))
         self.stop_with_bot = ov.get("stop_with_bot", _flag("OMNIROUTE_STOP_WITH_BOT", False))
-        self.heap_mb = g("heap_mb", "OMNIROUTE_HEAP_MB", 1536, int)
-        self.max_rss_mb = g("max_rss_mb", "OMNIROUTE_MAX_RSS_MB", 2200, int)
-        self.state_dir = g("state_dir", "OMNIROUTE_GUARD_DIR", os.path.join(os.path.expanduser("~"), ".omniroute-guardian"))
+        self.mem_limit_mb = mem_limit_mb()
+        auto_heap, auto_rss = _auto_limits(self.mem_limit_mb)
+        self.heap_mb = g("heap_mb", "OMNIROUTE_HEAP_MB", auto_heap, int)
+        self.max_rss_mb = g("max_rss_mb", "OMNIROUTE_MAX_RSS_MB", auto_rss, int)
+        self.state_dir = g("state_dir", "OMNIROUTE_GUARD_DIR", _default_state_dir())
+        self.auto_node = ov.get("auto_node", _flag("OMNIROUTE_AUTO_NODE", True))      # ينزّل Node بنفسه إذا ناقص (لينكس فقط)
+        self.node_major = g("node_major", "OMNIROUTE_NODE_MAJOR", 22, int)
+        self.node_mirror = g("node_mirror", "OMNIROUTE_NODE_MIRROR", "https://nodejs.org/dist")
+        self.bind = g("bind", "OMNIROUTE_BIND", "")                                   # عنوان استماع OmniRoute (الافتراضي: المحلي فقط داخل الحاويات)
+        here = os.path.dirname(os.path.abspath(globals().get("__file__") or "."))
+        cands = [os.path.join(here, "omniroute-data.tgz"), os.path.join(os.getcwd(), "omniroute-data.tgz")]
+        self.data_archive = g("data_archive", "OMNIROUTE_DATA_ARCHIVE", next((c for c in cands if os.path.isfile(c)), cands[0]))
         # توقيتات (بالثواني)
         self.interval = g("interval", "GUARD_INTERVAL", 15.0, float)          # فحص دوري وهو سليم
         self.fast_interval = g("fast_interval", "GUARD_FAST_INTERVAL", 2.0, float)   # فحص سريع وهو واقع
@@ -319,6 +433,7 @@ class OmniRouteGuardian:
         self.pid_path = os.path.join(self.state_dir, "omniroute.pid")
         self.pause_path = os.path.join(self.state_dir, "paused")
         self.lock = _FileLock(os.path.join(self.state_dir, "guardian.lock"))
+        self.npm_prefix = os.path.join(self.state_dir, "npm")
 
         self.proc = None
         self.state = "init"
@@ -469,6 +584,9 @@ class OmniRouteGuardian:
             up = int(s["uptime"] or 0)
             lines.append(f"العملية: PID {s['pid']} | شغّالة من {up // 3600}س {up % 3600 // 60}د")
         lines.append(f"مرات التشغيل: {s['spawns']} | إعادات بعد عطل: {s['restarts']}")
+        lines.append("بيانات OmniRoute: " + (os.environ.get("DATA_DIR") or os.path.join(self._home(), ".omniroute")))
+        if self.cfg.mem_limit_mb:
+            lines.append(f"الذاكرة: حد الجهاز/الحاوية {self.cfg.mem_limit_mb} ميغا | سقف Node {self.cfg.heap_mb} ميغا")
         if s["last_exit"]:
             le = s["last_exit"]
             lines.append(f"آخر وقوع: رمز {le['rc']} بعد {int(le['uptime'])} ثانية")
@@ -480,7 +598,13 @@ class OmniRouteGuardian:
     async def _run(self):
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self._wake_lock)
-        self._ensure_owner()
+        if self._ensure_owner() and self.cfg.data_archive and os.path.isfile(self.cfg.data_archive):
+            if await probe(self.host, self.port, 3.0) == "down" and not scan_omniroute_pids():
+                res = await loop.run_in_executor(None, self._restore_data)
+                if res and res.startswith("ok:"):
+                    self._emit("restored", "رجّعت بيانات OmniRoute (المزوّدات والمفاتيح) من الأرشيف: " + res[3:], {})
+                elif res:
+                    self._emit("restore_failed", "فشل استرجاع بيانات OmniRoute: " + res[5:], {}, every=3600)
         while not self._stopping:
             try:
                 await self._tick()
@@ -631,26 +755,40 @@ class OmniRouteGuardian:
                 out.append(v)
         return out
 
+    def _home(self):
+        h = os.environ.get("HOME") or os.path.expanduser("~")
+        if h and os.path.isdir(h) and os.access(h, os.W_OK):
+            return h
+        d = os.path.join(self.state_dir, "home")
+        os.makedirs(d, exist_ok=True)
+        return d
+
     def _path(self):
-        home = os.path.expanduser("~")
-        parts = [os.path.join(TERMUX_PREFIX, "bin"), os.path.join(home, ".npm-global", "bin"),
-                 os.path.join(home, ".local", "bin"), "/usr/local/bin"]
+        home = self._home()
+        local = [os.path.join(self.state_dir, "node", "bin"), os.path.join(self.npm_prefix, "bin")]   # Node/OmniRoute اللي نزّلهم الحارس
+        parts = local + [os.path.join(TERMUX_PREFIX, "bin"), os.path.join(home, ".npm-global", "bin"),
+                         os.path.join(home, ".local", "bin")] + list(_EXTRA_BIN_DIRS)
         cur = os.environ.get("PATH", "")
         have = set(cur.split(os.pathsep))
-        return os.pathsep.join([p for p in parts if os.path.isdir(p) and p not in have] + ([cur] if cur else []))
+        pre = [p for p in parts if os.path.isdir(p) and (p in local or p not in have)]
+        return os.pathsep.join(pre + ([cur] if cur else []))
 
     def _env(self):
         env = os.environ.copy()
         env["PATH"] = self._path()
-        env.setdefault("HOME", os.path.expanduser("~"))
+        env["HOME"] = self._home()
         if self.cfg.heap_mb > 0 and "max-old-space-size" not in env.get("NODE_OPTIONS", ""):
             env["NODE_OPTIONS"] = (env.get("NODE_OPTIONS", "") + f" --max-old-space-size={self.cfg.heap_mb}").strip()
         env.setdefault("NO_COLOR", "1")
         env.setdefault("FORCE_COLOR", "0")
         env.setdefault("BROWSER", "none")                  # لا يحاول يفتح متصفح
         env.setdefault("NEXT_TELEMETRY_DISABLED", "1")
-        if self.port != DEFAULT_PORT:
-            env["PORT"] = str(self.port)
+        env["PORT"] = str(self.port)                       # الاستضافات تثبّت PORT لشي ثاني (نقطة صحة البوت مثلاً)، وOmniRoute لازم يسمع على منفذه
+        # OmniRoute يسمع افتراضياً على 0.0.0.0 وبدون إلزام مفتاح API: نربطه بالمحلي فقط (البوت يوصله عبر localhost).
+        # HOSTNAME نفسه داخل الحاويات = معرّف الحاوية، وخوادم Next تسمع عليه بدل localhost فيفشل الاتصال.
+        # إذا حددت OMNIROUTE_BIND أو OMNIROUTE_SERVER_HOST بنفسك يُحترم.
+        bind = self.cfg.bind or os.environ.get("OMNIROUTE_SERVER_HOST") or "127.0.0.1"
+        env["OMNIROUTE_SERVER_HOST"] = env["HOSTNAME"] = bind
         for pair in re.split(r"[,;]", self.cfg.extra_env or ""):
             if "=" in pair:
                 k, v = pair.split("=", 1)
@@ -660,6 +798,14 @@ class OmniRouteGuardian:
     def _which(self, name):
         return shutil.which(name, path=self._path())
 
+    def _node_major(self, node):
+        try:
+            out = subprocess.run([node, "-v"], capture_output=True, text=True, timeout=20, env=self._env()).stdout.strip()
+            m = re.match(r"v(\d+)", out)
+            return int(m.group(1)) if m else 0
+        except Exception:                                  # noqa: BLE001
+            return 0
+
     async def _resolve_cmd(self):
         if self.cfg.cmd:
             return shlex.split(self.cfg.cmd)
@@ -667,43 +813,179 @@ class OmniRouteGuardian:
         if p:
             self._missing_since = None
             return [p]
-        if self.cfg.auto_install and self._which("npm"):
-            if not self._installing and time.time() - self._install_at > 1800:
-                self._install_at = time.time()
-                self._installing = True
-                self.state = "installing"
-                self._emit("installing", "OmniRoute مو منصّب. دا أنصّبه بـ npm (ياخذ كم دقيقة)...", {})
-                self._install_task = asyncio.get_running_loop().create_task(self._do_install())
+        if self._installing:
+            return None
+        if self.cfg.auto_install and time.time() - self._install_at > 1800:
+            self._install_at = time.time()
+            self._installing = True
+            self.state = "installing"
+            self._emit("installing", "OmniRoute مو منصّب. دا أجهّزه تلقائياً (Node + OmniRoute، ياخذ كم دقيقة أول مرة)...", {})
+            self._install_task = asyncio.get_running_loop().create_task(self._do_install())
             return None
         npx = self._which("npx")
         if npx:
             return [npx, "-y", "omniroute"]
         self._missing_since = self._missing_since or time.time()
-        self._emit("missing", "OmniRoute مو منصّب وما لكيت npm. نصّب Node ثم  npm i -g omniroute", {}, every=21600)
-        self._next_spawn = time.monotonic() + 60
+        self._emit("missing", "OmniRoute مو منصّب وما كدرت أنصّبه تلقائياً. " + (self.last_hint or "نصّب Node 22 ثم  npm i -g omniroute"), {}, every=21600)
         return None
+
+    # ---------------- تجهيز Node و OmniRoute (يشتغل بخيط منفصل) ----------------
+    def _http_get(self, url, timeout=60):
+        req = urllib.request.Request(url, headers={"User-Agent": "omniroute-guardian"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.read()
+
+    def _bootstrap_node(self):
+        """ينزّل Node الرسمي (tar.gz) من nodejs.org بعد التحقق من SHA256، ويفكّه بمجلد الحارس. يرجع (ok, رسالة)."""
+        if sys.platform != "linux":
+            return False, "تنزيل Node التلقائي يعمل على لينكس فقط."
+        if _is_musl():
+            return False, "النظام musl (Alpine) وNode الرسمي ما يشتغل عليه: اختر صورة Debian/Ubuntu أو نصّب Node بنفسك."
+        arch = {"x86_64": "x64", "amd64": "x64", "aarch64": "arm64", "arm64": "arm64", "armv7l": "armv7l"}.get(platform.machine().lower())
+        if not arch:
+            return False, f"معمارية غير مدعومة: {platform.machine()}"
+        base = f"{self.cfg.node_mirror.rstrip('/')}/latest-v{self.cfg.node_major}.x"
+        try:
+            sums = self._http_get(base + "/SHASUMS256.txt").decode("utf-8", "replace")
+        except Exception as e:                             # noqa: BLE001
+            return False, f"ما كدرت أوصل لـ {self.cfg.node_mirror} ({type(e).__name__}): الاستضافة تمنع الاتصال الخارجي؟"
+        want = None
+        for line in sums.splitlines():
+            parts = line.split()
+            if len(parts) == 2 and parts[1].endswith(f"-linux-{arch}.tar.gz"):
+                want = (parts[0], parts[1])
+        if not want:
+            return False, f"ما لقيت Node {self.cfg.node_major} لمعمارية {arch}."
+        sha, fname = want
+        tgz = os.path.join(self.state_dir, "node-download.tgz")
+        tmp = os.path.join(self.state_dir, "node-tmp")
+        final = os.path.join(self.state_dir, "node")
+        try:
+            log.info("guardian: تنزيل %s ...", fname)
+            h = hashlib.sha256()
+            req = urllib.request.Request(f"{base}/{fname}", headers={"User-Agent": "omniroute-guardian"})
+            done = last = 0
+            with urllib.request.urlopen(req, timeout=60) as r, open(tgz, "wb") as f:
+                while True:
+                    chunk = r.read(1 << 20)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    h.update(chunk)
+                    done += len(chunk)
+                    if done - last >= (10 << 20):
+                        last = done
+                        log.info("guardian: نزّلت %d ميغا من Node", done >> 20)
+            if h.hexdigest().lower() != sha.lower():
+                return False, "بصمة SHA256 للتنزيل ما تطابق، ألغيت التثبيت."
+            shutil.rmtree(tmp, ignore_errors=True)
+            with tarfile.open(tgz, "r:gz") as tar:
+                _safe_extract(tar, tmp, strip=1)
+            shutil.rmtree(final, ignore_errors=True)
+            os.rename(tmp, final)
+        except OSError as e:
+            return False, f"فشل تجهيز Node ({e}). المساحة ممتلئة؟"
+        except Exception as e:                             # noqa: BLE001
+            return False, f"فشل تجهيز Node ({type(e).__name__}: {e})"
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+            try:
+                os.remove(tgz)
+            except OSError:
+                pass
+        major = self._node_major(os.path.join(final, "bin", "node"))
+        if major < self.cfg.node_major:
+            return False, "Node اللي نزّلته ما اشتغل على هذا النظام (غالباً مكتبات النظام ناقصة)."
+        log.info("guardian: Node %s جاهز", major)
+        return True, "ok"
+
+    def _install_chain(self):
+        """Node إن ناقص أو قديم ثم  npm install -g --prefix  لـ OmniRoute داخل مجلد الحارس (بدون صلاحيات خاصة). يرجع (ok, رسالة)."""
+        node = self._which("node")
+        if not node or self._node_major(node) < self.cfg.node_major:
+            if os.path.isdir(TERMUX_PREFIX):
+                return False, f"Node ناقص أو أقدم من {self.cfg.node_major}: نفّذ  pkg upgrade nodejs"
+            if not self.cfg.auto_node:
+                return False, f"Node {self.cfg.node_major}+ مو موجود (OMNIROUTE_AUTO_NODE=0)."
+            ok, msg = self._bootstrap_node()
+            if not ok:
+                return False, msg
+        npm = self._which("npm")
+        if not npm:
+            return False, "npm مو موجود."
+        try:
+            free_mb = shutil.disk_usage(self.state_dir).free >> 20
+            if free_mb < 1500:
+                return False, f"المساحة المتاحة {free_mb} ميغا فقط، وOmniRoute يحتاج حوالي 3 غيغا (و4 أثناء التنصيب)."
+            if free_mb < 4500:
+                log.warning("guardian: المساحة المتاحة %d ميغا؛ OmniRoute يحتاج ~3 غيغا (و~4 أثناء التنصيب)", free_mb)
+        except OSError:
+            pass
+        env = self._env()
+        orig = os.environ.get("NODE_OPTIONS")
+        env.pop("NODE_OPTIONS", None)                      # سقف الذاكرة المخصّص لـ OmniRoute مو لعملية التنصيب
+        if orig:
+            env["NODE_OPTIONS"] = orig
+        env.update({"npm_config_cache": os.path.join(self.state_dir, "npm-cache"), "npm_config_update_notifier": "false",
+                    "npm_config_fund": "false", "npm_config_audit": "false"})
+        os.makedirs(self.npm_prefix, exist_ok=True)
+        try:
+            with open(self.log_path, "ab") as lf:
+                lf.write(f"\n===== [{time.strftime('%Y-%m-%d %H:%M:%S')}] guardian: npm install -g --prefix {self.npm_prefix} omniroute =====\n".encode())
+                rc = subprocess.run([npm, "install", "-g", "--prefix", self.npm_prefix, "omniroute"], stdout=lf, stderr=subprocess.STDOUT,
+                                    stdin=subprocess.DEVNULL, env=env, timeout=2400).returncode
+        finally:
+            shutil.rmtree(env["npm_config_cache"], ignore_errors=True)     # كاش npm يضاعف حجم التنصيب، وعلى الاستضافة كل ميغا يهم
+        if rc != 0:
+            tail = _tail(self.log_path, 40)
+            why = next((h for rx, h in _HINTS if rx.search(tail)), "")
+            return False, f"فشل npm install (رمز {rc}). " + (why + " " if why else "") + f"شوف السجل: {self.log_path}"
+        if not self._which("omniroute"):
+            return False, "اكتمل التنصيب لكن أمر omniroute ما ظهر."
+        return True, "ok"
 
     async def _do_install(self):
         loop = asyncio.get_running_loop()
-
-        def run():
-            with open(self.log_path, "ab") as lf:
-                lf.write(b"\n===== guardian: npm install -g omniroute =====\n")
-                return subprocess.run([self._which("npm"), "install", "-g", "omniroute"], stdout=lf, stderr=subprocess.STDOUT,
-                                      stdin=subprocess.DEVNULL, env=self._env(), timeout=1500).returncode
         try:
-            rc = await loop.run_in_executor(None, run)
+            ok, msg = await loop.run_in_executor(None, self._install_chain)
         except Exception as e:                             # noqa: BLE001
-            rc = -1
-            log.warning("guardian: npm install failed: %s", e)
+            ok, msg = False, f"{type(e).__name__}: {e}"
         self._installing = False
-        if rc == 0 and self._which("omniroute"):
-            self._emit("installed", "تم تنصيب OmniRoute وسيشتغل هسه.", {})
+        if ok:
+            self.last_hint = ""
+            self._emit("installed", "تم تجهيز OmniRoute وسيشتغل هسه.", {})
             self._next_spawn = 0.0
         else:
-            self.last_hint = "فشل التنصيب التلقائي: شغّل يدوياً  npm i -g omniroute  وشوف السجل: " + self.log_path
-            self._emit("missing", "فشل تنصيب OmniRoute تلقائياً. " + self.last_hint, {}, every=21600)
+            self.last_hint = "فشل التجهيز التلقائي: " + msg
+            self._emit("missing", "OmniRoute مو منصّب وفشل تجهيزه تلقائياً. " + msg, {}, every=21600)
         self.kick()
+
+    def _restore_data(self):
+        """إذا لقى omniroute-data.tgz بجنب البوت يفكّه ببيت المستخدم (مرة وحدة) كي ينتقل إعداد OmniRoute من جهاز ثاني. يرجع 'ok:...' أو 'fail:...'."""
+        arch = self.cfg.data_archive
+        if not arch or not os.path.isfile(arch):
+            return None
+        home = self._home()
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        try:
+            with tarfile.open(arch, "r:*") as tar:
+                tops = set()
+                for m in tar.getmembers():
+                    parts = [p for p in m.name.split("/") if p not in ("", ".")]
+                    if not parts:
+                        continue
+                    if not re.match(r"^\.?omniroute", parts[0], re.I):
+                        raise ValueError(f"الأرشيف لازم يحتوي مجلد .omniroute فقط (لقيت: {parts[0]})")
+                    tops.add(parts[0])
+                for t in tops:
+                    cur = os.path.join(home, t)
+                    if os.path.lexists(cur):
+                        os.rename(cur, f"{cur}.bak-{stamp}")          # لا نمسح شي: نسخة قديمة تبقى بجنبه
+                _safe_extract(tar, home)
+            os.rename(arch, f"{arch}.restored-{stamp}")
+            return "ok:" + ",".join(sorted(tops))
+        except Exception as e:                             # noqa: BLE001
+            return f"fail:{e}"
 
     async def _spawn(self):
         cmd = await self._resolve_cmd()
