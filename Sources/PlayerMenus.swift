@@ -349,7 +349,7 @@ extension PlayerViewController {
         guard i >= 0, i < sources.count else { return }
         sourceIndex = i
         incidentAttempt = 0
-        nativeDeadline = Date().addingTimeInterval(60)
+        nativeDeadline = Date().addingTimeInterval(45)
         errorPanel.isHidden = true
         wantsPlay = true
         userPaused = false

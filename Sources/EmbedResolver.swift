@@ -169,11 +169,11 @@ final class StreamSniffer: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         let w = WKWebView(frame: CGRect(x: 0, y: 0, width: 320, height: 180), configuration: cfg)
         w.navigationDelegate = self
         w.uiDelegate = self
-        w.alpha = 0.02
+        w.alpha = 0.03
         w.isUserInteractionEnabled = false
         w.isOpaque = false
         w.backgroundColor = .black
-        host.insertSubview(w, at: 0)
+        host.addSubview(w)          // on top (WebKit throttles a page that another view covers); alpha and touches make it invisible
         web = w
         w.load(URLRequest(url: url))
         timeoutTimer = Timer.scheduledTimer(withTimeInterval: timeout, repeats: false) { [weak self] _ in
@@ -274,7 +274,8 @@ final class StreamSniffer: NSObject, WKScriptMessageHandler, WKNavigationDelegat
                 // complete answers (picture AND sound) need no more waiting
                 let complete = (c.type == .master && c.masterHasAudio) || c.type == .bigMP4
                     || (c.type == .media && (c.content == .muxed || c.content == .audio))
-                if complete { self.decide() }
+                // after the waiting window every newly classified candidate may be the one that finishes the decision
+                if complete || Date().timeIntervalSince(self.firstAt) >= 7 { self.decide() }
             }
         }
     }

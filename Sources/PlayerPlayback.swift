@@ -28,7 +28,7 @@ extension PlayerViewController {
         wantsPlay = true
         userPaused = false
         lastPos = 0
-        nativeDeadline = Date().addingTimeInterval(60)
+        nativeDeadline = Date().addingTimeInterval(45)
         errorPanel.isHidden = true
         let d = SmartPlayback.decide(NetworkMonitor.shared.conditions())
         smartCap = d.maxHeight
@@ -238,7 +238,7 @@ extension PlayerViewController {
         errorPanel.isHidden = true
         sourceIndex = 0
         incidentAttempt = 0
-        nativeDeadline = Date().addingTimeInterval(60)
+        nativeDeadline = Date().addingTimeInterval(45)
         wantsPlay = true
         userPaused = false
         if let r = resolved { EmbedResolver.shared.invalidate(page: r.page) }
