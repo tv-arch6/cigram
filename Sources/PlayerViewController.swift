@@ -1,62 +1,191 @@
 import UIKit
-import WebKit
 import AVFoundation
+import AVKit
+import MediaPlayer
 
-/// Plays a film / an episode through its own VidBolt link (exactly what the admin published), with the other embed servers
-/// as automatic fallbacks. The title plays INSIDE the embed page (no stream extraction, see CLAUDE.md).
-///
-/// 1.1.2 — why the film «froze» (يعلگ) and what changed:
-///  1. The old auto-play clicked the first element whose class contained "play" — on these pages that is the player box
-///     itself, so the clicks at 0 s / 1.2 s / 3 s toggled play → pause. Now: `video.play()` once per video, and the
-///     player's own big-play button is pressed at most once, only when the browser refused to start the video.
-///  2. A tap recognizer on the whole screen competed with the web view's own tap recognizers: taps on the embed's
-///     play / seek / subtitle buttons could be swallowed. It now recognizes together with them and ignores our buttons.
-///  3. Siri, a call, Control Center or an alarm interrupt the audio session and WebKit pauses the video; nothing resumed it.
-///     A pause the viewer did not make (no touch in that frame just before it) is now resumed when the interruption ends
-///     and when the app comes back to the front — in every frame (the video lives in the embed's iframe).
-///  4. The embed's ad layer: pop-ups / pop-unders / redirects are refused (as before) and known ad networks are blocked
-///     (content rules); floating ad overlays laid over the player (fixed, high z-index, no video inside, not a player
-///     control) are removed as they appear.
-///  5. The script bridge held the controller strongly (a leak that kept the page — and its audio — alive after closing).
-///  6. Portrait: the bar sits under the Dynamic Island and the page starts under the bar (nothing hides the embed's own
-///     buttons). Landscape: the bar floats and lets every touch outside its buttons through.
-final class PlayerViewController: UIViewController, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, UIGestureRecognizerDelegate {
-    private let show: Show
-    private var episode: CatalogItem?
-    private var web: WKWebView!
-    private var sources: [URL] = []
-    private var index = 0
-    private var allowedHost = ""
-    private var committed = false
-    private var playing = false
-    private var sawVideo = false
-    private var shield: WKContentRuleList?
-    private var shieldOn = false
-    private var shieldRetried = false
-    private var videoFrames: [WKFrameInfo] = []
-    private let bar = PassThroughView()
-    private let barShade = UIView()
-    private let close = UIButton(type: .system)
-    private let titleLabel = UILabel()
-    private let nextButton = UIButton(type: .system)
-    private let server = UIButton(type: .system)
-    private let hint = UILabel()
-    private let spinner = UIActivityIndicatorView(style: .large)
-    private var hideTimer: Timer?
-    private var hintTimer: Timer?
-    private static let bridge = "cg"
+/// THE PLAYER. A native player (AVPlayer) with the same behaviour as the Android ExoPlayer player (PlayerActivity):
+///  - an embed link (vidbolt, ...) is turned into the real stream first (EmbedResolver) and played here, with its own
+///    controls: double-tap ±10 s, drag to seek, speed, quality, subtitles with a delay, audio tracks, sleep timer, skip intro,
+///    next-episode card, resume, episode list, Picture in Picture, AirPlay (the Android «cast» button), lock screen controls;
+///  - a broken playback is repaired in place (CigramRepairPlan: reopen / renew the link / lower the quality / wait for the
+///    network) before the viewer is told anything;
+///  - when no server gives a stream the browser player (WebPlayerViewController) takes over, exactly like the Android
+///    CigramWebPlayerActivity fallback.
+/// The iPhone app has no ads, so the ad hooks of the Android player do not exist here.
+final class PlayerViewController: UIViewController, UIGestureRecognizerDelegate, AVPlayerItemLegibleOutputPushDelegate,
+                                  AVPictureInPictureControllerDelegate, UIDocumentPickerDelegate {
+    enum PanMode { case none, seek, brightness, volume }
+
+    struct SubChoice {
+        enum Kind {
+            case external(String)
+            case embedded(AVMediaSelectionOption)
+        }
+        let title: String
+        let kind: Kind
+    }
+
+    // MARK: content
+    let show: Show
+    var episode: CatalogItem?
+    var progressKey = ""
+    var speedKey = ""
+
+    // MARK: engine
+    let player = AVPlayer()
+    let surface = PlayerSurface()
+    var item: AVPlayerItem?
+    var timeObserver: Any?
+    var observations: [NSKeyValueObservation] = []
+    var legibleOutput: AVPlayerItemLegibleOutput?
+    var pip: AVPictureInPictureController?
+    var remoteTargets: [(MPRemoteCommand, Any)] = []
+
+    // MARK: sources
+    var sources: [String] = []
+    var sourceIndex = 0
+    var resolved: ResolvedStream?
+    var currentStream = ""
+    var originalStream = ""
+    var triedStreams = Set<String>()
+    var embedJob: EmbedJob?
+    var loadGeneration = 0
+    var nativeDeadline = Date()
+    var everPlayed = false
+    var inWebFallback = false
+    var closing = false
+
+    // MARK: repair
+    var incidentAttempt = 0
+    var repairTimer: Timer?
+    var stallTimer: Timer?
+    var audioCheckTimer: Timer?
+    var loadingTimer: Timer?
+    var playingSince: Date?
+    var waitingForNetwork = false
+    var pendingRepair: (kind: RepairPlan.Kind, http: Int)?
+    var restartAfterNetwork = false
+    var qualityCeiling = 0
+    var manualHeight = 0
+    var smartCap = 0
+    var variants: [HLSVariant] = []
+    var masterInfo: (text: String, base: String)?
+
+    // MARK: playback state
+    var speed: Float = 1
+    var wantsPlay = true
+    var userPaused = false
+    var isReady = false
+    var pendingResume: Double = 0
+    var duration: Double = 0
+    var bufferedEnd: Double = 0
+    var sleepLeft: Double = 0
+    var lastSave = Date.distantPast
+    var lastSlowTick: Double = 0
+    var lastPos: Double = 0
+    var brightnessTouched = false
+    var sceneSegments: [(start: Double, end: Double)] = []
+    var lastSceneSkip: Double = -100
+    var skipEngine = SkipIntroEngine()
+    var skipTarget: Double = 0
+    var panMode = PanMode.none
+    var panStartValue: CGFloat = 0
+    var panStartTime: Double = 0
+    var panTarget: Double = 0
+    var originalBrightness: CGFloat = 0.5
+    var controlsVisible = true
+    var controlsLocked = false
+    var hideTimer: Timer?
+    var statusTimer: Timer?
+    var hudTimer: Timer?
+    var flashTimer: Timer?
+    var flashAccum = 0
+    var flashForward = true
+    var sheet: PlayerSheet?
+    var resizeMode = 0
+
+    // MARK: subtitles / audio
+    var subChoices: [SubChoice] = []
+    var subSelected = -1
+    var subDoc: SubtitleDocument?
+    var subDelay: Double = 0
+    var subCache: [String: SubtitleDocument] = [:]
+    var embeddedText = ""
+    var lastSubText = "\u{0}"
+    var legibleGroup: AVMediaSelectionGroup?
+    var audioGroup: AVMediaSelectionGroup?
+
+    // MARK: views
+    let shadeTop = CAGradientLayer()
+    let shadeBottom = CAGradientLayer()
+    let controls = UIView()
+    let subtitleLabel = UILabel()
+    let spinner = UIActivityIndicatorView(style: .large)
+    let statusLabel = UILabel()
+    let hudLabel = UILabel()
+    let flashLabel = UILabel()
+    let bubble = UILabel()
+    let closeButton = RoundIconButton(symbols: ["xmark"], size: 19, label: "إغلاق")
+    let titleLabel = UILabel()
+    let episodeLabel = UILabel()
+    let routeView = AVRoutePickerView()
+    let pipButton = RoundIconButton(symbols: ["pip.enter", "rectangle.on.rectangle"], size: 19, label: "صورة داخل صورة")
+    let lockButton = RoundIconButton(symbols: ["lock.fill"], size: 18, label: "قفل الشاشة")
+    let rotateButton = RoundIconButton(symbols: ["arrow.triangle.2.circlepath", "rotate.right"], size: 18, label: "تدوير الشاشة")
+    let episodesButton = RoundIconButton(symbols: ["list.bullet"], size: 19, label: "الحلقات")
+    let settingsButton = RoundIconButton(symbols: ["gearshape.fill", "gear"], size: 20, label: "إعدادات المشاهدة")
+    let prevButton = RoundIconButton(symbols: ["backward.end.fill"], size: 24, label: "الحلقة السابقة")
+    let nextButton = RoundIconButton(symbols: ["forward.end.fill"], size: 24, label: "الحلقة التالية")
+    let backButton = RoundIconButton(symbols: ["gobackward.10", "gobackward"], size: 30, label: "رجوع 10 ثوانٍ")
+    let forwardButton = RoundIconButton(symbols: ["goforward.10", "goforward"], size: 30, label: "تقديم 10 ثوانٍ")
+    let playButton = RoundIconButton(symbols: ["play.fill"], size: 38, label: "تشغيل أو إيقاف")
+    let timeLabel = UILabel()
+    let leftLabel = UILabel()
+    let seekBar = SeekBar()
+    let chips = UIScrollView()
+    let speedChip = GlassChip(frame: .zero)
+    let qualityChip = GlassChip(frame: .zero)
+    let subsChip = GlassChip(frame: .zero)
+    let resizeChip = GlassChip(frame: .zero)
+    let sourceChip = GlassChip(frame: .zero)
+    let skipButton = GlassChip(frame: .zero)
+    let nextCard = UIView()
+    let nextTitle = UILabel()
+    let nextCountdown = UILabel()
+    let nextNow = GlassChip(frame: .zero)
+    let nextCancel = GlassChip(frame: .zero)
+    let resumeChip = UIView()
+    let resumeLabel = UILabel()
+    let resumeStartOver = GlassChip(frame: .zero)
+    let errorPanel = UIView()
+    let errorLabel = UILabel()
+    let errorRetry = GlassChip(frame: .zero)
+    let errorWeb = GlassChip(frame: .zero)
+    let errorClose = GlassChip(frame: .zero)
+    let webHint = GlassChip(frame: .zero)
+    let unlockButton = RoundIconButton(symbols: ["lock.open.fill", "lock.fill"], size: 20, label: "فتح القفل")
+    let volumeView = MPVolumeView(frame: CGRect(x: -3000, y: -3000, width: 10, height: 10))
+
+    // MARK: init
 
     init(show: Show, episode: CatalogItem?) {
         self.show = show
         self.episode = episode
         super.init(nibName: nil, bundle: nil)
+        modalPresentationCapturesStatusBarAppearance = true
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
     deinit {
         NotificationCenter.default.removeObserver(self)
         hideTimer?.invalidate()
-        hintTimer?.invalidate()
+        repairTimer?.invalidate()
+        stallTimer?.invalidate()
+        audioCheckTimer?.invalidate()
+        loadingTimer?.invalidate()
+        statusTimer?.invalidate()
+        hudTimer?.invalidate()
+        flashTimer?.invalidate()
     }
 
     override var prefersStatusBarHidden: Bool { return true }
@@ -64,11 +193,18 @@ final class PlayerViewController: UIViewController, WKNavigationDelegate, WKUIDe
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask { return .allButUpsideDown }
     override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation { return .landscapeRight }
 
-    private var isPortrait: Bool { return view.bounds.height >= view.bounds.width }
+    var isPortrait: Bool { return view.bounds.height >= view.bounds.width }
+
+    // MARK: view
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
+        view.semanticContentAttribute = .forceLeftToRight
+        NetworkMonitor.shared.start()
+        originalBrightness = UIScreen.main.brightness
+        resizeMode = PlayerPrefs.resize
+
         // activating the audio session can block for a moment (it interrupts other apps): never on the main thread
         let session = AVAudioSession.sharedInstance()
         DispatchQueue.global(qos: .userInitiated).async {
@@ -76,558 +212,643 @@ final class PlayerViewController: UIViewController, WKNavigationDelegate, WKUIDe
             try? session.setActive(true)
         }
 
-        let cfg = WKWebViewConfiguration()
-        cfg.allowsInlineMediaPlayback = true
-        cfg.allowsPictureInPictureMediaPlayback = true
-        cfg.mediaTypesRequiringUserActionForPlayback = []
-        cfg.preferences.javaScriptCanOpenWindowsAutomatically = false
-        cfg.applicationNameForUserAgent = "Version/17.4 Mobile/15E148 Safari/604.1"
-        let ucc = cfg.userContentController
-        ucc.add(WeakScriptHandler(self), name: PlayerViewController.bridge)
-        ucc.addUserScript(WKUserScript(source: PlayerScripts.guardScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
-        ucc.addUserScript(WKUserScript(source: PlayerScripts.startScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false))
-        web = WKWebView(frame: view.bounds, configuration: cfg)
-        web.navigationDelegate = self
-        web.uiDelegate = self
-        web.backgroundColor = .black
-        web.isOpaque = false
-        web.scrollView.backgroundColor = .black
-        web.scrollView.contentInsetAdjustmentBehavior = .never
-        web.scrollView.bounces = false
-        web.allowsLinkPreview = false
-        view.addSubview(web)
+        surface.backgroundColor = .black
+        surface.playerLayer.player = player
+        surface.playerLayer.videoGravity = AVLayerVideoGravity.resizeAspect
+        view.addSubview(surface)
+        player.automaticallyWaitsToMinimizeStalling = true
+        player.allowsExternalPlayback = true
+        player.usesExternalPlaybackWhileExternalScreenIsActive = true
+        applyResize()
 
-        spinner.color = .white
-        spinner.hidesWhenStopped = true
-        view.addSubview(spinner)
+        configureLabels()
+        view.addSubview(subtitleLabel)
 
-        hint.text = "إذا لم يبدأ الفيديو اضغط «مصدر آخر»"
-        hint.textColor = .white
-        hint.font = Theme.font(13.5, .semibold)
-        hint.textAlignment = .center
-        hint.backgroundColor = UIColor.black.withAlphaComponent(0.6)
-        hint.layer.cornerRadius = 10
-        hint.clipsToBounds = true
-        hint.alpha = 0
-        view.addSubview(hint)
+        shadeTop.colors = [UIColor.black.withAlphaComponent(0.72).cgColor, UIColor.clear.cgColor]
+        shadeBottom.colors = [UIColor.clear.cgColor, UIColor.black.withAlphaComponent(0.78).cgColor]
+        controls.layer.addSublayer(shadeTop)
+        controls.layer.addSublayer(shadeBottom)
+        controls.backgroundColor = .clear
+        view.addSubview(controls)
 
-        barShade.backgroundColor = UIColor.black.withAlphaComponent(0.6)
-        barShade.isUserInteractionEnabled = false
-        view.addSubview(barShade)
-        view.addSubview(bar)
-        close.setImage(UIImage(systemName: "xmark", withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .bold)), for: .normal)
-        close.tintColor = .white
-        close.accessibilityLabel = "إغلاق"
-        close.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
-        titleLabel.textColor = .white
-        titleLabel.font = Theme.font(15, .bold)
-        titleLabel.textAlignment = .center
-        titleLabel.adjustsFontSizeToFitWidth = true
-        titleLabel.minimumScaleFactor = 0.75
-        nextButton.setTitle("الحلقة التالية ›", for: .normal)
-        nextButton.setTitleColor(.white, for: .normal)
-        nextButton.titleLabel?.font = Theme.font(14, .bold)
-        nextButton.addTarget(self, action: #selector(nextTapped), for: .touchUpInside)
-        server.setTitleColor(Theme.text2, for: .normal)
-        server.titleLabel?.font = Theme.font(13, .semibold)
-        server.addTarget(self, action: #selector(serverTapped), for: .touchUpInside)
-        [close, nextButton, server].forEach { bar.addSubview($0) }
-        bar.addSubview(titleLabel)
-
-        // shows the bar; recognizes TOGETHER with the web view's own taps (never takes them away from the embed)
-        let tap = UITapGestureRecognizer(target: self, action: #selector(showBar))
-        tap.cancelsTouchesInView = false
-        tap.delaysTouchesBegan = false
-        tap.delaysTouchesEnded = false
-        tap.delegate = self
-        view.addGestureRecognizer(tap)
+        configureButtons()
+        configureOverlays()
+        configureGestures()
+        view.addSubview(volumeView)
 
         let nc = NotificationCenter.default
         nc.addObserver(self, selector: #selector(audioInterrupted(_:)), name: AVAudioSession.interruptionNotification, object: nil)
+        nc.addObserver(self, selector: #selector(routeChanged(_:)), name: AVAudioSession.routeChangeNotification, object: nil)
         nc.addObserver(self, selector: #selector(becameActive), name: UIApplication.didBecomeActiveNotification, object: nil)
+        nc.addObserver(self, selector: #selector(networkChanged), name: NetworkMonitor.changed, object: nil)
 
-        WebShield.rules { [weak self] list in
-            guard let self = self else { return }
-            self.shield = list
-            self.setShield(true)
-            self.start()
+        addTimeObserver()
+        setupRemoteCommands()
+        setupPictureInPicture()
+        start()
+        showControls()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        UIApplication.shared.isIdleTimerDisabled = true
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        if isBeingDismissed || closing { UIApplication.shared.isIdleTimerDisabled = false }
+    }
+
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: nil) { [weak self] _ in
+            self?.showControls()
         }
     }
+
+    // MARK: building the controls
+
+    private func configureLabels() {
+        subtitleLabel.numberOfLines = 0
+        subtitleLabel.textAlignment = .center
+        subtitleLabel.isUserInteractionEnabled = false
+        subtitleLabel.isHidden = true
+
+        titleLabel.font = Theme.font(17, .bold)
+        titleLabel.textColor = .white
+        titleLabel.textAlignment = .right
+        titleLabel.adjustsFontSizeToFitWidth = true
+        titleLabel.minimumScaleFactor = 0.7
+        episodeLabel.font = Theme.font(13, .medium)
+        episodeLabel.textColor = Theme.text2
+        episodeLabel.textAlignment = .right
+        episodeLabel.adjustsFontSizeToFitWidth = true
+        episodeLabel.minimumScaleFactor = 0.7
+
+        for l in [timeLabel, leftLabel] {
+            l.font = UIFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium)
+            l.textColor = .white
+            l.text = "0:00"
+        }
+        timeLabel.textAlignment = .left
+        leftLabel.textAlignment = .right
+
+        spinner.color = .white
+        spinner.hidesWhenStopped = true
+
+        statusLabel.font = Theme.font(14, .semibold)
+        statusLabel.textColor = .white
+        statusLabel.textAlignment = .center
+        statusLabel.numberOfLines = 2
+        statusLabel.backgroundColor = UIColor(red: 0x14 / 255.0, green: 0x14 / 255.0, blue: 0x16 / 255.0, alpha: 0.92)
+        statusLabel.layer.cornerRadius = 18
+        statusLabel.layer.borderWidth = 1
+        statusLabel.layer.borderColor = Theme.red.withAlphaComponent(0.35).cgColor
+        statusLabel.clipsToBounds = true
+        statusLabel.alpha = 0
+
+        hudLabel.font = Theme.font(18, .bold)
+        hudLabel.textColor = .white
+        hudLabel.textAlignment = .center
+        hudLabel.backgroundColor = UIColor(white: 0.05, alpha: 0.78)
+        hudLabel.layer.cornerRadius = 16
+        hudLabel.clipsToBounds = true
+        hudLabel.alpha = 0
+
+        flashLabel.font = Theme.font(20, .heavy)
+        flashLabel.textColor = .white
+        flashLabel.textAlignment = .center
+        flashLabel.backgroundColor = UIColor(white: 1, alpha: 0.18)
+        flashLabel.clipsToBounds = true
+        flashLabel.alpha = 0
+
+        bubble.font = UIFont.monospacedDigitSystemFont(ofSize: 15, weight: .bold)
+        bubble.textColor = .white
+        bubble.textAlignment = .center
+        bubble.backgroundColor = UIColor(white: 0.05, alpha: 0.82)
+        bubble.layer.cornerRadius = 10
+        bubble.clipsToBounds = true
+        bubble.alpha = 0
+    }
+
+    private func configureButtons() {
+        closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
+        routeView.tintColor = .white
+        routeView.activeTintColor = Theme.red
+        routeView.prioritizesVideoDevices = true
+        routeView.accessibilityLabel = "البث على التلفاز (AirPlay)"
+        pipButton.addTarget(self, action: #selector(pipTapped), for: .touchUpInside)
+        lockButton.addTarget(self, action: #selector(lockTapped), for: .touchUpInside)
+        rotateButton.addTarget(self, action: #selector(rotateTapped), for: .touchUpInside)
+        episodesButton.addTarget(self, action: #selector(episodesTapped), for: .touchUpInside)
+        settingsButton.addTarget(self, action: #selector(settingsTapped), for: .touchUpInside)
+        prevButton.addTarget(self, action: #selector(prevEpisodeTapped), for: .touchUpInside)
+        nextButton.addTarget(self, action: #selector(nextEpisodeTapped), for: .touchUpInside)
+        backButton.addTarget(self, action: #selector(backTapped), for: .touchUpInside)
+        forwardButton.addTarget(self, action: #selector(forwardTapped), for: .touchUpInside)
+        playButton.addTarget(self, action: #selector(playTapped), for: .touchUpInside)
+        unlockButton.addTarget(self, action: #selector(unlockTapped), for: .touchUpInside)
+        unlockButton.backgroundColor = UIColor(white: 0.07, alpha: 0.8)
+        unlockButton.layer.cornerRadius = 24
+        unlockButton.alpha = 0
+        unlockButton.isHidden = true
+
+        let top: [UIView] = [closeButton, titleLabel, episodeLabel, routeView, pipButton, lockButton, rotateButton, episodesButton, settingsButton]
+        for v in top { controls.addSubview(v) }
+        for v in [prevButton, backButton, playButton, forwardButton, nextButton] { controls.addSubview(v) }
+        for v in [timeLabel, seekBar, leftLabel, chips] { controls.addSubview(v) }
+        pipButton.isHidden = !AVPictureInPictureController.isPictureInPictureSupported()
+
+        seekBar.onBegan = { [weak self] in
+            self?.hideTimer?.invalidate()
+            self?.bubble.alpha = 1
+        }
+        seekBar.onChanged = { [weak self] s in self?.scrubbing(s) }
+        seekBar.onEnded = { [weak self] s in self?.scrubEnded(s) }
+
+        chips.showsHorizontalScrollIndicator = false
+        chips.semanticContentAttribute = .forceLeftToRight
+        speedChip.addTarget(self, action: #selector(speedChipTapped), for: .touchUpInside)
+        qualityChip.addTarget(self, action: #selector(qualityChipTapped), for: .touchUpInside)
+        subsChip.addTarget(self, action: #selector(subsChipTapped), for: .touchUpInside)
+        resizeChip.addTarget(self, action: #selector(resizeChipTapped), for: .touchUpInside)
+        sourceChip.addTarget(self, action: #selector(sourceChipTapped), for: .touchUpInside)
+        for c in [speedChip, qualityChip, subsChip, resizeChip, sourceChip] { chips.addSubview(c) }
+        refreshChips()
+    }
+
+    private func configureOverlays() {
+        view.addSubview(spinner)
+        view.addSubview(statusLabel)
+        view.addSubview(hudLabel)
+        view.addSubview(flashLabel)
+        view.addSubview(bubble)
+
+        skipButton.setText("تخطي المقدمة  ⏭")
+        skipButton.backgroundColor = UIColor(red: 0x0B / 255.0, green: 0x1F / 255.0, blue: 0x29 / 255.0, alpha: 0.9)
+        skipButton.layer.borderColor = UIColor.white.cgColor
+        skipButton.layer.borderWidth = 1.5
+        skipButton.layer.cornerRadius = 22
+        skipButton.titleLabel?.font = Theme.font(15, .bold)
+        skipButton.alpha = 0
+        skipButton.isHidden = true
+        skipButton.addTarget(self, action: #selector(skipTapped), for: .touchUpInside)
+        view.addSubview(skipButton)
+
+        nextCard.backgroundColor = UIColor(red: 0x0B / 255.0, green: 0x1F / 255.0, blue: 0x29 / 255.0, alpha: 0.92)
+        nextCard.layer.cornerRadius = 20
+        nextCard.layer.borderWidth = 1
+        nextCard.layer.borderColor = UIColor(white: 1, alpha: 0.25).cgColor
+        nextCard.alpha = 0
+        nextCard.isHidden = true
+        nextTitle.text = "الحلقة التالية"
+        nextTitle.font = Theme.font(16, .bold)
+        nextTitle.textColor = .white
+        nextTitle.textAlignment = .right
+        nextCountdown.font = Theme.font(12.5)
+        nextCountdown.textColor = Theme.text2
+        nextCountdown.textAlignment = .right
+        nextNow.setText("شاهد الآن")
+        nextNow.backgroundColor = Theme.red
+        nextNow.addTarget(self, action: #selector(nextNowTapped), for: .touchUpInside)
+        nextCancel.setText("إلغاء")
+        nextCancel.addTarget(self, action: #selector(nextCancelTapped), for: .touchUpInside)
+        for v in [nextTitle, nextCountdown, nextNow, nextCancel] { nextCard.addSubview(v) }
+        view.addSubview(nextCard)
+
+        resumeChip.backgroundColor = UIColor(red: 0x14 / 255.0, green: 0x14 / 255.0, blue: 0x16 / 255.0, alpha: 0.94)
+        resumeChip.layer.cornerRadius = 20
+        resumeChip.layer.borderWidth = 1
+        resumeChip.layer.borderColor = UIColor(white: 1, alpha: 0.2).cgColor
+        resumeChip.alpha = 0
+        resumeChip.isHidden = true
+        resumeLabel.font = Theme.font(14, .semibold)
+        resumeLabel.textColor = .white
+        resumeLabel.textAlignment = .right
+        resumeStartOver.setText("من البداية")
+        resumeStartOver.addTarget(self, action: #selector(startOverTapped), for: .touchUpInside)
+        resumeChip.addSubview(resumeLabel)
+        resumeChip.addSubview(resumeStartOver)
+        view.addSubview(resumeChip)
+
+        errorPanel.backgroundColor = UIColor(white: 0, alpha: 0.82)
+        errorPanel.isHidden = true
+        errorLabel.font = Theme.font(16, .semibold)
+        errorLabel.textColor = .white
+        errorLabel.textAlignment = .center
+        errorLabel.numberOfLines = 0
+        errorRetry.setText("إعادة المحاولة")
+        errorRetry.backgroundColor = Theme.red
+        errorRetry.addTarget(self, action: #selector(retryTapped), for: .touchUpInside)
+        errorWeb.setText("المشغّل البديل")
+        errorWeb.addTarget(self, action: #selector(webTapped), for: .touchUpInside)
+        errorClose.setText("رجوع")
+        errorClose.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
+        for v in [errorLabel, errorRetry, errorWeb, errorClose] { errorPanel.addSubview(v) }
+        view.addSubview(errorPanel)
+
+        // shown while the video is being prepared, so the viewer is never stuck behind a spinner
+        webHint.setText("المشغّل البديل")
+        webHint.alpha = 0
+        webHint.isHidden = true
+        webHint.addTarget(self, action: #selector(webTapped), for: .touchUpInside)
+        view.addSubview(webHint)
+        view.addSubview(unlockButton)
+    }
+
+    private func configureGestures() {
+        let single = UITapGestureRecognizer(target: self, action: #selector(singleTapped(_:)))
+        let double = UITapGestureRecognizer(target: self, action: #selector(doubleTapped(_:)))
+        double.numberOfTapsRequired = 2
+        single.require(toFail: double)
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(panned(_:)))
+        pan.maximumNumberOfTouches = 1
+        let pinch = UIPinchGestureRecognizer(target: self, action: #selector(pinched(_:)))
+        for g in [single, double, pan, pinch] as [UIGestureRecognizer] {
+            g.delegate = self
+            view.addGestureRecognizer(g)
+        }
+    }
+
+    func gestureRecognizer(_ g: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        if sheet?.isOpen == true { return false }
+        if !errorPanel.isHidden { return false }
+        var v: UIView? = touch.view
+        while let x = v {
+            if x is UIControl || x === routeView || x === nextCard || x === resumeChip { return false }
+            v = x.superview
+        }
+        return true
+    }
+
+    func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        return g is UIPinchGestureRecognizer || other is UIPinchGestureRecognizer
+    }
+
+    // MARK: layout
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         let b = view.bounds
         let s = view.safeAreaInsets
-        let barH: CGFloat = 52
-        let side = max(8, max(s.left, s.right))
-        if isPortrait {
-            // a solid bar under the Dynamic Island; the page starts below it (the embed's buttons stay reachable)
-            barShade.frame = CGRect(x: 0, y: 0, width: b.width, height: s.top + barH)
-            barShade.backgroundColor = .black
-            bar.frame = CGRect(x: 0, y: s.top, width: b.width, height: barH)
-            web.frame = CGRect(x: 0, y: s.top + barH, width: b.width, height: max(0, b.height - s.top - barH - s.bottom))
-            bar.alpha = 1
-            barShade.alpha = 1
-        } else {
-            barShade.frame = CGRect(x: 0, y: 0, width: b.width, height: barH)
-            barShade.backgroundColor = UIColor.black.withAlphaComponent(0.6)
-            bar.frame = CGRect(x: 0, y: 0, width: b.width, height: barH)
-            web.frame = CGRect(x: s.left, y: 0, width: b.width - s.left - s.right, height: b.height)
+        surface.frame = b
+        controls.frame = b
+        shadeTop.frame = CGRect(x: 0, y: 0, width: b.width, height: s.top + 110)
+        shadeBottom.frame = CGRect(x: 0, y: b.height - (s.bottom + 170), width: b.width, height: s.bottom + 170)
+
+        let left = max(12, s.left + 4)
+        let right = b.width - max(12, s.right + 4)
+        let topY = max(s.top, 8)
+        let portrait = isPortrait
+
+        // top bar: close · title … buttons
+        closeButton.frame = CGRect(x: left, y: topY, width: 44, height: 44)
+        var bx = right
+        func place(_ v: UIView, _ w: CGFloat) {
+            if v.isHidden { return }
+            bx -= w
+            v.frame = CGRect(x: bx, y: topY + 2, width: w, height: 40)
         }
-        let w = b.width
-        close.frame = CGRect(x: side, y: 4, width: 44, height: 44)
-        server.frame = CGRect(x: side + 48, y: 4, width: 96, height: 44)
-        nextButton.frame = CGRect(x: w - side - 130, y: 4, width: 130, height: 44)
-        let tx = side + 148
-        let tw = max(40, w - tx - (nextButton.isHidden ? side + 8 : side + 136))
-        titleLabel.frame = CGRect(x: tx, y: 4, width: tw, height: 44)
-        spinner.center = CGPoint(x: web.frame.midX, y: web.frame.midY)
-        hint.frame = CGRect(x: (w - 280) / 2, y: web.frame.maxY - 64, width: 280, height: 36)
+        place(settingsButton, 44)
+        place(episodesButton, 44)
+        place(rotateButton, 44)
+        place(lockButton, 44)
+        place(pipButton, 44)
+        routeView.frame = CGRect(x: bx - 44, y: topY + 2, width: 44, height: 40)
+        bx -= 44
+        let titleX = left + 52
+        let titleW = max(60, bx - titleX - 8)
+        titleLabel.frame = CGRect(x: titleX, y: topY + (episodeLabel.text?.isEmpty == false ? 0 : 6), width: titleW, height: 26)
+        episodeLabel.frame = CGRect(x: titleX, y: topY + 24, width: titleW, height: 20)
+
+        // bottom: chips · seek row
+        let bottom = b.height - max(s.bottom, 10) - 6
+        let chipsY = bottom - 36
+        chips.frame = CGRect(x: left, y: chipsY, width: right - left, height: 36)
+        layoutChips()
+        let seekY = chipsY - 38
+        timeLabel.frame = CGRect(x: left, y: seekY, width: 56, height: 32)
+        leftLabel.frame = CGRect(x: right - 64, y: seekY, width: 64, height: 32)
+        seekBar.frame = CGRect(x: left + 54, y: seekY, width: max(40, right - left - 54 - 62), height: 32)
+
+        // centre cluster
+        let midY = (topY + 48 + seekY) / 2
+        let cx = b.width / 2
+        let gap: CGFloat = portrait ? 8 : 20
+        playButton.frame = CGRect(x: cx - 36, y: midY - 36, width: 72, height: 72)
+        backButton.frame = CGRect(x: playButton.frame.minX - gap - 56, y: midY - 28, width: 56, height: 56)
+        forwardButton.frame = CGRect(x: playButton.frame.maxX + gap, y: midY - 28, width: 56, height: 56)
+        prevButton.frame = CGRect(x: backButton.frame.minX - gap - 48, y: midY - 24, width: 48, height: 48)
+        nextButton.frame = CGRect(x: forwardButton.frame.maxX + gap, y: midY - 24, width: 48, height: 48)
+
+        spinner.center = CGPoint(x: cx, y: b.height / 2)
+        statusLabel.frame = CGRect(x: (b.width - min(b.width - 40, 380)) / 2, y: topY + 52, width: min(b.width - 40, 380), height: 38)
+        hudLabel.frame = CGRect(x: cx - 90, y: b.height * 0.22, width: 180, height: 44)
+        bubble.frame = CGRect(x: 0, y: seekY - 40, width: 84, height: 32)
+        webHint.frame = CGRect(x: cx - 80, y: b.height / 2 + 36, width: 160, height: 36)
+        unlockButton.frame = CGRect(x: left + 6, y: b.height / 2 - 24, width: 48, height: 48)
+
+        let cornerRight = right
+        let cornerY = seekY - 56
+        skipButton.frame = CGRect(x: cornerRight - skipButton.neededWidth - 8, y: cornerY, width: skipButton.neededWidth + 8, height: 44)
+        let cardW: CGFloat = 236
+        nextCard.frame = CGRect(x: cornerRight - cardW, y: seekY - 112, width: cardW, height: 104)
+        nextTitle.frame = CGRect(x: 14, y: 10, width: cardW - 28, height: 22)
+        nextCountdown.frame = CGRect(x: 14, y: 32, width: cardW - 28, height: 18)
+        nextNow.frame = CGRect(x: cardW - 14 - 100, y: 58, width: 100, height: 36)
+        nextCancel.frame = CGRect(x: cardW - 14 - 100 - 8 - 80, y: 58, width: 80, height: 36)
+        let rw = min(b.width - 40, 340)
+        resumeChip.frame = CGRect(x: cx - rw / 2, y: topY + 100, width: rw, height: 44)
+        resumeLabel.frame = CGRect(x: 90, y: 0, width: rw - 106, height: 44)
+        resumeStartOver.frame = CGRect(x: 8, y: 6, width: 78, height: 32)
+
+        errorPanel.frame = b
+        errorLabel.frame = CGRect(x: 30, y: b.height / 2 - 110, width: b.width - 60, height: 100)
+        let bw: CGFloat = 130
+        let by = b.height / 2 + 10
+        errorRetry.frame = CGRect(x: cx - bw * 1.5 - 8, y: by, width: bw, height: 40)
+        errorWeb.frame = CGRect(x: cx - bw / 2, y: by, width: bw, height: 40)
+        errorClose.frame = CGRect(x: cx + bw / 2 + 8, y: by, width: bw, height: 40)
+
+        layoutSubtitle()
     }
 
-    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
-        super.viewWillTransition(to: size, with: coordinator)
-        coordinator.animate(alongsideTransition: nil) { [weak self] _ in self?.showBar() }
+    func layoutChips() {
+        var x: CGFloat = 0
+        let all: [GlassChip] = [speedChip, qualityChip, subsChip, resizeChip, sourceChip]
+        for c in all {
+            if c.isHidden { continue }
+            let w = c.neededWidth
+            c.frame = CGRect(x: x, y: 0, width: w, height: 34)
+            x += w + 8
+        }
+        chips.contentSize = CGSize(width: x, height: 36)
     }
 
-    // MARK: sources
+    func layoutSubtitle() {
+        let b = view.bounds
+        let s = view.safeAreaInsets
+        let side = max(24, max(s.left, s.right) + 12)
+        let w = b.width - side * 2
+        let size = subtitleLabel.sizeThatFits(CGSize(width: w, height: 400))
+        let h = min(size.height, 200)
+        let bottomInset: CGFloat = controlsVisible ? (max(s.bottom, 10) + 6 + 36 + 38 + 16) : (max(s.bottom, 10) + 22)
+        subtitleLabel.frame = CGRect(x: side, y: b.height - bottomInset - h, width: w, height: h)
+    }
 
-    private func start() {
-        var text = show.title
-        if let e = episode { text += " · م" + String(e.season) + " ح" + String(e.episode) }
-        titleLabel.text = text
-        nextButton.isHidden = nextEpisode() == nil
-        sources = buildSources()
-        index = 0
-        load()
-        showBar()
+    // MARK: controls
+
+    func showControls(autoHide: Bool = true) {
+        if controlsLocked { return }
+        hideTimer?.invalidate()
+        controlsVisible = true
+        UIView.animate(withDuration: 0.2) { self.controls.alpha = 1 }
+        layoutSubtitle()
+        if autoHide { scheduleHide() }
+    }
+
+    func scheduleHide() {
+        hideTimer?.invalidate()
+        hideTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            if self.sheet?.isOpen == true || self.seekBar.isScrubbing || !self.player.rate.isNormalPositive { return }
+            self.hideControls()
+        }
+    }
+
+    func hideControls() {
+        hideTimer?.invalidate()
+        controlsVisible = false
+        UIView.animate(withDuration: 0.25) { self.controls.alpha = 0 }
+        layoutSubtitle()
+    }
+
+    @objc func singleTapped(_ g: UITapGestureRecognizer) {
+        if controlsLocked {
+            showUnlock()
+            return
+        }
+        if controlsVisible { hideControls() } else { showControls() }
+    }
+
+    @objc func doubleTapped(_ g: UITapGestureRecognizer) {
+        if controlsLocked { showUnlock(); return }
+        let x = g.location(in: view).x
+        let w = view.bounds.width
+        if x < w * 0.35 { skip(by: -Double(PlayerPrefs.seekStep)) }
+        else if x > w * 0.65 { skip(by: Double(PlayerPrefs.seekStep)) }
+        else { togglePlay() }
+    }
+
+    @objc func pinched(_ g: UIPinchGestureRecognizer) {
+        if g.state != .ended || controlsLocked { return }
+        if g.scale > 1.12 && resizeMode != 1 { setResize(1) }
+        else if g.scale < 0.88 && resizeMode != 0 { setResize(0) }
+    }
+
+    @objc func panned(_ g: UIPanGestureRecognizer) {
+        if controlsLocked { return }
+        let t = g.translation(in: view)
+        switch g.state {
+        case .began:
+            let v = g.velocity(in: view)
+            let x = g.location(in: view).x
+            if abs(v.x) > abs(v.y) {
+                panMode = .seek
+                panStartTime = currentSeconds()
+                panTarget = panStartTime
+            } else if x < view.bounds.width / 2 {
+                panMode = .brightness
+                brightnessTouched = true
+                panStartValue = UIScreen.main.brightness
+            } else {
+                panMode = .volume
+                panStartValue = CGFloat(AVAudioSession.sharedInstance().outputVolume)
+            }
+        case .changed:
+            switch panMode {
+            case .seek:
+                if duration <= 0 { return }
+                let delta = Double(t.x / max(1, view.bounds.width)) * 120
+                panTarget = min(max(0, panStartTime + delta), max(0, duration - 1))
+                showHUD((delta >= 0 ? "+" : "−") + ClockText.format(abs(panTarget - panStartTime)) + "   " + ClockText.format(panTarget))
+            case .brightness:
+                let v = min(1, max(0, panStartValue - t.y / (view.bounds.height * 0.7)))
+                UIScreen.main.brightness = v
+                showHUD("السطوع  " + String(Int(v * 100)) + "%")
+            case .volume:
+                let v = min(1, max(0, panStartValue - t.y / (view.bounds.height * 0.7)))
+                setSystemVolume(Float(v))
+                showHUD("الصوت  " + String(Int(v * 100)) + "%")
+            case .none:
+                break
+            }
+        case .ended:
+            if panMode == .seek && duration > 0 { seek(to: panTarget) }
+            panMode = .none
+            hideHUD(after: 0.6)
+        default:
+            panMode = .none
+            hideHUD(after: 0.2)
+        }
+    }
+
+    func setSystemVolume(_ v: Float) {
+        for sub in volumeView.subviews {
+            if let slider = sub as? UISlider { slider.value = v; return }
+        }
+    }
+
+    func showHUD(_ text: String) {
+        hudTimer?.invalidate()
+        hudLabel.text = text
+        hudLabel.alpha = 1
+    }
+
+    func hideHUD(after: TimeInterval) {
+        hudTimer?.invalidate()
+        hudTimer = Timer.scheduledTimer(withTimeInterval: after, repeats: false) { [weak self] _ in
+            UIView.animate(withDuration: 0.25) { self?.hudLabel.alpha = 0 }
+        }
+    }
+
+    // a ripple at the side that was double-tapped («رجوع 10 ثوانٍ» / «تقديم 10 ثوانٍ»), adding up while the viewer keeps tapping
+    func flashSeek(forward: Bool, seconds: Int) {
+        if flashForward != forward { flashAccum = 0 }
+        flashForward = forward
+        flashAccum += seconds
+        let b = view.bounds
+        let w: CGFloat = min(160, b.width * 0.3)
+        flashLabel.frame = CGRect(x: forward ? b.width - w - 20 : 20, y: b.height / 2 - w / 2, width: w, height: w)
+        flashLabel.layer.cornerRadius = w / 2
+        flashLabel.text = (forward ? "+" : "−") + String(flashAccum) + " ث"
+        flashLabel.alpha = 1
+        flashTimer?.invalidate()
+        flashTimer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: false) { [weak self] _ in
+            self?.flashAccum = 0
+            UIView.animate(withDuration: 0.25) { self?.flashLabel.alpha = 0 }
+        }
+    }
+
+    // MARK: seek bar
+
+    func scrubbing(_ seconds: Double) {
+        timeLabel.text = ClockText.format(seconds)
+        leftLabel.text = "-" + ClockText.format(max(0, duration - seconds))
+        bubble.text = ClockText.format(seconds)
+        let x = seekBar.convert(CGPoint(x: seekBar.x(for: seconds), y: 0), to: view).x
+        bubble.frame = CGRect(x: min(max(8, x - 42), view.bounds.width - 92), y: bubble.frame.minY, width: 84, height: 32)
+    }
+
+    func scrubEnded(_ seconds: Double?) {
+        UIView.animate(withDuration: 0.2) { self.bubble.alpha = 0 }
+        if let s = seconds { seek(to: s) }
+        scheduleHide()
+    }
+
+    func updateBubbleY() {
+        bubble.frame = CGRect(x: bubble.frame.minX, y: controls.convert(seekBar.frame, to: view).minY - 40, width: 84, height: 32)
+    }
+
+    // MARK: visual state helpers
+
+    func refreshPlayButton() {
+        let playing = player.timeControlStatus != .paused && wantsPlay
+        playButton.set(symbols: [playing ? "pause.fill" : "play.fill"], size: 38)
+    }
+
+    func refreshChips() {
+        speedChip.setText(speed == 1 ? "1x" : String(format: "%gx", Double(speed)))
+        if manualHeight > 0 {
+            qualityChip.setText("الجودة · " + QualityLabel.label(height: manualHeight))
+        } else {
+            qualityChip.setText("الجودة · تلقائي")
+        }
+        if subSelected >= 0 && subSelected < subChoices.count { subsChip.setText("الترجمة · " + shortTitle(subChoices[subSelected].title)) }
+        else { subsChip.setText("الترجمة · إيقاف") }
+        resizeChip.setText(["ملاءمة", "ملء الشاشة", "تمديد"][min(2, max(0, resizeMode))])
+        sourceChip.setText(sources.count > 1 ? "المصدر " + String(sourceIndex + 1) + "/" + String(sources.count) : "إعادة التحميل")
         view.setNeedsLayout()
     }
 
-    /// The published link first, then the same title on the other embed servers (TMDB id).
-    private func buildSources() -> [URL] {
-        var out: [URL] = []
-        let own = (episode?.video ?? (show.isSeries ? "" : show.head.video)).replacingOccurrences(of: "vidbolt.xyz", with: "vidbolt.pro")
-        if own.hasPrefix("http"), let u = URL(string: own) { out.append(u) }
-        let tmdb = show.head.tmdb.isEmpty ? (episode?.tmdb ?? "") : show.head.tmdb
-        if !tmdb.isEmpty {
-            if let e = episode {
-                for f in Backend.tvServers {
-                    if let u = URL(string: String(format: f, tmdb, e.season, e.episode)), !out.contains(u) { out.append(u) }
-                }
-            } else if !show.isSeries {
-                for f in Backend.movieServers {
-                    if let u = URL(string: String(format: f, tmdb)), !out.contains(u) { out.append(u) }
-                }
-            }
+    func shortTitle(_ t: String) -> String { return t.count > 12 ? String(t.prefix(11)) + "…" : t }
+
+    func setResize(_ mode: Int) {
+        resizeMode = mode
+        PlayerPrefs.resize = mode
+        applyResize()
+        refreshChips()
+        showHUD(["ملاءمة الشاشة", "ملء الشاشة", "تمديد"][min(2, max(0, mode))])
+        hideHUD(after: 0.9)
+    }
+
+    func applyResize() {
+        switch resizeMode {
+        case 1: surface.playerLayer.videoGravity = AVLayerVideoGravity.resizeAspectFill
+        case 2: surface.playerLayer.videoGravity = AVLayerVideoGravity.resize
+        default: surface.playerLayer.videoGravity = AVLayerVideoGravity.resizeAspect
         }
-        return out
     }
 
-    /// The ad shield on / off for the page (off only for a source whose player would not even build with it).
-    private func setShield(_ on: Bool) {
-        guard let l = shield, on != shieldOn else { return }
-        let ucc = web.configuration.userContentController
-        if on { ucc.add(l) } else { ucc.remove(l) }
-        shieldOn = on
-    }
-
-    private func load(keepShieldState: Bool = false) {
-        if !keepShieldState { shieldRetried = false; setShield(true) }
-        guard index < sources.count else {
-            spinner.stopAnimating()
-            let a = UIAlertController(title: "الفيديو غير متاح الآن", message: "جرّب بعد قليل.", preferredStyle: .alert)
-            a.addAction(UIAlertAction(title: "رجوع", style: .cancel) { [weak self] _ in self?.closeTapped() })
-            present(a, animated: true)
+    /// A short line at the top (repair progress, a smart-quality notice ...). nil hides it.
+    func showStatus(_ text: String?, autoHide: TimeInterval = 0) {
+        statusTimer?.invalidate()
+        guard let t = text else {
+            UIView.animate(withDuration: 0.2) { self.statusLabel.alpha = 0 }
             return
         }
-        let u = sources[index]
-        allowedHost = (u.host ?? "").lowercased()
-        committed = false
-        playing = false
-        sawVideo = false
-        videoFrames.removeAll()
-        server.setTitle(sources.count > 1 ? "مصدر آخر (" + String(index + 1) + "/" + String(sources.count) + ")" : "إعادة التحميل", for: .normal)
-        spinner.startAnimating()
-        hideHint()
-        hintTimer?.invalidate()
-        hintTimer = Timer.scheduledTimer(withTimeInterval: 18, repeats: false) { [weak self] _ in
-            guard let self = self, !self.playing else { return }
-            // some players refuse to build at all when their ad scripts are blocked: such a source (no video element in
-            // any frame after 18 s) is loaded once more WITHOUT the shield before the viewer is told to switch
-            if !self.sawVideo && self.shieldOn && !self.shieldRetried {
-                NSLog("CIGRAM_CHECK player: no video with the shield, reloading the source without it")
-                self.shieldRetried = true
-                self.setShield(false)
-                self.load(keepShieldState: true)
-                return
+        statusLabel.text = t
+        statusLabel.alpha = 1
+        if autoHide > 0 {
+            statusTimer = Timer.scheduledTimer(withTimeInterval: autoHide, repeats: false) { [weak self] _ in
+                UIView.animate(withDuration: 0.25) { self?.statusLabel.alpha = 0 }
             }
-            UIView.animate(withDuration: 0.25) { self.hint.alpha = 1 }
-            self.showBar()
         }
-        web.load(URLRequest(url: u))
     }
 
-    private func hideHint() { if hint.alpha > 0 { UIView.animate(withDuration: 0.2) { self.hint.alpha = 0 } } }
+    // MARK: lock
 
-    private func nextEpisode() -> CatalogItem? {
-        guard let e = episode, let i = show.episodes.firstIndex(where: { $0.season == e.season && $0.episode == e.episode }),
-              i + 1 < show.episodes.count else { return nil }
-        return show.episodes[i + 1]
+    @objc func lockTapped() {
+        controlsLocked = true
+        hideControls()
+        showUnlock()
+        showHUD("تم قفل الشاشة")
+        hideHUD(after: 1.2)
     }
 
-    // MARK: actions
-
-    @objc private func closeTapped() {
-        hintTimer?.invalidate()
-        web.stopLoading()
-        web.configuration.userContentController.removeScriptMessageHandler(forName: PlayerViewController.bridge)
-        web.loadHTMLString("", baseURL: nil)
-        dismiss(animated: true)
-    }
-
-    @objc private func nextTapped() {
-        guard let n = nextEpisode() else { return }
-        episode = n
-        Library.shared.record(show, episode: n)
-        start()
-    }
-
-    @objc private func serverTapped() {
-        index = sources.count > 1 ? (index + 1) % sources.count : index
-        load()
-        showBar()
-    }
-
-    @objc private func showBar() {
+    func showUnlock() {
+        unlockButton.isHidden = false
+        UIView.animate(withDuration: 0.2) { self.unlockButton.alpha = 1 }
         hideTimer?.invalidate()
-        if isPortrait { bar.alpha = 1; barShade.alpha = 1; return }
-        UIView.animate(withDuration: 0.2) { self.bar.alpha = 1; self.barShade.alpha = 1 }
-        hideTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: false) { [weak self] _ in
-            guard let self = self, !self.isPortrait else { return }
-            UIView.animate(withDuration: 0.3) { self.bar.alpha = 0; self.barShade.alpha = 0 }
+        hideTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: false) { [weak self] _ in
+            UIView.animate(withDuration: 0.25, animations: { self?.unlockButton.alpha = 0 }, completion: { _ in self?.unlockButton.isHidden = true })
         }
     }
 
-    func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { return true }
-
-    func gestureRecognizer(_ g: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool { return !(touch.view is UIControl) }
-
-    // MARK: resume after Siri / a call / Control Center
-
-    @objc private func audioInterrupted(_ n: Notification) {
-        guard let raw = n.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
-              let type = AVAudioSession.InterruptionType(rawValue: raw), type == .ended else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.resumeVideo() }
+    @objc func unlockTapped() {
+        controlsLocked = false
+        unlockButton.alpha = 0
+        unlockButton.isHidden = true
+        showControls()
     }
 
-    @objc private func becameActive() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.resumeVideo() }
-    }
-
-    /// Plays again every video that was paused by the system (never one the viewer paused), in every frame that has one.
-    private func resumeVideo() {
-        guard presentedViewController == nil, web != nil else { return }
-        let js = "window.__cgResume && window.__cgResume();"
-        DispatchQueue.global(qos: .userInitiated).async {
-            try? AVAudioSession.sharedInstance().setActive(true)
+    @objc func rotateTapped() {
+        let toLandscape = view.bounds.height > view.bounds.width
+        if #available(iOS 16.0, *) {
+            guard let scene = view.window?.windowScene else { return }
+            let mask: UIInterfaceOrientationMask = toLandscape ? .landscapeRight : .portrait
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: mask), errorHandler: { _ in })
+            setNeedsUpdateOfSupportedInterfaceOrientations()
+        } else {
+            let o: UIInterfaceOrientation = toLandscape ? .landscapeRight : .portrait
+            UIDevice.current.setValue(o.rawValue, forKey: "orientation")
+            UIViewController.attemptRotationToDeviceOrientation()
         }
-        web.evaluateJavaScript(js, completionHandler: nil)
-        if #available(iOS 14.0, *) {
-            for f in videoFrames where !f.isMainFrame {
-                web.evaluateJavaScript(js, in: f, in: .page, completionHandler: nil)
-            }
-        }
-    }
-
-    // MARK: WKScriptMessageHandler — what the page scripts report
-
-    func userContentController(_ ucc: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard let body = message.body as? [String: Any], let t = body["t"] as? String else { return }
-        switch t {
-        case "video":
-            sawVideo = true
-            // remember the frame that holds the player (at most a few; a frame that navigated is simply ignored later)
-            if !videoFrames.contains(where: { $0.securityOrigin.host == message.frameInfo.securityOrigin.host && $0.isMainFrame == message.frameInfo.isMainFrame }) {
-                videoFrames.append(message.frameInfo)
-                if videoFrames.count > 6 { videoFrames.removeFirst() }
-            }
-        case "playing":
-            playing = true
-            spinner.stopAnimating()
-            hintTimer?.invalidate()
-            hideHint()
-        case "removed":
-            NSLog("CIGRAM_CHECK player removed an overlay: %@", (body["what"] as? String) ?? "")
-        default: break
-        }
-    }
-
-    // MARK: WKNavigationDelegate / WKUIDelegate
-
-    func webView(_ w: WKWebView, didCommit n: WKNavigation!) { committed = true }
-
-    func webView(_ w: WKWebView, didFinish n: WKNavigation!) {
-        if !playing { DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in self?.spinner.stopAnimating() } }
-    }
-
-    func webView(_ w: WKWebView, decidePolicyFor action: WKNavigationAction,
-                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        guard let url = action.request.url else { decisionHandler(.cancel); return }
-        let scheme = (url.scheme ?? "").lowercased()
-        // app links of ads (itms-apps, intent, tel, sms, custom schemes) never leave the player
-        if !["http", "https", "about", "blob", "data", "javascript"].contains(scheme) { decisionHandler(.cancel); return }
-        // a new window (target=_blank / window.open): refused, pop-ups and pop-unders never open
-        guard let target = action.targetFrame else { decisionHandler(.cancel); return }
-        // the player's iframes may come from other hosts
-        guard target.isMainFrame else { decisionHandler(.allow); return }
-        let h = (url.host ?? "").lowercased()
-        if h.isEmpty || scheme == "about" { decisionHandler(.allow); return }
-        if PlayerViewController.sameSite(h, allowedHost) { decisionHandler(.allow); return }
-        // the embed link's own server redirect (vidbolt.xyz → vidbolt.pro, a mirror) happens before the first page
-        // commits and without a tap: follow it, and from then on that host is the player's host
-        if !committed && action.navigationType == .other {
-            allowedHost = h
-            decisionHandler(.allow)
-            return
-        }
-        // anything else that tries to take over the player (an ad redirect after a tap) is dropped
-        NSLog("CIGRAM_CHECK player blocked a redirect to %@", h)
-        decisionHandler(.cancel)
-    }
-
-    static func sameSite(_ a: String, _ b: String) -> Bool {
-        if a == b || a.hasSuffix("." + b) || b.hasSuffix("." + a) { return true }
-        // same registrable name (player.example.com ~ cdn.example.com)
-        let pa = a.split(separator: "."), pb = b.split(separator: ".")
-        return pa.count >= 2 && pb.count >= 2 && pa.suffix(2) == pb.suffix(2)
-    }
-
-    func webView(_ w: WKWebView, createWebViewWith c: WKWebViewConfiguration,
-                 for a: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? { return nil }
-
-    // a page that asks for alert / confirm / prompt (ad tricks) is answered silently
-    func webView(_ w: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo,
-                 completionHandler: @escaping () -> Void) { completionHandler() }
-    func webView(_ w: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo,
-                 completionHandler: @escaping (Bool) -> Void) { completionHandler(false) }
-    func webView(_ w: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?,
-                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (String?) -> Void) { completionHandler(nil) }
-
-    func webView(_ w: WKWebView, didFail n: WKNavigation!, withError e: Error) { failover(e) }
-    func webView(_ w: WKWebView, didFailProvisionalNavigation n: WKNavigation!, withError e: Error) { failover(e) }
-
-    /// The web content process died (memory pressure on a long film): load the same source again instead of a black screen.
-    func webViewWebContentProcessDidTerminate(_ w: WKWebView) {
-        NSLog("CIGRAM_CHECK player web process ended, reloading the source")
-        load()
-    }
-
-    func webView(_ w: WKWebView, decidePolicyFor response: WKNavigationResponse,
-                 decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
-        if response.isForMainFrame, let http = response.response as? HTTPURLResponse, http.statusCode >= 400 {
-            decisionHandler(.cancel)
-            DispatchQueue.main.async { [weak self] in self?.advance() }
-            return
-        }
-        decisionHandler(.allow)
-    }
-
-    private func failover(_ e: Error) {
-        let ns = e as NSError
-        if ns.code == NSURLErrorCancelled { return }
-        if ns.domain == "WebKitErrorDomain" && ns.code == 102 { return }      // frame load interrupted (our own cancel)
-        if committed { return }                                                 // a failing sub-resource is not a dead source
-        advance()
-    }
-
-    private func advance() {
-        index += 1
-        load()
+        showControls()
     }
 }
 
-/// WKUserContentController keeps its handlers strongly; this proxy keeps the player weakly so it can be released.
-final class WeakScriptHandler: NSObject, WKScriptMessageHandler {
-    private weak var target: WKScriptMessageHandler?
-    init(_ target: WKScriptMessageHandler) { self.target = target }
-    func userContentController(_ ucc: WKUserContentController, didReceive message: WKScriptMessage) {
-        target?.userContentController(ucc, didReceive: message)
-    }
-}
-
-/// The scripts injected into every frame of the embed page.
-enum PlayerScripts {
-    /// Document start: no new windows, the viewer's touches are remembered (a pause right after a touch is the viewer's),
-    /// `__cgResume()` plays again what the system paused, the native side learns which frame has the video.
-    static let guardScript = """
-    (function(){
-      if (window.__cgGuard) return; window.__cgGuard = 1;
-      var post = function(m){ try { window.webkit.messageHandlers.cg.postMessage(m); } catch (e) {} };
-      try { window.open = function(){ return null; }; } catch (e) {}
-      var lastTouch = 0;
-      ['touchstart','touchend','pointerdown','mousedown','keydown','click'].forEach(function(t){
-        window.addEventListener(t, function(){ lastTouch = Date.now(); }, true);
-      });
-      document.addEventListener('pause', function(e){
-        var v = e.target; if (!v || v.tagName !== 'VIDEO') return;
-        v.__cgUserPause = (Date.now() - lastTouch) < 1500 && !document.hidden;
-      }, true);
-      document.addEventListener('play', function(e){
-        var v = e.target; if (!v || v.tagName !== 'VIDEO') return;
-        v.__cgUserPause = false; v.__cgStarted = true;
-      }, true);
-      document.addEventListener('playing', function(e){
-        var v = e.target; if (!v || v.tagName !== 'VIDEO') return;
-        v.__cgStarted = true; post({t:'playing'});
-      }, true);
-      document.addEventListener('loadedmetadata', function(e){
-        var v = e.target; if (v && v.tagName === 'VIDEO') post({t:'video'});
-      }, true);
-      window.__cgResume = function(){
-        var vs = document.querySelectorAll('video');
-        for (var i = 0; i < vs.length; i++) {
-          var v = vs[i];
-          if (v.paused && !v.ended && v.__cgStarted && !v.__cgUserPause) {
-            try { var p = v.play(); if (p && p.catch) p.catch(function(){}); } catch (e) {}
-          }
-        }
-      };
-      document.addEventListener('visibilitychange', function(){ if (!document.hidden) setTimeout(window.__cgResume, 400); });
-    })();
-    """
-
-    /// Document end: start the video once (no clicking around), and keep floating ad layers off the player.
-    static let startScript = """
-    (function(){
-      if (window.__cgStart) return; window.__cgStart = 1;
-      var post = function(m){ try { window.webkit.messageHandlers.cg.postMessage(m); } catch (e) {} };
-      var BIG = '.jw-display-icon-display,.jw-icon-display,.vjs-big-play-button,.plyr__control--overlaid,.art-control-play,.dplayer-mobile-play,.fp-play,.mejs__overlay-button';
-      var pressed = false;
-      var tryStart = function(){
-        var v = document.querySelector('video');
-        if (!v) return false;
-        post({t:'video'});
-        if (v.__cgStarted || v.__cgTried) return true;
-        v.__cgTried = true;
-        try {
-          var p = v.play();
-          if (p && p.catch) p.catch(function(){
-            if (pressed) return; pressed = true;
-            var b = document.querySelector(BIG); if (b) { try { b.click(); } catch (e) {} }
-          });
-        } catch (e) {}
-        return true;
-      };
-      var n = 0;
-      var iv = setInterval(function(){ n++; if (tryStart() || n > 15) clearInterval(iv); }, 700);
-      tryStart();
-
-      var PLAYERISH = /(jw|vjs|video|plyr|player|art-|dplayer|setting|subtit|caption|menu|control|quality|audio|track|episode|server|source|loader|loading|spinner|captcha|cf-|turnstile)/i;
-      var vw = function(){ return Math.max(1, window.innerWidth * window.innerHeight); };
-      var named = function(el){ return ((el.id || '') + ' ' + (typeof el.className === 'string' ? el.className : '')); };
-      var holdsPlayer = function(el){
-        if (el.querySelector && el.querySelector('video')) return true;
-        var fr = el.tagName === 'IFRAME' ? [el] : (el.querySelectorAll ? el.querySelectorAll('iframe') : []);
-        for (var i = 0; i < fr.length; i++) {
-          var r = fr[i].getBoundingClientRect();
-          if (r.width * r.height > vw() * 0.3) return true;
-        }
-        return false;
-      };
-      var suspicious = function(el){
-        if (!el || el === document.body || el === document.documentElement) return false;
-        if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || el.tagName === 'LINK' || el.tagName === 'VIDEO') return false;
-        var cs; try { cs = window.getComputedStyle(el); } catch (e) { return false; }
-        if (!cs || (cs.position !== 'fixed' && !(cs.position === 'absolute' && el.parentNode === document.body))) return false;
-        var z = parseInt(cs.zIndex, 10); if (!(z >= 1000)) return false;
-        if (holdsPlayer(el)) return false;
-        if (PLAYERISH.test(named(el))) return false;
-        var first = el.firstElementChild; if (first && PLAYERISH.test(named(first))) return false;
-        return true;
-      };
-      var sweep = function(){
-        if (!document.body) return;
-        var kids = document.body.children;
-        for (var i = kids.length - 1; i >= 0; i--) {
-          var el = kids[i];
-          if (suspicious(el)) { post({t:'removed', what: el.tagName + ' ' + named(el).slice(0, 60)}); el.remove(); }
-        }
-        var frames = document.querySelectorAll('iframe');
-        for (var j = 0; j < frames.length; j++) {
-          var f = frames[j];
-          if (f.parentNode && f.parentNode !== document.body && suspicious(f)) { post({t:'removed', what: 'IFRAME ' + (f.src || '').slice(0, 60)}); f.remove(); }
-        }
-      };
-      var queued = false;
-      var later = function(){ if (queued) return; queued = true; setTimeout(function(){ queued = false; sweep(); }, 350); };
-      sweep();
-      try { new MutationObserver(later).observe(document.documentElement, {childList: true, subtree: false}); } catch (e) {}
-      try { if (document.body) new MutationObserver(later).observe(document.body, {childList: true, subtree: false}); } catch (e) {}
-      var k = 0; var sv = setInterval(function(){ k++; sweep(); if (k > 20) clearInterval(sv); }, 1500);
-    })();
-    """
-}
-
-/// Content rules for the player's web view: the ad networks these embed pages pull pop-ups, pop-unders and overlays from
-/// are never loaded (third-party requests only). Compiled once, kept by WebKit between launches.
-enum WebShield {
-    private static let identifier = "cigram-player-shield-v2"
-    private static var compiled: WKContentRuleList?
-    private static var waiting: [(WKContentRuleList?) -> Void] = []
-    private static var working = false
-
-    static let blockedHosts = [
-        "doubleclick.net", "googlesyndication.com", "googleadservices.com", "adservice.google.com",
-        "popads.net", "popcash.net", "propellerads.com", "propellerclick.com", "onclickads.net", "onclkds.com",
-        "adsterra.com", "highperformanceformat.com", "profitablecpmrate.com", "profitablegatecpm.com",
-        "effectiveratecpm.com", "effectivegatecpm.com", "exoclick.com", "exosrv.com", "exdynsrv.com", "magsrv.com",
-        "juicyads.com", "trafficjunky.net", "hilltopads.net", "hilltopads.com", "clickadu.com", "adcash.com",
-        "acscdn.com", "a-ads.com", "monetag.com", "galaksion.com", "tsyndicate.com", "realsrv.com", "admaven.com",
-        "ad-maven.com", "bidgear.com", "yllix.com", "displayvertising.com", "pushame.com", "richpush.co",
-        "clickaine.com", "adsco.re", "popmyads.com", "zeropark.com", "mgid.com", "revcontent.com",
-        "outbrain.com", "taboola.com", "adnxs.com", "rubiconproject.com", "pubmatic.com", "criteo.com",
-    ]
-
-    static func ruleJSON() -> String {
-        var rules: [[String: Any]] = []
-        for h in blockedHosts {
-            // the regex WebKit receives is  ^https?://[^/]*doubleclick\.net[:/]  (JSONSerialization escapes the backslash)
-            let escaped = h.replacingOccurrences(of: ".", with: "\\.")
-            let trigger: [String: Any] = ["url-filter": "^https?://[^/]*" + escaped + "[:/]", "load-type": ["third-party"]]
-            let action: [String: Any] = ["type": "block"]
-            rules.append(["trigger": trigger, "action": action])
-        }
-        let data = (try? JSONSerialization.data(withJSONObject: rules)) ?? Data("[]".utf8)
-        return String(data: data, encoding: .utf8) ?? "[]"
-    }
-
-    /// The compiled list (nil when WebKit could not compile it: the player then simply runs without it).
-    static func rules(_ done: @escaping (WKContentRuleList?) -> Void) {
-        if let c = compiled { done(c); return }
-        waiting.append(done)
-        if working { return }
-        working = true
-        guard let store = WKContentRuleListStore.default() else { finish(nil); return }
-        store.lookUpContentRuleList(forIdentifier: identifier) { list, _ in
-            if let l = list { finish(l); return }
-            store.compileContentRuleList(forIdentifier: identifier, encodedContentRuleList: ruleJSON()) { list, error in
-                if let e = error { NSLog("CIGRAM_CHECK player shield not compiled: %@", e.localizedDescription) }
-                finish(list)
-            }
-        }
-    }
-
-    private static func finish(_ list: WKContentRuleList?) {
-        DispatchQueue.main.async {
-            compiled = list
-            working = false
-            let w = waiting
-            waiting.removeAll()
-            w.forEach { $0(list) }
-        }
-    }
-
-    /// Compiles the list early (app start), so the first film does not wait for it.
-    static func prepare() { rules { _ in } }
+private extension Float {
+    /// A rate above zero (the video is moving).
+    var isNormalPositive: Bool { return self > 0.01 }
 }

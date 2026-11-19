@@ -71,6 +71,12 @@ struct CatalogItem {
     let episode: Int
     let created: Double
     let originalTitle: String
+    /// Player extras the admin can publish per film / episode (same fields the Android player reads).
+    let subtitle: String
+    let skipSegments: String
+    let introStart: Double
+    let introEnd: Double
+    let creditsStart: Double
 
     var isEpisode: Bool { return type == "episode" || (!seriesId.isEmpty && type != "series" && episode > 0) }
     var isSeriesHeader: Bool { return type == "series" }
@@ -105,6 +111,11 @@ struct CatalogItem {
         episode = Int(s("episode")) ?? 0
         if let n = r["created_at_ms"] as? NSNumber { created = n.doubleValue } else { created = Double(s("created_at_ms")) ?? 0 }
         originalTitle = s("original_title")
+        subtitle = s("subtitle", "subtitle_url", "subtitles", "sub")
+        skipSegments = s("skip_segments")
+        introStart = ClockText.seconds(s("intro_start", "skip_intro_start"))
+        introEnd = ClockText.seconds(s("intro_end", "skip_intro_end", "intro"))
+        creditsStart = ClockText.seconds(s("credits_start", "outro_start", "end_credits"))
     }
 }
 
