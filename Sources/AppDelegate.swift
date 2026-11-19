@@ -39,6 +39,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate, UITabBarControllerD
         w.rootViewController = t
         w.makeKeyAndVisible()
 
+        _ = HistoryDB.shared                      // opens the history database (moves the old history into it, once)
+        EmbedResolver.shared.warmUp()             // DNS / TLS to the watch servers and the browser process, before the first film
         DownloadUI.install()
         DownloadManager.shared.launch()           // re-attaches the background downloads the system kept
         CatalogStore.shared.start()

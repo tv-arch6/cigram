@@ -58,6 +58,8 @@ final class PlayerViewController: UIViewController, UIGestureRecognizerDelegate,
     var prewarmedNext = false
     /// Set by «تشغيل من الجهاز»: a downloaded title plays from its file. Also used on its own when the phone is offline.
     var forceOffline = false
+    var loadingUI = false
+    var raceJobs: [EmbedJob] = []
     var offlineURL: URL?
     var pipActive = false
     var layerDetached = false
@@ -123,6 +125,8 @@ final class PlayerViewController: UIViewController, UIGestureRecognizerDelegate,
     var audioGroup: AVMediaSelectionGroup?
 
     // MARK: views
+    let backdropView = UIImageView()
+    let backdropShade = UIView()
     let shadeTop = CAGradientLayer()
     let shadeBottom = CAGradientLayer()
     let controls = UIView()
@@ -234,6 +238,15 @@ final class PlayerViewController: UIViewController, UIGestureRecognizerDelegate,
         surface.playerLayer.player = player
         surface.playerLayer.videoGravity = AVLayerVideoGravity.resizeAspect
         view.addSubview(surface)
+        // while the film is being prepared the viewer sees its picture (never a black screen); it fades out at the first frame
+        backdropView.contentMode = .scaleAspectFill
+        backdropView.clipsToBounds = true
+        backdropView.backgroundColor = .black
+        backdropShade.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        backdropShade.isUserInteractionEnabled = false
+        backdropView.isUserInteractionEnabled = false
+        view.addSubview(backdropView)
+        view.addSubview(backdropShade)
         player.automaticallyWaitsToMinimizeStalling = true
         player.allowsExternalPlayback = true
         player.usesExternalPlaybackWhileExternalScreenIsActive = true
@@ -512,6 +525,8 @@ final class PlayerViewController: UIViewController, UIGestureRecognizerDelegate,
         let b = view.bounds
         let s = view.safeAreaInsets
         surface.frame = b
+        backdropView.frame = b
+        backdropShade.frame = b
         controls.frame = b
         shadeTop.frame = CGRect(x: 0, y: 0, width: b.width, height: s.top + 110)
         shadeBottom.frame = CGRect(x: 0, y: b.height - (s.bottom + 170), width: b.width, height: s.bottom + 170)

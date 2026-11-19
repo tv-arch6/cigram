@@ -35,12 +35,12 @@ jobs:
           [ -d "$APP" ] || { echo "::error::Cigram.app not found"; exit 1; }
           /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Info.plist"
           rm -rf Payload && mkdir Payload && cp -R "$APP" Payload/
-          zip -qry Cigram-1.1.5-unsigned.ipa Payload
-          ls -lh Cigram-1.1.5-unsigned.ipa
+          zip -qry Cigram-1.1.6-unsigned.ipa Payload
+          ls -lh Cigram-1.1.6-unsigned.ipa
       - uses: actions/upload-artifact@v6
         with:
           name: Cigram-ipa
-          path: Cigram-1.1.5-unsigned.ipa
+          path: Cigram-1.1.6-unsigned.ipa
 
       - name: Build for the simulator
         if: ${{ inputs.screenshots }}

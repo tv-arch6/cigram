@@ -226,22 +226,28 @@ enum QualityLabel {
 
 // MARK: - why a title does not play (CigramPlaybackError)
 
+/// How the title being played is called in messages: «الفيلم» or «الحلقة» (never «الفيديو»). Set by the player when it starts.
+enum ContentNoun {
+    static var isEpisode = false
+    static var name: String { return isEpisode ? "الحلقة" : "الفيلم" }
+}
+
 enum PlaybackProblem: Int {
     case unknown = 0, invalidURL, unsupportedFormat, missingStream, expiredSource, engine, timeout, offline, server, unreachable
 
     /// Arabic sentence for a category (no technical code).
     var message: String {
         switch self {
-        case .invalidURL: return "رابط الفيديو غير صالح أو لا يشير إلى ملف فيديو."
-        case .unsupportedFormat: return "صيغة هذا الفيديو غير مدعومة على هذا الجهاز."
-        case .missingStream: return "ملف الفيديو غير موجود في المصدر حالياً."
+        case .invalidURL: return "رابط " + ContentNoun.name + " غير صالح."
+        case .unsupportedFormat: return "صيغة " + ContentNoun.name + " غير مدعومة على هذا الجهاز."
+        case .missingStream: return "ملف " + ContentNoun.name + " غير موجود في المصدر حالياً."
         case .expiredSource: return "انتهت صلاحية رابط المصدر أو رفض الخادم الوصول إليه."
-        case .engine: return "تعذّر تشغيل محرك المتصفح (WebKit) اللازم لاستخراج الفيديو."
-        case .timeout: return "تأخر خادم الفيديو في الرد. حاول مرة أخرى بعد قليل."
+        case .engine: return "تعذّر تشغيل محرك المتصفح (WebKit) اللازم لتجهيز " + ContentNoun.name + "."
+        case .timeout: return "تأخر خادم المشاهدة في الرد. حاول مرة أخرى بعد قليل."
         case .offline: return "لا يوجد اتصال بالإنترنت على هذا الجهاز."
-        case .server: return "خادم الفيديو يواجه مشكلة حالياً."
-        case .unreachable: return "تعذّر الوصول إلى خادم الفيديو."
-        case .unknown: return "تعذّر تشغيل الفيديو."
+        case .server: return "خادم المشاهدة يواجه مشكلة حالياً."
+        case .unreachable: return "تعذّر الوصول إلى خادم المشاهدة."
+        case .unknown: return "تعذّر تشغيل " + ContentNoun.name + "."
         }
     }
 
@@ -406,15 +412,15 @@ enum RepairPlan {
     static func giveUpText(_ kind: Kind, httpStatus: Int) -> String {
         switch kind {
         case .httpStatus:
-            if httpStatus == 404 || httpStatus == 410 { return "ملف هذا الفيديو لم يعد موجوداً على الخادم." }
-            if httpStatus == 401 || httpStatus == 403 { return "خادم الفيديو يرفض الطلب (انتهت صلاحية الرابط أو المحتوى غير متاح في منطقتك)." }
-            return "خادم الفيديو لا يستجيب الآن (" + String(httpStatus) + "). حاول بعد قليل."
+            if httpStatus == 404 || httpStatus == 410 { return "ملف " + ContentNoun.name + " لم يعد موجوداً على الخادم." }
+            if httpStatus == 401 || httpStatus == 403 { return "خادم المشاهدة يرفض الطلب (انتهت صلاحية الرابط أو المحتوى غير متاح في منطقتك)." }
+            return "خادم المشاهدة لا يستجيب الآن (" + String(httpStatus) + "). حاول بعد قليل."
         case .network: return "الاتصال بالخادم ينقطع باستمرار. تحقق من الشبكة ثم أعد المحاولة."
-        case .parsing: return "ملف الفيديو تالف أو بصيغة لا يدعمها المشغل."
-        case .decoder: return "جهازك لا يستطيع فك ترميز هذا الفيديو بأي جودة متاحة."
+        case .parsing: return "ملف " + ContentNoun.name + " تالف أو بصيغة لا يدعمها المشغل."
+        case .decoder: return "جهازك لا يستطيع تشغيل " + ContentNoun.name + " بأي جودة متاحة."
         case .audio: return "تعذر تشغيل الصوت على هذا الجهاز. أغلق التطبيقات التي تستخدم الصوت ثم أعد المحاولة."
-        case .stall: return "سرعة الاتصال لا تكفي لتشغيل هذا الفيديو الآن."
-        default: return "تعذر تشغيل الفيديو بعد عدة محاولات إصلاح."
+        case .stall: return "سرعة الاتصال لا تكفي لتشغيل " + ContentNoun.name + " الآن."
+        default: return "تعذر تشغيل " + ContentNoun.name + " بعد عدة محاولات إصلاح."
         }
     }
 }
@@ -473,6 +479,20 @@ enum SmartPlayback {
 
 enum PlayerPrefs {
     private static let d = UserDefaults.standard
+
+    /// The best quality the viewer wants: 0 = automatic (by the connection), else 720, 1080, 1440 (2K) or 2160 (4K). A CAP: the player
+    /// still picks what the connection can carry, up to this height.
+    static var preferredHeight: Int {
+        get { let v = d.integer(forKey: "cg.pl.prefq"); return [0, 720, 1080, 1440, 2160].contains(v) ? v : 0 }
+        set { d.set(newValue, forKey: "cg.pl.prefq") }
+    }
+
+    static func qualityName(_ h: Int) -> String {
+        if h <= 0 { return "تلقائي · حسب سرعة إنترنتك" }
+        if h >= 2160 { return "4K" }
+        if h >= 1440 { return "2K" }
+        return String(h) + "p"
+    }
 
     /// «تخطي المشاهد المحددة» (the admin's skip_segments); on by default.
     static var skipScenes: Bool {
@@ -535,26 +555,40 @@ final class PlaybackStore {
         var at: Double
     }
 
-    private let defaults = UserDefaults.standard
-    private let storeKey = "cg.progress.v1"
-    private var cache: [String: Entry]
+    /// Kept in the history database (HistoryDB), per account; a small memory copy of the rows read so far.
+    private var cache: [String: Entry] = [:]
+    private var cacheAccount = ""
 
-    private init() {
-        if let data = defaults.data(forKey: storeKey), let m = try? JSONDecoder().decode([String: Entry].self, from: data) { cache = m } else { cache = [:] }
-    }
+    private init() {}
 
     static func key(show: Show, episode: CatalogItem?) -> String {
         if let e = episode { return show.key + "|" + String(e.season) + "|" + String(e.episode) }
         return show.key
     }
 
-    func entry(_ key: String) -> Entry? { return cache[key] }
+    private func accountSwitch() -> String {
+        let account = HistoryDB.accountId
+        if account != cacheAccount {
+            cache = [:]
+            cacheAccount = account
+        }
+        return account
+    }
 
-    func isFinished(_ key: String) -> Bool { return cache[key]?.finished ?? false }
+    func entry(_ key: String) -> Entry? {
+        let account = accountSwitch()
+        if let e = cache[key] { return e }
+        guard let r = HistoryDB.shared.progress(account: account, key: key) else { return nil }
+        let e = Entry(pos: r.pos, dur: r.dur, finished: r.finished, at: r.at)
+        cache[key] = e
+        return e
+    }
+
+    func isFinished(_ key: String) -> Bool { return entry(key)?.finished ?? false }
 
     /// Seconds to resume from, or 0 when nothing useful is saved (finished, too early, or too close to the end).
     func resume(_ key: String) -> Double {
-        guard let e = cache[key], !e.finished else { return 0 }
+        guard let e = entry(key), !e.finished else { return 0 }
         if e.pos < 5 { return 0 }
         if e.dur > 0 && e.dur - e.pos <= 15 { return 0 }
         return e.pos
@@ -562,33 +596,29 @@ final class PlaybackStore {
 
     func save(_ key: String, pos: Double, dur: Double) {
         if key.isEmpty || !pos.isFinite || pos < 0 { return }
-        let d = dur.isFinite && dur > 0 ? dur : (cache[key]?.dur ?? 0)
+        let old = entry(key)
+        let d = dur.isFinite && dur > 0 ? dur : (old?.dur ?? 0)
         let done = d > 0 && (d - pos <= 30 || pos / d >= 0.95)
-        cache[key] = Entry(pos: pos, dur: d, finished: done, at: Date().timeIntervalSince1970)
-        flush()
+        write(key, Entry(pos: pos, dur: d, finished: done, at: Date().timeIntervalSince1970))
     }
 
     func markFinished(_ key: String) {
-        var e = cache[key] ?? Entry(pos: 0, dur: 0, finished: true, at: 0)
+        var e = entry(key) ?? Entry(pos: 0, dur: 0, finished: true, at: 0)
         e.finished = true
         e.at = Date().timeIntervalSince1970
-        cache[key] = e
-        flush()
+        write(key, e)
     }
 
     func clearAll() {
+        let account = accountSwitch()
         cache = [:]
-        defaults.removeObject(forKey: storeKey)
+        HistoryDB.shared.clearProgress(account: account)
     }
 
-    private func flush() {
-        if cache.count > 400 {
-            let keep = cache.sorted { $0.value.at > $1.value.at }.prefix(300)
-            var m: [String: Entry] = [:]
-            for (k, v) in keep { m[k] = v }
-            cache = m
-        }
-        if let data = try? JSONEncoder().encode(cache) { defaults.set(data, forKey: storeKey) }
+    private func write(_ key: String, _ e: Entry) {
+        let account = accountSwitch()
+        cache[key] = e
+        HistoryDB.shared.saveProgress(account: account, key: key, row: ProgressRow(pos: e.pos, dur: e.dur, finished: e.finished, at: e.at))
     }
 }
 

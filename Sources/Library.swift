@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 /// «قائمتي» and «شاهدتها مؤخراً» on this iPhone (same idea as the Android app's watch-later list and history).
-final class Library {
+final class Library: NSObject {
     static let shared = Library()
     static let changed = Notification.Name("cigram.library.changed")
 
@@ -29,7 +29,7 @@ final class Library {
 
     func myList() -> [Show] { return myListKeys.compactMap { CatalogStore.shared.show(forKey: $0) } }
 
-    // MARK: شاهدتها مؤخراً
+    // MARK: شاهدتها مؤخراً  (a database, one set per account — see HistoryDB)
 
     struct Entry: Codable {
         let key: String
@@ -38,15 +38,31 @@ final class Library {
         let at: Double
     }
 
+    private var cached: (account: String, list: [Entry])?
+
+    override init() {
+        super.init()
+        NotificationCenter.default.addObserver(self, selector: #selector(accountChanged), name: Account.changed, object: nil)
+    }
+
+    /// The account changed (sign in / sign out): the screens read the new account's history.
+    @objc private func accountChanged() {
+        cached = nil
+        NotificationCenter.default.post(name: Library.changed, object: nil)
+    }
+
     var history: [Entry] {
-        guard let d = defaults.data(forKey: historyKey), let list = try? JSONDecoder().decode([Entry].self, from: d) else { return [] }
+        let account = HistoryDB.accountId
+        if let c = cached, c.account == account { return c.list }
+        let list = HistoryDB.shared.history(account: account).map { Entry(key: $0.key, season: $0.season, episode: $0.episode, at: $0.at) }
+        cached = (account: account, list: list)
         return list
     }
 
     func record(_ show: Show, episode: CatalogItem?) {
-        var list = history.filter { $0.key != show.key }
-        list.insert(Entry(key: show.key, season: episode?.season ?? 0, episode: episode?.episode ?? 0, at: Date().timeIntervalSince1970), at: 0)
-        if let d = try? JSONEncoder().encode(Array(list.prefix(60))) { defaults.set(d, forKey: historyKey) }
+        HistoryDB.shared.addHistory(account: HistoryDB.accountId, key: show.key, season: episode?.season ?? 0, episode: episode?.episode ?? 0,
+                                    at: Date().timeIntervalSince1970)
+        cached = nil
         NotificationCenter.default.post(name: Library.changed, object: nil)
     }
 
@@ -58,7 +74,8 @@ final class Library {
     func recent() -> [Show] { return history.compactMap { CatalogStore.shared.show(forKey: $0.key) } }
 
     func clearHistory() {
-        defaults.removeObject(forKey: historyKey)
+        HistoryDB.shared.clearHistory(account: HistoryDB.accountId)
+        cached = nil
         NotificationCenter.default.post(name: Library.changed, object: nil)
     }
 

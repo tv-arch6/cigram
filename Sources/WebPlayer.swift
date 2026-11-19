@@ -106,7 +106,7 @@ final class WebPlayerViewController: UIViewController, WKNavigationDelegate, WKU
         spinner.hidesWhenStopped = true
         view.addSubview(spinner)
 
-        hint.text = "إذا لم يبدأ الفيديو اضغط «مصدر آخر»"
+        hint.text = "إذا لم يبدأ العرض اضغط «مصدر آخر»"
         hint.textColor = .white
         hint.font = Theme.font(13.5, .semibold)
         hint.textAlignment = .center
@@ -241,7 +241,7 @@ final class WebPlayerViewController: UIViewController, WKNavigationDelegate, WKU
         if !keepShieldState { shieldRetried = false; setShield(true) }
         guard index < sources.count else {
             spinner.stopAnimating()
-            let a = UIAlertController(title: "الفيديو غير متاح الآن", message: "جرّب بعد قليل.", preferredStyle: .alert)
+            let a = UIAlertController(title: (episode == nil ? "الفيلم" : "الحلقة") + " غير متاح الآن", message: "جرّب بعد قليل.", preferredStyle: .alert)
             a.addAction(UIAlertAction(title: "رجوع", style: .cancel) { [weak self] _ in self?.closeTapped() })
             present(a, animated: true)
             return

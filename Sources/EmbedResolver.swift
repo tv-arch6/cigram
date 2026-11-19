@@ -36,13 +36,87 @@ final class EmbedJob {
     }
 }
 
+/// One resolve call: the first answer (the hidden browser or the saved stream of an earlier visit) wins.
+private final class ResolveRun {
+    var settled = false
+    var cacheChecking = false
+    var pendingFailure: String?
+}
+
 final class EmbedResolver {
     static let shared = EmbedResolver()
     private var cache: [String: (stream: ResolvedStream, at: Date)] = [:]
     private let cacheTTL: TimeInterval = 8 * 60
+    private let diskKey = "cg.stream.cache.v1"
+    private let diskTTL: TimeInterval = 6 * 3600
 
     /// Forget a resolved stream (it stopped working: expired link): the next resolve starts again.
-    func invalidate(page: String) { cache[StreamLink.clean(page)] = nil }
+    func invalidate(page: String) {
+        let p = StreamLink.clean(page)
+        cache[p] = nil
+        dropDisk(p)
+    }
+
+    // MARK: saved streams (an earlier visit: the stream is checked with ONE small request, then used at once)
+
+    private func diskEntry(_ page: String) -> ResolvedStream? {
+        guard let all = UserDefaults.standard.dictionary(forKey: diskKey) as? [String: [String: Any]], let e = all[page],
+              let at = e["at"] as? Double, Date().timeIntervalSince1970 - at < diskTTL, let url = e["url"] as? String else { return nil }
+        let alts = (e["alts"] as? [String]) ?? [url]
+        return ResolvedStream(url: url, alternatives: alts.isEmpty ? [url] : alts, subtitles: [], page: page)
+    }
+
+    private func saveDisk(_ s: ResolvedStream) {
+        if s.url.hasPrefix("data:") { return }          // a playlist the app wrote itself is rebuilt, not kept
+        var all = (UserDefaults.standard.dictionary(forKey: diskKey) as? [String: [String: Any]]) ?? [:]
+        all[s.page] = ["url": s.url, "alts": s.alternatives.filter { !$0.hasPrefix("data:") }, "at": Date().timeIntervalSince1970]
+        if all.count > 40 {
+            let oldest = all.sorted { ($0.value["at"] as? Double ?? 0) < ($1.value["at"] as? Double ?? 0) }.prefix(all.count - 40)
+            for (k, _) in oldest { all[k] = nil }
+        }
+        UserDefaults.standard.set(all, forKey: diskKey)
+    }
+
+    private func dropDisk(_ page: String) {
+        guard var all = UserDefaults.standard.dictionary(forKey: diskKey) as? [String: [String: Any]], all[page] != nil else { return }
+        all[page] = nil
+        UserDefaults.standard.set(all, forKey: diskKey)
+    }
+
+    /// True when the saved stream still answers like a stream (background thread).
+    private static func stillPlays(_ stream: String) -> Bool {
+        let clean = StreamLink.clean(stream)
+        guard clean.lowercased().hasPrefix("http") else { return false }
+        var h = StreamLink.headers(of: stream)
+        if h["Accept"] == nil { h["Accept"] = "*/*" }
+        guard let r = StreamNet.get(clean, headers: h, range: "bytes=0-2047", maxBytes: 2048, timeout: 3), r.status >= 200, r.status < 300 else { return false }
+        let head = String(decoding: r.data.prefix(32), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        if head.hasPrefix("#EXTM3U") { return true }
+        let b = [UInt8](r.data)
+        return b.count > 11 && b[4] == 0x66 && b[5] == 0x74 && b[6] == 0x79 && b[7] == 0x70
+    }
+
+    // MARK: warming up (at launch)
+
+    /// The first request to each embed site pays DNS + TLS: done once, in the background, before any film is opened. The browser
+    /// process the hidden pages run in is started too (it takes a moment the first time).
+    func warmUp() {
+        for host in ["vidbolt.pro", "vidfast.vc", "vidnest.fun", "videm.xyz"] {
+            guard let u = URL(string: "https://" + host + "/") else { continue }
+            var req = URLRequest(url: u, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 6)
+            req.httpMethod = "HEAD"
+            URLSession.shared.dataTask(with: req) { _, _, _ in }.resume()
+        }
+        guard let window = (UIApplication.shared.delegate as? AppDelegate)?.window else { return }
+        let cfg = WKWebViewConfiguration()
+        cfg.processPool = StreamSniffer.pool
+        let web = WKWebView(frame: CGRect(x: 0, y: 0, width: 2, height: 2), configuration: cfg)
+        web.alpha = 0.01
+        web.isUserInteractionEnabled = false
+        window.addSubview(web)
+        web.loadHTMLString("<html><body></body></html>", baseURL: nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) { web.removeFromSuperview() }
+    }
 
     /// A title being resolved in advance (the details page, the end of an episode): the player that asks for the same page
     /// joins it instead of starting a second browser, or finds the answer in the cache.
@@ -77,13 +151,41 @@ final class EmbedResolver {
             waiters[page, default: []].append((job: job, done: completion))
             return job
         }
+        let run = ResolveRun()
         let finish: (ResolvedStream?, String) -> Void = { [weak self, weak job] stream, reason in
             DispatchQueue.main.async {
-                guard let job = job, !job.cancelled else { return }
-                if let s = stream { self?.cache[page] = (stream: s, at: Date()) }
+                guard let job = job, !job.cancelled, !run.settled else { return }
+                if stream == nil && run.cacheChecking {          // the saved stream is still being checked: it may answer
+                    run.pendingFailure = reason
+                    return
+                }
+                run.settled = true
+                if let s = stream {
+                    self?.cache[page] = (stream: s, at: Date())
+                    self?.saveDisk(s)
+                    job.sniffer?.abort()                       // another part already found it
+                    job.sniffer = nil
+                }
                 completion(stream, reason)
             }
         }
+        // 1. a stream saved by an earlier visit: one small request says whether it is still good (runs beside the browser)
+        if let saved = diskEntry(page) {
+            run.cacheChecking = true
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                let ok = EmbedResolver.stillPlays(saved.url)
+                DispatchQueue.main.async {
+                    run.cacheChecking = false
+                    if ok {
+                        finish(saved, "")
+                    } else {
+                        self?.dropDisk(page)
+                        if let reason = run.pendingFailure { finish(nil, reason) }       // the browser had already failed
+                    }
+                }
+            }
+        }
+        // 2. the page itself
         DispatchQueue.global(qos: .userInitiated).async { [weak job] in
             guard let job = job, !job.cancelled else { return }
             var found: String?
@@ -98,7 +200,7 @@ final class EmbedResolver {
                 return
             }
             DispatchQueue.main.async { [weak job] in
-                guard let job = job, !job.cancelled else { return }
+                guard let job = job, !job.cancelled, !run.settled else { return }
                 let sniffer = StreamSniffer(page: page, host: host, timeout: timeout) { [weak job] stream, reason in
                     job?.sniffer = nil
                     if let s = stream { finish(s, ""); return }
@@ -138,6 +240,8 @@ final class StreamSniffer: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     }
 
     private static let bridge = "cgs"
+    /// One browser process pool for every hidden page (and the warm-up): the process is already running when a film is opened.
+    static let pool = WKProcessPool()
     private static let queue: OperationQueue = {
         let q = OperationQueue()
         q.maxConcurrentOperationCount = 3
@@ -180,6 +284,7 @@ final class StreamSniffer: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         guard let host = host, let url = URL(string: page) else { finish(nil, "engine: bad page link"); return }
         allowedHost = (url.host ?? "").lowercased()
         let cfg = WKWebViewConfiguration()
+        cfg.processPool = StreamSniffer.pool
         cfg.allowsInlineMediaPlayback = true
         cfg.mediaTypesRequiringUserActionForPlayback = []
         cfg.preferences.javaScriptCanOpenWindowsAutomatically = false
@@ -189,10 +294,11 @@ final class StreamSniffer: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         ucc.addUserScript(WKUserScript(source: StreamSniffer.sniffScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         ucc.addUserScript(WKUserScript(source: StreamSniffer.autoplayScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false))
         // the page is really rendered and played (small, almost transparent, behind everything, takes no touch)
-        let w = WKWebView(frame: CGRect(x: 0, y: 0, width: 320, height: 180), configuration: cfg)
+        // a real page size (players check it), laid just outside the screen: rendered and played, never seen
+        let w = WKWebView(frame: CGRect(x: -340, y: 0, width: 320, height: 180), configuration: cfg)
         w.navigationDelegate = self
         w.uiDelegate = self
-        w.alpha = 0.03
+        w.alpha = 0.02
         w.isUserInteractionEnabled = false
         w.isOpaque = false
         w.backgroundColor = .black
@@ -283,7 +389,7 @@ final class StreamSniffer: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         if cands.count == 1 {
             firstAt = Date()
             // first sign of a video: give the page a moment to ask for the MASTER playlist too
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in self?.decide() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in self?.decide() }
         }
         StreamSniffer.queue.addOperation { [weak self] in
             guard let self = self else { return }
@@ -298,7 +404,7 @@ final class StreamSniffer: NSObject, WKScriptMessageHandler, WKNavigationDelegat
                 let complete = (c.type == .master && c.masterHasAudio) || c.type == .bigMP4
                     || (c.type == .media && (c.content == .muxed || c.content == .audio))
                 // after the waiting window every newly classified candidate may be the one that finishes the decision
-                if complete || Date().timeIntervalSince(self.firstAt) >= 4 { self.decide() }
+                if complete || Date().timeIntervalSince(self.firstAt) >= 2.5 { self.decide() }
             }
         }
     }
@@ -308,7 +414,7 @@ final class StreamSniffer: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     private func classify(_ c: Cand) -> (type: CType, content: SegmentContent, masterAudio: Bool, text: String) {
         let skip: (type: CType, content: SegmentContent, masterAudio: Bool, text: String) = (CType.ignored, SegmentContent.unknown, false, "")
         let h = headers(origin: c.origin)
-        guard let r = StreamNet.get(c.url, headers: h, range: "bytes=0-65535", maxBytes: 65536, timeout: 8),
+        guard let r = StreamNet.get(c.url, headers: h, range: "bytes=0-65535", maxBytes: 65536, timeout: 6),
               r.status >= 200, r.status < 400 else { return skip }
         let type = r.header("Content-Type").lowercased()
         var total: Int64 = -1
@@ -418,7 +524,7 @@ final class StreamSniffer: NSObject, WKScriptMessageHandler, WKNavigationDelegat
                     return
                 }
                 if qState == 1 {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.decide() }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.decide() }
                     return
                 }
             }
@@ -437,9 +543,9 @@ final class StreamSniffer: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         }
         if pick == nil {
             let waited = Date().timeIntervalSince(firstAt)
-            if (pending || audio == nil) && waited < 4 {
+            if (pending || audio == nil) && waited < 2.5 {
                 // the sound playlist is usually asked for right after the picture: give it a little longer
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.decide() }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.decide() }
                 return
             }
             pick = masterNoSound ?? videoOnly ?? unknownMedia ?? loose
@@ -487,12 +593,12 @@ final class StreamSniffer: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         var verified: [Int] = []
         let lock = NSLock()
         let group = DispatchGroup()
-        for height in HLS.ladder {
+        for height in HLS.ladder where height >= 720 {
             group.enter()
             DispatchQueue.global(qos: .userInitiated).async {
                 defer { group.leave() }
                 let url = tpl.replacingOccurrences(of: "{H}", with: String(height))
-                guard let r = StreamNet.get(url, headers: h, maxBytes: 262144, timeout: 6), r.status >= 200, r.status < 300 else { return }
+                guard let r = StreamNet.get(url, headers: h, maxBytes: 262144, timeout: 3), r.status >= 200, r.status < 300 else { return }
                 let text = r.text
                 guard text.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("#EXTM3U"), text.contains("#EXTINF") else { return }
                 guard let first = HLS.firstSegment(text).segment, let abs = StreamLink.absolute(base: url, rel: first) else { return }
@@ -504,7 +610,7 @@ final class StreamSniffer: NSObject, WKScriptMessageHandler, WKNavigationDelegat
                 }
             }
         }
-        _ = group.wait(timeout: .now() + 9)
+        _ = group.wait(timeout: .now() + 3.5)
         lock.lock()
         let heights = verified
         lock.unlock()
@@ -580,13 +686,50 @@ final class StreamSniffer: NSObject, WKScriptMessageHandler, WKNavigationDelegat
           if (viaRequest && !STATIC.test(u)) { seen[u] = 1; post({t:'m', u:u, o:org(), h:0}); }
         } catch (e) {}
       };
+      // the answers of the page's own API calls (JSON / text) are read too: the stream link is often in one of them, before the
+      // player has even asked for it (and without needing the player to start)
+      var URLRE = /https?:\\/\\/[^\\s"'<>\\\\)\\]}]+?\\.(?:m3u8|mp4)(?:\\?[^\\s"'<>\\\\)\\]}]*)?/gi;
+      var scanText = function(t){
+        try {
+          if (!t || t.length > 3000000) return;
+          t = String(t);
+          if (t.indexOf('#EXTM3U') === 0) return;
+          t = t.replace(/\\\\\\//g, '/');
+          var m, n = 0; URLRE.lastIndex = 0;
+          while ((m = URLRE.exec(t)) && n++ < 12) offer(m[0], false);
+        } catch (e) {}
+      };
       try {
         var of = window.fetch;
-        if (of) window.fetch = function(i){ try { offer(typeof i === 'string' ? i : (i && i.url), true); } catch (e) {} return of.apply(this, arguments); };
+        if (of) window.fetch = function(i){
+          var p = of.apply(this, arguments);
+          try {
+            offer(typeof i === 'string' ? i : (i && i.url), true);
+            p.then(function(r){
+              try {
+                var ct = ((r.headers && r.headers.get('content-type')) || '').toLowerCase();
+                if (ct.indexOf('json') >= 0 || ct.indexOf('text') >= 0 || ct.indexOf('javascript') >= 0) r.clone().text().then(scanText).catch(function(){});
+              } catch (e) {}
+            }).catch(function(){});
+          } catch (e) {}
+          return p;
+        };
       } catch (e) {}
       try {
         var ox = XMLHttpRequest.prototype.open;
-        XMLHttpRequest.prototype.open = function(m, u){ try { offer(u, true); } catch (e) {} return ox.apply(this, arguments); };
+        XMLHttpRequest.prototype.open = function(m, u){
+          try {
+            offer(u, true);
+            this.addEventListener('load', function(){
+              try {
+                var rt = this.responseType;
+                if (rt === '' || rt === 'text') scanText(this.responseText);
+                else if (rt === 'json' && this.response) scanText(JSON.stringify(this.response));
+              } catch (e) {}
+            });
+          } catch (e) {}
+          return ox.apply(this, arguments);
+        };
       } catch (e) {}
       try {
         var ds = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'src');

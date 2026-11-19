@@ -31,13 +31,15 @@ extension PlayerViewController {
         wantsPlay = true
         userPaused = false
         lastPos = 0
-        nativeDeadline = Date().addingTimeInterval(45)
+        nativeDeadline = Date().addingTimeInterval(32)
         errorPanel.isHidden = true
+        ContentNoun.isEpisode = episode != nil
         let d = SmartPlayback.decide(NetworkMonitor.shared.conditions())
         smartCap = d.maxHeight
         if !d.reason.isEmpty { showStatus(d.reason, autoHide: 4) }
         resetSubtitles()
         configureSkip()
+        loadBackdrop()
         sleepLeft = 0
         let resume = PlaybackStore.shared.resume(progressKey)
         refreshChips()
@@ -62,8 +64,8 @@ extension PlayerViewController {
         let series = episode != nil
         episodesButton.isHidden = !series
         let hasPrev = previousEpisode() != nil, hasNext = nextEpisode() != nil
-        prevButton.isHidden = !series
-        nextButton.isHidden = !series
+        prevButton.isHidden = !series || loadingUI
+        nextButton.isHidden = !series || loadingUI
         prevButton.isEnabled = hasPrev
         nextButton.isEnabled = hasNext
         prevButton.alpha = hasPrev ? 1 : 0.35
@@ -124,11 +126,30 @@ extension PlayerViewController {
 
     // MARK: - loading a source
 
+    /// While the title is being prepared only the close button, the name and the spinner show (no dead play / skip buttons).
+    func setLoadingUI(_ on: Bool) {
+        loadingUI = on
+        for v in [playButton, backButton, forwardButton, seekBar, timeLabel, leftLabel, chips] as [UIView] { v.isHidden = on }
+        refreshEpisodeButtons()
+        UIView.animate(withDuration: 0.25) {
+            self.backdropView.alpha = on ? 1 : 0
+            self.backdropShade.alpha = on ? 1 : 0
+        }
+    }
+
+    func loadBackdrop() {
+        var url: URL? = show.backdropURL ?? show.posterURL
+        if let e = episode, let u = Show.image(e.backdrop.isEmpty ? e.poster : e.backdrop, size: "w780") { url = u }
+        backdropView.image = nil
+        _ = ImageLoader.shared.load(url, maxPixel: 900) { [weak self] img in self?.backdropView.image = img }
+    }
+
     func showLoading() {
         spinner.startAnimating()
-        showStatus("جارٍ تجهيز الفيديو…")
+        setLoadingUI(true)
+        showStatus("جارٍ تجهيز " + ContentNoun.name + "…")
         loadingTimer?.invalidate()
-        loadingTimer = Timer.scheduledTimer(withTimeInterval: 8, repeats: false) { [weak self] _ in
+        loadingTimer = Timer.scheduledTimer(withTimeInterval: 6, repeats: false) { [weak self] _ in
             guard let self = self, !self.isReady else { return }
             self.webHint.isHidden = false
             UIView.animate(withDuration: 0.2) { self.webHint.alpha = 1 }
@@ -137,6 +158,7 @@ extension PlayerViewController {
 
     func hideLoading() {
         loadingTimer?.invalidate()
+        if loadingUI { setLoadingUI(false) }
         spinner.stopAnimating()
         showStatus(nil)
         UIView.animate(withDuration: 0.2, animations: { self.webHint.alpha = 0 }, completion: { _ in self.webHint.isHidden = true })
@@ -146,6 +168,8 @@ extension PlayerViewController {
     func cancelWork() {
         embedJob?.cancel()
         embedJob = nil
+        for j in raceJobs { j.cancel() }
+        raceJobs = []
         repairTimer?.invalidate()
         stallTimer?.invalidate()
         audioCheckTimer?.invalidate()
@@ -173,22 +197,57 @@ extension PlayerViewController {
             return
         }
         if StreamLink.kind(of: link) == nil && StreamLink.isEmbed(link) {
-            let t: TimeInterval = sourceIndex == 0 ? 28 : 18
-            embedJob = EmbedResolver.shared.resolve(page: link, host: view, timeout: t) { [weak self] stream, reason in
-                guard let self = self, gen == self.loadGeneration, !self.closing else { return }
-                self.embedJob = nil
-                guard let s = stream else { self.sourceFailed(reason: reason); return }
-                self.resolved = s
-                self.triedStreams = []
-                self.originalStream = s.url
-                self.mergeSniffedSubtitles(s.subtitles)
-                self.openStream(s.url, resume: self.pendingResume)
-            }
+            raceSources(from: sourceIndex, gen: gen)
         } else {
             resolved = nil
             triedStreams = []
             originalStream = link
             openStream(link, resume: resume)
+        }
+    }
+
+    /// The first server and the next two are asked TOGETHER; the first one that gives a stream wins and the others are stopped. (Waiting
+    /// for one server to fail before asking the next is what made a slow server delay the film.)
+    func raceSources(from first: Int, gen: Int) {
+        var racers: [Int] = []
+        var i = first
+        while i < sources.count && racers.count < 3 {
+            let l = sources[i]
+            if StreamLink.kind(of: l) == nil && StreamLink.isEmbed(l) { racers.append(i) }
+            i += 1
+        }
+        for j in raceJobs { j.cancel() }
+        raceJobs = []
+        if racers.isEmpty { sourceFailed(reason: "no embed"); return }
+        var pending = racers.count
+        var won = false
+        var lastReason = ""
+        for idx in racers {
+            let page = sources[idx]
+            let job = EmbedResolver.shared.resolve(page: page, host: view, timeout: idx == first ? 22 : 18) { [weak self] stream, reason in
+                guard let self = self, gen == self.loadGeneration, !self.closing, !won else { return }
+                pending -= 1
+                if let s = stream {
+                    won = true
+                    for j in self.raceJobs { j.cancel() }
+                    self.raceJobs = []
+                    self.sourceIndex = idx
+                    self.resolved = s
+                    self.triedStreams = []
+                    self.originalStream = s.url
+                    self.mergeSniffedSubtitles(s.subtitles)
+                    self.refreshChips()
+                    self.openStream(s.url, resume: self.pendingResume)
+                    return
+                }
+                lastReason = reason
+                if pending == 0 {
+                    self.raceJobs = []
+                    self.sourceIndex = racers.last ?? first        // sourceFailed moves on to the one after the last asked
+                    self.sourceFailed(reason: lastReason)
+                }
+            }
+            raceJobs.append(job)
         }
     }
 
@@ -254,7 +313,7 @@ extension PlayerViewController {
         errorPanel.isHidden = true
         sourceIndex = 0
         incidentAttempt = 0
-        nativeDeadline = Date().addingTimeInterval(45)
+        nativeDeadline = Date().addingTimeInterval(32)
         wantsPlay = true
         userPaused = false
         if let r = resolved { EmbedResolver.shared.invalidate(page: r.page) }
@@ -884,6 +943,8 @@ extension PlayerViewController {
     /// by hand wins over the smart cap (not over the repair ceiling: a decoder that gave up cannot be forced).
     func applyQualityLimits(to it: AVPlayerItem) {
         var cap = manualHeight > 0 ? manualHeight : smartCap
+        let wanted = PlayerPrefs.preferredHeight                         // «الجودة المفضلة»: the highest the viewer wants
+        if manualHeight == 0 && wanted > 0 { cap = cap > 0 ? min(cap, wanted) : wanted }
         if qualityCeiling > 0 { cap = cap > 0 ? min(cap, qualityCeiling) : qualityCeiling }
         if cap > 0 { it.preferredMaximumResolution = CGSize(width: CGFloat(cap) * 2.4, height: CGFloat(cap)) }
         else { it.preferredMaximumResolution = CGSize.zero }

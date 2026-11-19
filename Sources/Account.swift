@@ -155,6 +155,7 @@ final class Account {
     func deleteAccount(password: String, _ done: @escaping Done) {
         call("POST", "/account/delete", body: ["password": password, "confirm": "DELETE"]) { status, json in
             if (json?["success"] as? Bool) == true || (json?["ok"] as? Bool) == true {
+                HistoryDB.shared.wipe(account: HistoryDB.accountId)          // the account's history goes with it
                 self.clear()
                 done(true, (json?["message"] as? String) ?? "تم حذف الحساب")
             } else {
@@ -567,7 +568,7 @@ final class AccountHeaderView: UIView {
 }
 
 final class AccountViewController: UITableViewController {
-    private enum Row { case myList, recent, downloads, support, requests, telegram, email, notifications, fonts, cache, history, terms, logout, delete }
+    private enum Row { case myList, recent, downloads, support, requests, telegram, email, notifications, quality, fonts, cache, history, terms, logout, delete }
     private var sections: [(String, [Row])] = []
     private let header = AccountHeaderView()
     private var headerWidth: CGFloat = 0
@@ -625,7 +626,7 @@ final class AccountViewController: UITableViewController {
         if Account.shared.isLoggedIn {
             sections = [("المحتوى", [.myList, .recent, .downloads]),
                         ("الدعم والتواصل", [.support, .requests, .telegram, .email]),
-                        ("الإعدادات", [.notifications, .fonts, .cache, .history]),
+                        ("الإعدادات", [.notifications, .quality, .fonts, .cache, .history]),
                         ("عن التطبيق", [.terms]),
                         ("الحساب", [.logout, .delete])]
         } else {
@@ -788,6 +789,8 @@ final class AccountViewController: UITableViewController {
         case .notifications:
             let s = notificationsOn.map { $0 ? "مفعّلة · الجديد ورسائل الدعم" : "متوقفة — اضغط لتفعيلها" } ?? ""
             c.set("الإشعارات", sub: s, symbol: "bell.badge.fill", tint: Theme.red)
+        case .quality:
+            c.set("جودة التشغيل المفضلة", sub: PlayerPrefs.qualityName(PlayerPrefs.preferredHeight) + " · من 720p إلى 4K", symbol: "slider.horizontal.3", tint: blue)
         case .fonts:
             c.set("الخطوط", sub: "خط الترجمة · المعاينة · لون الخلفية · لون النص", symbol: "textformat", tint: purple)
         case .cache:
@@ -831,6 +834,7 @@ final class AccountViewController: UITableViewController {
                     }
                 }
             }
+        case .quality: chooseQuality()
         case .fonts: navigationController?.pushViewController(FontsViewController(), animated: true)
         case .cache:
             URLCache.shared.removeAllCachedResponses()
@@ -848,6 +852,22 @@ final class AccountViewController: UITableViewController {
             }
         case .delete: askDelete()
         }
+    }
+
+    /// «جودة التشغيل المفضلة»: the highest quality the player may use (it still follows the connection up to it).
+    private func chooseQuality() {
+        let a = UIAlertController(title: "جودة التشغيل المفضلة", message: "هي الحد الأعلى: يختار المشغّل أفضل جودة تتحمّلها سرعة إنترنتك حتى اختيارك.", preferredStyle: .actionSheet)
+        for h in [0, 720, 1080, 1440, 2160] {
+            let t = (PlayerPrefs.preferredHeight == h ? "✓ " : "") + (h == 0 ? PlayerPrefs.qualityName(0) : "حتى " + PlayerPrefs.qualityName(h))
+            a.addAction(UIAlertAction(title: t, style: .default) { [weak self] _ in
+                PlayerPrefs.preferredHeight = h
+                self?.tableView.reloadData()
+            })
+        }
+        a.addAction(UIAlertAction(title: "إغلاق", style: .cancel))
+        a.popoverPresentationController?.sourceView = view
+        a.popoverPresentationController?.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1)
+        present(a, animated: true)
     }
 
     private func askDelete() {

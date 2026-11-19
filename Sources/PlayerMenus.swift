@@ -41,6 +41,7 @@ extension PlayerViewController {
 
     func qualityValue() -> String {
         if manualHeight > 0 { return QualityLabel.label(height: manualHeight) }
+        if PlayerPrefs.preferredHeight > 0 { return "تلقائي · حتى " + PlayerPrefs.qualityName(PlayerPrefs.preferredHeight) }
         return "تلقائي"
     }
 
@@ -70,7 +71,7 @@ extension PlayerViewController {
             guard let self = self else { return [] }
             var items: [SheetItem] = []
             items.append(.section("الصورة"))
-            items.append(.action(title: "جودة الفيديو", value: self.qualityValue(), handler: { [weak self] in
+            items.append(.action(title: "الجودة", value: self.qualityValue(), handler: { [weak self] in
                 guard let self = self else { return }
                 self.sheet?.push(self.qualityPage())
             }))
@@ -117,7 +118,7 @@ extension PlayerViewController {
     // MARK: - quality
 
     func qualityPage() -> SheetPage {
-        return SheetPage(title: "جودة الفيديو") { [weak self] in
+        return SheetPage(title: "الجودة") { [weak self] in
             guard let self = self else { return [] }
             var items: [SheetItem] = []
             let offered = self.offeredQualities()
@@ -135,14 +136,25 @@ extension PlayerViewController {
             if offered.isEmpty {
                 let k = StreamLink.kind(of: self.currentStream)
                 if self.masterInfo == nil && (k == .hls || k == nil) && self.isReady && self.variants.isEmpty {
-                    items.append(.note("جارٍ البحث عن دقات أخرى لهذا الفيلم… أعد فتح القائمة بعد لحظات"))
+                    items.append(.note("جارٍ البحث عن دقات أخرى لـ" + (self.episode != nil ? "هذه الحلقة" : "هذا الفيلم") + "… أعد فتح القائمة بعد لحظات"))
                 } else {
-                    items.append(.note("هذا الفيلم متوفر بدقة واحدة فقط"))
+                    items.append(.note((self.episode != nil ? "هذه الحلقة متوفرة" : "هذا الفيلم متوفر") + " بدقة واحدة فقط"))
                 }
             }
             if self.smartCap > 0 {
                 items.append(.note("الجودة التلقائية محدودة بـ " + String(self.smartCap) + "p حالياً (البطارية / الحرارة / توفير البيانات). اختيارك اليدوي يتجاوز هذا الحد."))
             }
+            items.append(.section("الجودة المفضلة"))
+            for h in [0, 720, 1080, 1440, 2160] {
+                let title = h == 0 ? PlayerPrefs.qualityName(0) : "حتى " + PlayerPrefs.qualityName(h)
+                items.append(.choice(title: title, selected: PlayerPrefs.preferredHeight == h, handler: { [weak self] in
+                    PlayerPrefs.preferredHeight = h
+                    if let it = self?.item { self?.applyQualityLimits(to: it) }
+                    self?.refreshChips()
+                    self?.sheet?.reload()
+                }))
+            }
+            items.append(.note("هي الحد الأعلى: يختار المشغّل أفضل جودة تتحمّلها سرعة إنترنتك من 720p حتى 4K دون أن يتجاوز اختيارك، وتُطبَّق على كل الأفلام والمسلسلات."))
             return items
         }
     }
@@ -195,7 +207,7 @@ extension PlayerViewController {
                 self?.pickSubtitleFile()
             }))
             if self.subChoices.isEmpty {
-                items.append(.note("لا توجد ترجمة لهذا العنوان. يمكنك اختيار ملف ترجمة (.srt أو .vtt) من تطبيق «الملفات» ليُعرض فوق الفيديو، ويُحفظ توقيته لهذا الملف فقط."))
+                items.append(.note("لا توجد ترجمة لهذا العنوان. يمكنك اختيار ملف ترجمة (.srt أو .vtt) من تطبيق «الملفات» ليُعرض على الشاشة، ويُحفظ توقيته لهذا الملف فقط."))
             }
             return items
         }
@@ -260,7 +272,7 @@ extension PlayerViewController {
         return SheetPage(title: "مسار الصوت") { [weak self] in
             guard let self = self else { return [] }
             guard let g = self.audioGroup, let it = self.item, g.options.count > 0 else {
-                return [.note("هذا الفيديو فيه مسار صوت واحد فقط.")]
+                return [.note("فيه مسار صوت واحد فقط.")]
             }
             let current = it.currentMediaSelection.selectedMediaOption(in: g)
             var items: [SheetItem] = []
@@ -332,7 +344,7 @@ extension PlayerViewController {
         guard i >= 0, i < sources.count else { return }
         sourceIndex = i
         incidentAttempt = 0
-        nativeDeadline = Date().addingTimeInterval(45)
+        nativeDeadline = Date().addingTimeInterval(32)
         errorPanel.isHidden = true
         wantsPlay = true
         userPaused = false
@@ -340,7 +352,7 @@ extension PlayerViewController {
     }
 
     func infoPage() -> SheetPage {
-        return SheetPage(title: "معلومات الفيديو") { [weak self] in
+        return SheetPage(title: "معلومات العرض") { [weak self] in
             guard let self = self else { return [] }
             var items: [SheetItem] = []
             let link = self.currentStream.hasPrefix("data:") ? (self.resolved?.page ?? "") : self.currentStream

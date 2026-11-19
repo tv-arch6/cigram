@@ -117,7 +117,7 @@ enum DownloadUI {
             }
         }
         if NetworkMonitor.shared.isExpensive {
-            let a = UIAlertController(title: "أنت على بيانات الجوال", message: "تنزيل الفيديو قد يستهلك حجماً كبيراً من باقتك. هل تريد المتابعة؟",
+            let a = UIAlertController(title: "أنت على بيانات الجوال", message: "التنزيل قد يستهلك حجماً كبيراً من باقتك. هل تريد المتابعة؟",
                                       preferredStyle: .alert)
             a.addAction(UIAlertAction(title: "تنزيل", style: .default) { _ in go() })
             a.addAction(UIAlertAction(title: "إلغاء", style: .cancel))
@@ -143,7 +143,7 @@ enum DownloadUI {
             a.addAction(UIAlertAction(title: "رجوع", style: .cancel))
             vc.present(a, animated: true)
         case .delete:
-            let a = UIAlertController(title: "حذف التنزيل", message: "يُحذف الفيديو من هذا الآيفون ولا يعود متاحاً بدون إنترنت.", preferredStyle: .alert)
+            let a = UIAlertController(title: "حذف التنزيل", message: "يُحذف الملف المحمّل من هذا الآيفون ولا يعود متاحاً بدون إنترنت.", preferredStyle: .alert)
             a.addAction(UIAlertAction(title: "حذف", style: .destructive) { _ in DownloadManager.shared.delete(id) })
             a.addAction(UIAlertAction(title: "إلغاء", style: .cancel))
             vc.present(a, animated: true)
@@ -238,7 +238,7 @@ enum DownloadUI {
     static func install() {
         DownloadManager.shared.qualityPicker = { record, options, done in
             guard let top = topViewController() else { done(options.first); return }
-            let a = UIAlertController(title: "جودة التنزيل", message: record.title + "\nالجودة الأعلى تحتاج مساحة أكبر. الفيديو يُحفظ كما هو بلا تحويل.",
+            let a = UIAlertController(title: "جودة التنزيل", message: record.title + "\nالجودة الأعلى تحتاج مساحة أكبر. يُحفظ بجودته الأصلية بلا تحويل.",
                                       preferredStyle: .actionSheet)
             for (i, o) in options.enumerated() {
                 var t = o.label.isEmpty ? "الأصلية" : o.label
