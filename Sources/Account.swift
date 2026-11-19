@@ -567,7 +567,7 @@ final class AccountHeaderView: UIView {
 }
 
 final class AccountViewController: UITableViewController {
-    private enum Row { case myList, recent, support, requests, telegram, email, notifications, cache, history, terms, logout, delete }
+    private enum Row { case myList, recent, downloads, support, requests, telegram, email, notifications, fonts, cache, history, terms, logout, delete }
     private var sections: [(String, [Row])] = []
     private let header = AccountHeaderView()
     private var headerWidth: CGFloat = 0
@@ -593,6 +593,7 @@ final class AccountViewController: UITableViewController {
         nc.addObserver(self, selector: #selector(reload), name: Account.changed, object: nil)
         nc.addObserver(self, selector: #selector(reload), name: Library.changed, object: nil)
         nc.addObserver(self, selector: #selector(reload), name: SupportCenter.changed, object: nil)
+        nc.addObserver(self, selector: #selector(downloadsChanged), name: DownloadManager.changed, object: nil)
         nc.addObserver(self, selector: #selector(checkNotifications), name: UIApplication.didBecomeActiveNotification, object: nil)
         reload()
         Account.shared.refresh()
@@ -622,14 +623,15 @@ final class AccountViewController: UITableViewController {
 
     @objc private func reload() {
         if Account.shared.isLoggedIn {
-            sections = [("المحتوى", [.myList, .recent]),
+            sections = [("المحتوى", [.myList, .recent, .downloads]),
                         ("الدعم والتواصل", [.support, .requests, .telegram, .email]),
-                        ("الإعدادات", [.notifications, .cache, .history]),
+                        ("الإعدادات", [.notifications, .fonts, .cache, .history]),
                         ("عن التطبيق", [.terms]),
                         ("الحساب", [.logout, .delete])]
         } else {
             // a visitor sees the welcome card, the support entry (locked: it needs an e-mail account) and the terms only
-            sections = [("الدعم والتواصل", [.support, .requests, .telegram]),
+            sections = [("المحتوى", [.downloads]),
+                        ("الدعم والتواصل", [.support, .requests, .telegram]),
                         ("عن التطبيق", [.terms])]
         }
         headerWidth = 0
@@ -637,6 +639,9 @@ final class AccountViewController: UITableViewController {
         tableView.tableFooterView = footer()
         tableView.reloadData()
     }
+
+    /// The «التنزيلات» row shows the counts: only the table is refreshed (not the header).
+    @objc private func downloadsChanged() { tableView.reloadData() }
 
     @objc private func checkNotifications() {
         UNUserNotificationCenter.current().getNotificationSettings { s in
@@ -761,6 +766,12 @@ final class AccountViewController: UITableViewController {
             c.set("قائمتي", sub: String(Library.shared.myListKeys.count) + " عنوان محفوظ", symbol: "bookmark.fill", tint: Theme.red)
         case .recent:
             c.set("شاهدتها مؤخراً", sub: String(Library.shared.history.count) + " عنوان", symbol: "clock.arrow.circlepath", tint: blue)
+        case .downloads:
+            let done = DownloadManager.shared.completedCount
+            let busy = DownloadManager.shared.records.filter { $0.state != .completed && $0.state != .failed }.count
+            var sub = "مشاهدة بدون إنترنت"
+            if done > 0 || busy > 0 { sub = String(done) + " مكتمل" + (busy > 0 ? " · " + String(busy) + " قيد التنزيل" : "") }
+            c.set("التنزيلات", sub: sub, symbol: "arrow.down.circle.fill", tint: green)
         case .support:
             let unread = SupportCenter.shared.unread
             c.set("الدعم والتواصل", sub: logged ? (unread > 0 ? "رد جديد من فريق سيكرام" : "المشاكل · الاقتراحات · التواصل مع المطوّر")
@@ -777,6 +788,8 @@ final class AccountViewController: UITableViewController {
         case .notifications:
             let s = notificationsOn.map { $0 ? "مفعّلة · الجديد ورسائل الدعم" : "متوقفة — اضغط لتفعيلها" } ?? ""
             c.set("الإشعارات", sub: s, symbol: "bell.badge.fill", tint: Theme.red)
+        case .fonts:
+            c.set("الخطوط", sub: "خط الترجمة · المعاينة · لون الخلفية · لون النص", symbol: "textformat", tint: purple)
         case .cache:
             c.set("مسح ذاكرة الصور", sub: "يحرّر المساحة؛ الصور تُحمّل من جديد", symbol: "photo.on.rectangle", tint: grey)
             c.showsChevron = false
@@ -801,6 +814,7 @@ final class AccountViewController: UITableViewController {
         switch sections[ip.section].1[ip.row] {
         case .myList: openMyList()
         case .recent: openRecent()
+        case .downloads: navigationController?.pushViewController(DownloadsViewController(), animated: true)
         case .support: openSupport()
         case .requests: openRequests()
         case .telegram: openTelegram()
@@ -817,6 +831,7 @@ final class AccountViewController: UITableViewController {
                     }
                 }
             }
+        case .fonts: navigationController?.pushViewController(FontsViewController(), animated: true)
         case .cache:
             URLCache.shared.removeAllCachedResponses()
             ImageLoader.shared.clear()

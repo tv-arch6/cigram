@@ -81,7 +81,7 @@ extension PlayerViewController {
             items.append(.segments(title: "أبعاد الشاشة", labels: ["ملاءمة", "ملء الشاشة", "تمديد"], selected: self.resizeMode, handler: { [weak self] i in
                 self?.setResize(i)
             }))
-            items.append(.section("الصوت والترجمة"))
+            items.append(.section("الترجمة"))
             items.append(.action(title: "الترجمة", value: self.subtitleValue(), handler: { [weak self] in
                 guard let self = self else { return }
                 self.sheet?.push(self.subtitlesPage())
@@ -93,10 +93,6 @@ extension PlayerViewController {
             items.append(.action(title: "حجم الترجمة", value: self.sizeNames()[min(3, max(0, PlayerPrefs.subtitleSize))], handler: { [weak self] in
                 guard let self = self else { return }
                 self.sheet?.push(self.subtitleSizePage())
-            }))
-            items.append(.action(title: "مسار الصوت", value: self.audioValue(), handler: { [weak self] in
-                guard let self = self else { return }
-                self.sheet?.push(self.audioPage())
             }))
             items.append(.section("التشغيل"))
             if self.episode != nil {
@@ -113,19 +109,6 @@ extension PlayerViewController {
             items.append(.action(title: "مؤقت الإيقاف", value: self.sleepText(), handler: { [weak self] in
                 guard let self = self else { return }
                 self.sheet?.push(self.sleepPage())
-            }))
-            items.append(.action(title: "المصدر", value: self.sources.count > 1 ? String(self.sourceIndex + 1) + " / " + String(self.sources.count) : "—", handler: { [weak self] in
-                guard let self = self else { return }
-                self.sheet?.push(self.sourcesPage())
-            }))
-            items.append(.section("أخرى"))
-            items.append(.action(title: "معلومات الفيديو", value: "", handler: { [weak self] in
-                guard let self = self else { return }
-                self.sheet?.push(self.infoPage())
-            }))
-            items.append(.action(title: "المشغّل البديل (المتصفح)", value: "", handler: { [weak self] in
-                self?.sheet?.close(animated: false)
-                self?.openWebPlayer(auto: false)
             }))
             return items
         }

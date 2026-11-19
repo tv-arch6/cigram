@@ -16,6 +16,8 @@ extension PlayerViewController {
         progressKey = PlaybackStore.key(show: show, episode: episode)
         speedKey = SmartPlayback.seriesKey(isSeries: show.isSeries, id: show.key, title: show.title)
         speed = SmartPlayback.speed(forKey: speedKey, fallback: PlayerPrefs.speed)
+        // a downloaded title plays from its file when asked to (or when the phone is offline); anything else streams
+        offlineURL = (forceOffline || !NetworkMonitor.shared.isOnline) ? DownloadManager.shared.offlineURL(show: show, episode: episode) : nil
         sources = buildSources()
         sourceIndex = 0
         resolved = nil
@@ -25,6 +27,7 @@ extension PlayerViewController {
         qualityCeiling = 0
         incidentAttempt = 0
         everPlayed = false
+        prewarmedNext = false
         wantsPlay = true
         userPaused = false
         lastPos = 0
@@ -70,6 +73,7 @@ extension PlayerViewController {
 
     /// The published link first, then the same title on the other embed servers (TMDB id).
     func buildSources() -> [String] {
+        if let u = offlineURL { return [u.absoluteString] }
         var out: [String] = []
         let own = (episode?.video ?? (show.isSeries ? "" : show.head.video)).replacingOccurrences(of: "vidbolt.xyz", with: "vidbolt.pro")
         if own.hasPrefix("http") { out.append(own) }
@@ -162,7 +166,7 @@ extension PlayerViewController {
         refreshChips()
         if PlaybackProblem.validate(link) == .invalidURL { sourceFailed(reason: "invalid link"); return }
         if let k = StreamLink.kind(of: link), !k.playableOnIOS { sourceFailed(reason: "unsupported format " + k.rawValue); return }
-        if !NetworkMonitor.shared.isOnline {
+        if offlineURL == nil && !NetworkMonitor.shared.isOnline {
             restartAfterNetwork = true
             hideLoading()
             showStatus(PlaybackProblem.offline.message + " — يبدأ التشغيل تلقائياً عند عودته")
@@ -188,7 +192,19 @@ extension PlayerViewController {
         }
     }
 
+    /// The downloaded file would not play: the title streams instead (the file stays in «التنزيلات»).
+    func fallbackFromOffline() {
+        offlineURL = nil
+        forceOffline = false
+        showStatus("تعذّر تشغيل الملف المحمّل — يُشغَّل من الإنترنت", autoHide: 4)
+        sources = buildSources()
+        sourceIndex = 0
+        incidentAttempt = 0
+        startSource(resume: lastPos)
+    }
+
     func sourceFailed(reason: String) {
+        if offlineURL != nil { fallbackFromOffline(); return }
         NSLog("CIGRAM_CHECK player source %ld failed: %@", sourceIndex, reason)
         advanceSource(problem: PlaybackProblem.fromResolver(reason, online: NetworkMonitor.shared.isOnline))
     }
@@ -273,6 +289,10 @@ extension PlayerViewController {
         guard let asset = PlayerAsset.make(stream) else { sourceFailed(reason: "bad link"); return }
         let it = AVPlayerItem(asset: asset)
         it.audioTimePitchAlgorithm = AVAudioTimePitchAlgorithm.spectral
+        // fastest possible start: begin on the first quality that fits, do not wait for a safety buffer (the player waits
+        // again, to avoid stutter, after 8 s of steady playing: see timeTick)
+        if #available(iOS 14.0, *) { it.startsOnFirstEligibleVariant = true }
+        player.automaticallyWaitsToMinimizeStalling = false
         applyQualityLimits(to: it)
         let out = AVPlayerItemLegibleOutput()
         out.suppressesPlayerRendering = true
@@ -451,9 +471,18 @@ extension PlayerViewController {
         }
         let playing = player.rate > 0.01
         // the repair ladder starts again from the top after 8 s of steady playing
-        if let since = playingSince, Date().timeIntervalSince(since) > 8, incidentAttempt > 0 {
-            incidentAttempt = 0
-            showStatus(nil)
+        if let since = playingSince, Date().timeIntervalSince(since) > 8 {
+            if incidentAttempt > 0 {
+                incidentAttempt = 0
+                showStatus(nil)
+            }
+            if !player.automaticallyWaitsToMinimizeStalling { player.automaticallyWaitsToMinimizeStalling = true }
+        }
+        // the next episode is resolved in advance (its first server), so it opens at once
+        if episode != nil && offlineURL == nil && !prewarmedNext && duration > 120 && duration - t < 90, let n = nextEpisode() {
+            prewarmedNext = true
+            let link = n.video.replacingOccurrences(of: "vidbolt.xyz", with: "vidbolt.pro")
+            if link.hasPrefix("http") { EmbedResolver.shared.prewarm(page: link) }
         }
         // «موقّت النوم»: only counts while the player is on screen
         if sleepLeft > 0 && playing && UIApplication.shared.applicationState == .active {
@@ -662,6 +691,7 @@ extension PlayerViewController {
     }
 
     func handleFailure(domain: String, code: Int, http: Int) {
+        if offlineURL != nil { fallbackFromOffline(); return }
         NSLog("CIGRAM_CHECK player failed: %@ %ld http=%ld", domain, code, http)
         let kind = RepairPlan.kind(domain: domain, code: code, http: http)
         repairIncident(kind: kind, http: http)
@@ -800,7 +830,7 @@ extension PlayerViewController {
     // MARK: - qualities
 
     func fetchQualities() {
-        if masterInfo != nil { return }
+        if masterInfo != nil || offlineURL != nil { return }
         let stream = originalStream
         let k = StreamLink.kind(of: stream)
         guard k == .hls || k == nil || stream.hasPrefix("data:application/vnd.apple.mpegurl") else { refreshChips(); return }
@@ -1036,16 +1066,7 @@ extension PlayerViewController {
         }
         let sizes: [CGFloat] = [16, 20, 25, 31]
         let size = sizes[min(3, max(0, PlayerPrefs.subtitleSize))] * (isPortrait ? 0.8 : 1)
-        let style = NSMutableParagraphStyle()
-        style.alignment = .center
-        let attrs: [NSAttributedString.Key: Any] = [
-            NSAttributedString.Key.font: Theme.font(size, .semibold),
-            NSAttributedString.Key.foregroundColor: UIColor.white,
-            NSAttributedString.Key.strokeColor: UIColor.black,
-            NSAttributedString.Key.strokeWidth: -3.0,
-            NSAttributedString.Key.paragraphStyle: style,
-        ]
-        subtitleLabel.attributedText = NSAttributedString(string: t, attributes: attrs)
+        subtitleLabel.attributedText = SubtitleStyle.attributed(t, size: size)   // the font / colours chosen in «حسابي ← الخطوط»
         subtitleLabel.isHidden = false
         layoutSubtitle()
     }
@@ -1163,6 +1184,29 @@ extension PlayerViewController {
         completionHandler(true)
     }
 
+    func pictureInPictureControllerWillStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) { pipActive = true }
+    func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) { pipActive = false }
+    func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
+        pipActive = false
+    }
+
+    // MARK: - the app goes to the background: the film keeps playing
+
+    /// The app leaves the front while a layer shows the video: iOS would stop the stream. Detaching the layer lets the sound go
+    /// on (the background-audio mode); when Picture in Picture is on, it keeps the picture too and nothing is detached.
+    @objc func appDidEnterBackground() {
+        guard !pipActive, !layerDetached, !inWebFallback else { return }
+        surface.playerLayer.player = nil
+        layerDetached = true
+    }
+
+    @objc func appWillEnterForeground() {
+        if layerDetached {
+            surface.playerLayer.player = player
+            layerDetached = false
+        }
+    }
+
     // MARK: - closing
 
     @objc func closeTapped() { closeNow(animated: true) }
@@ -1183,6 +1227,7 @@ extension PlayerViewController {
         if brightnessTouched { UIScreen.main.brightness = originalBrightness }
         UIApplication.shared.isIdleTimerDisabled = false
         sheet?.close(animated: false)
+        leaveOrientation()                       // the app turns back to portrait with the player
         dismiss(animated: animated)
     }
 }

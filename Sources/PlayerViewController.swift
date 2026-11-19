@@ -54,6 +54,13 @@ final class PlayerViewController: UIViewController, UIGestureRecognizerDelegate,
     var everPlayed = false
     var inWebFallback = false
     var closing = false
+    var orientationEntered = false
+    var prewarmedNext = false
+    /// Set by «تشغيل من الجهاز»: a downloaded title plays from its file. Also used on its own when the phone is offline.
+    var forceOffline = false
+    var offlineURL: URL?
+    var pipActive = false
+    var layerDetached = false
 
     // MARK: repair
     var incidentAttempt = 0
@@ -173,10 +180,21 @@ final class PlayerViewController: UIViewController, UIGestureRecognizerDelegate,
         self.episode = episode
         super.init(nibName: nil, bundle: nil)
         modalPresentationCapturesStatusBarAppearance = true
+        // landscape is allowed (and the player opens in it) from now on; leaving puts the app back to portrait
+        AppOrientation.enterPlayer()
+        orientationEntered = true
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
+    func leaveOrientation() {
+        if orientationEntered {
+            orientationEntered = false
+            AppOrientation.leavePlayer()
+        }
+    }
+
     deinit {
+        if orientationEntered { AppOrientation.leavePlayer() }
         NotificationCenter.default.removeObserver(self)
         hideTimer?.invalidate()
         repairTimer?.invalidate()
@@ -241,6 +259,8 @@ final class PlayerViewController: UIViewController, UIGestureRecognizerDelegate,
         nc.addObserver(self, selector: #selector(routeChanged(_:)), name: AVAudioSession.routeChangeNotification, object: nil)
         nc.addObserver(self, selector: #selector(becameActive), name: UIApplication.didBecomeActiveNotification, object: nil)
         nc.addObserver(self, selector: #selector(networkChanged), name: NetworkMonitor.changed, object: nil)
+        nc.addObserver(self, selector: #selector(appDidEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
+        nc.addObserver(self, selector: #selector(appWillEnterForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
 
         addTimeObserver()
         setupRemoteCommands()
@@ -768,6 +788,7 @@ final class PlayerViewController: UIViewController, UIGestureRecognizerDelegate,
         else { subsChip.setText("الترجمة · إيقاف") }
         resizeChip.setText(["ملاءمة", "ملء الشاشة", "تمديد"][min(2, max(0, resizeMode))])
         sourceChip.setText(sources.count > 1 ? "المصدر " + String(sourceIndex + 1) + "/" + String(sources.count) : "إعادة التحميل")
+        sourceChip.isHidden = offlineURL != nil
         view.setNeedsLayout()
     }
 

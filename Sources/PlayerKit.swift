@@ -314,6 +314,11 @@ final class PlayerSheet: UIView {
     private let closeButton = UIButton(type: .system)
     private let scroll = TouchScroll()
     private var pages: [SheetPage] = []
+    /// The scroll position of every page the viewer left to open a sub page: going back returns to the same place.
+    private var savedOffsets: [CGFloat] = []
+    private var pendingOffset: CGFloat?
+    /// Where the main page was left the last time the panel closed (reopening the gear returns there).
+    private static var lastRootOffset: CGFloat = 0
     private var builtWidth: CGFloat = -1
     private var dirty = true
     private var closing = false
@@ -360,6 +365,8 @@ final class PlayerSheet: UIView {
 
     func show(_ page: SheetPage, in parent: UIView) {
         pages = [page]
+        savedOffsets = []
+        pendingOffset = PlayerSheet.lastRootOffset
         closing = false
         frame = parent.bounds
         autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -377,17 +384,18 @@ final class PlayerSheet: UIView {
     }
 
     func push(_ page: SheetPage) {
+        savedOffsets.append(scroll.contentOffset.y)
         pages.append(page)
+        pendingOffset = 0
         dirty = true
-        scroll.contentOffset = .zero
         setNeedsLayout()
     }
 
     func pop() {
         if pages.count > 1 {
             pages.removeLast()
+            pendingOffset = savedOffsets.popLast() ?? 0
             dirty = true
-            scroll.contentOffset = .zero
             setNeedsLayout()
         } else {
             close()
@@ -403,6 +411,7 @@ final class PlayerSheet: UIView {
     func close(animated: Bool = true) {
         if closing { return }
         closing = true
+        PlayerSheet.lastRootOffset = pages.count > 1 ? (savedOffsets.first ?? 0) : scroll.contentOffset.y
         let landscape = bounds.width > bounds.height
         let to = landscape ? CGAffineTransform(translationX: -panel.frame.width, y: 0) : CGAffineTransform(translationX: 0, y: panel.frame.height)
         let finish = { [weak self] in
@@ -460,7 +469,8 @@ final class PlayerSheet: UIView {
     private func rebuildRows() {
         dirty = false
         builtWidth = scroll.bounds.width
-        let offset = scroll.contentOffset
+        let offsetY = pendingOffset ?? scroll.contentOffset.y
+        pendingOffset = nil
         for v in scroll.subviews { v.removeFromSuperview() }
         guard let page = pages.last else { return }
         let w = scroll.bounds.width
@@ -611,7 +621,7 @@ final class PlayerSheet: UIView {
         }
         scroll.contentSize = CGSize(width: w, height: y + bottomInset + 12)
         let maxOffset = max(0, scroll.contentSize.height - scroll.bounds.height)
-        scroll.contentOffset = CGPoint(x: 0, y: min(offset.y, maxOffset))
+        scroll.contentOffset = CGPoint(x: 0, y: min(max(0, offsetY), maxOffset))
     }
 }
 

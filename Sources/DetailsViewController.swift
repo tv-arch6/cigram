@@ -14,6 +14,7 @@ final class DetailsViewController: UIViewController, UITableViewDataSource, UITa
     private let dislikeButton = ActionButton(title: "لم يعجبني", symbol: "hand.thumbsdown")
     private let shareButton = ActionButton(title: "مشاركة", symbol: "square.and.arrow.up")
     private let playButton = UIButton(type: .system)
+    private let downloadPanel = DownloadPanel()
     private var headerWidth: CGFloat = 0
 
     init(show: Show) {
@@ -49,6 +50,13 @@ final class DetailsViewController: UIViewController, UITableViewDataSource, UITa
         seasonControl.addTarget(self, action: #selector(seasonChanged), for: .valueChanged)
         refreshActions()
         NotificationCenter.default.addObserver(self, selector: #selector(refreshActions), name: Library.changed, object: nil)
+        // «تنزيل»: the film's panel and every episode's button follow the download manager (live progress)
+        downloadPanel.onAction = { [weak self] a in self?.movieDownload(a) }
+        DownloadManager.shared.launch()
+        let nc = NotificationCenter.default
+        nc.addObserver(self, selector: #selector(refreshDownloads), name: DownloadManager.changed, object: nil)
+        nc.addObserver(self, selector: #selector(refreshDownloads), name: DownloadManager.progressed, object: nil)
+        refreshDownloads()
     }
 
     /// The header is built for the page's real width, and again when it changes (rotation, iPad split view).
@@ -123,6 +131,13 @@ final class DetailsViewController: UIViewController, UITableViewDataSource, UITa
         playButton.alpha = playButton.isEnabled ? 1 : 0.4
         box.addSubview(playButton)
         y = playButton.frame.maxY + 14
+        if !show.isSeries {
+            // a film is downloaded from here; a series episode from its own row
+            downloadPanel.frame = CGRect(x: 16, y: y, width: w - 32, height: DownloadPanel.height)
+            box.addSubview(downloadPanel)
+            y = downloadPanel.frame.maxY + 14
+            refreshDownloads()
+        }
 
         let actions = UIStackView(arrangedSubviews: [listButton, likeButton, dislikeButton, shareButton])
         actions.axis = .horizontal
@@ -220,6 +235,40 @@ final class DetailsViewController: UIViewController, UITableViewDataSource, UITa
 
     @objc private func playMain() { Router.play(show, episode: nil, from: self) }
 
+    // MARK: downloads
+
+    @objc private func refreshDownloads() {
+        if !show.isSeries {
+            let r = DownloadManager.shared.record(for: show, episode: nil)
+            downloadPanel.update(r, speed: r.map { DownloadManager.shared.speed(of: $0.id) } ?? 0)
+        }
+        for c in table.visibleCells {
+            if let cell = c as? EpisodeCell, let e = cell.item { cell.downloadButton.update(DownloadManager.shared.record(for: show, episode: e)) }
+        }
+    }
+
+    private func movieDownload(_ a: DownloadAction) {
+        if a == .start { DownloadUI.start(show: show, episode: nil, from: self); return }
+        guard let r = DownloadManager.shared.record(for: show, episode: nil) else { return }
+        DownloadUI.act(a, id: r.id, from: self)
+    }
+
+    private func episodeDownload(_ e: CatalogItem, source: UIView) {
+        if let r = DownloadManager.shared.record(for: show, episode: e) {
+            DownloadUI.menu(for: r, from: self, source: source)       // the actions of its state
+        } else {
+            DownloadUI.start(show: show, episode: e, from: self)
+        }
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // the stream of what «شاهد الآن» opens is found while the viewer reads the page: the player then starts at once
+        let ep = show.isSeries ? (Library.shared.lastEpisode(of: show) ?? show.episodes.first) : nil
+        let link = (ep?.video ?? (show.isSeries ? "" : show.head.video)).replacingOccurrences(of: "vidbolt.xyz", with: "vidbolt.pro")
+        if link.hasPrefix("http") { EmbedResolver.shared.prewarm(page: link) }
+    }
+
     // MARK: table — 0 episodes, 1 «أعمال مشابهة»
 
     func numberOfSections(in t: UITableView) -> Int { return 2 }
@@ -248,6 +297,12 @@ final class DetailsViewController: UIViewController, UITableViewDataSource, UITa
         let e = episodes[ip.row]
         let last = Library.shared.lastEpisode(of: show)
         c.configure(e, poster: show.posterURL, current: last?.season == e.season && last?.episode == e.episode)
+        c.item = e
+        c.downloadButton.update(DownloadManager.shared.record(for: show, episode: e))
+        c.onDownload = { [weak self, weak c] in
+            guard let self = self, let c = c else { return }
+            self.episodeDownload(e, source: c.downloadButton)
+        }
         return c
     }
 
@@ -266,6 +321,10 @@ final class EpisodeCell: UITableViewCell {
     private let sub = UILabel()
     private let glyph = UIImageView(image: UIImage(systemName: "play.circle.fill"))
     private var shown: URL?
+    /// «تنزيل» of this episode (state and progress ring); a tap starts the download or opens its actions.
+    let downloadButton = DownloadCellButton()
+    var item: CatalogItem?
+    var onDownload: (() -> Void)?
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -284,17 +343,21 @@ final class EpisodeCell: UITableViewCell {
         sub.textColor = Theme.text3
         sub.textAlignment = .right
         glyph.tintColor = .white
-        [thumb, title, sub, glyph].forEach { contentView.addSubview($0) }
+        [thumb, title, sub, glyph, downloadButton].forEach { contentView.addSubview($0) }
+        downloadButton.addTarget(self, action: #selector(downloadTapped), for: .touchUpInside)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    @objc private func downloadTapped() { onDownload?() }
 
     override func layoutSubviews() {
         super.layoutSubviews()
         let w = contentView.bounds.width
         thumb.frame = CGRect(x: w - 16 - 96, y: 9, width: 96, height: 56)
-        title.frame = CGRect(x: 52, y: 14, width: w - 52 - 124, height: 22)
-        sub.frame = CGRect(x: 52, y: 38, width: w - 52 - 124, height: 18)
-        glyph.frame = CGRect(x: 16, y: 23, width: 28, height: 28)
+        downloadButton.frame = CGRect(x: 8, y: 17, width: 40, height: 40)
+        glyph.frame = CGRect(x: 52, y: 25, width: 24, height: 24)
+        title.frame = CGRect(x: 84, y: 14, width: w - 84 - 124, height: 22)
+        sub.frame = CGRect(x: 84, y: 38, width: w - 84 - 124, height: 18)
     }
 
     func configure(_ e: CatalogItem, poster: URL?, current: Bool) {

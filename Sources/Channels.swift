@@ -469,34 +469,50 @@ final class PassThroughView: UIView {
 
 // MARK: - the live player
 
-final class ChannelPlayerViewController: UIViewController, UIGestureRecognizerDelegate {
+/// A live channel in the app's own player (like the film player): portrait and landscape, Picture in Picture, AirPlay, and the
+/// sound keeps playing when the app goes to the background (a layer showing HLS video is detached then, which is what lets
+/// iOS keep the stream alive; PiP keeps the picture instead when it is on).
+final class ChannelPlayerViewController: UIViewController, UIGestureRecognizerDelegate, AVPictureInPictureControllerDelegate {
     private let channels: [Channel]
     private var index: Int
-    private let playerVC = AVPlayerViewController()
-    private let bar = PassThroughView()
+    private let player = AVPlayer()
+    private let surface = PlayerSurface()
+    private let bar = UIView()
     private let shade = CAGradientLayer()
     private let close = UIButton(type: .system)
     private let name = UILabel()
     private let live = UILabel()
     private let prevButton = UIButton(type: .system)
     private let nextButton = UIButton(type: .system)
+    private let pipButton = UIButton(type: .system)
+    private let rotateButton = UIButton(type: .system)
+    private let routeView = AVRoutePickerView()
+    private let playButton = UIButton(type: .system)
     private let report = UIButton(type: .system)
     private let status = UILabel()
     private let spinner = UIActivityIndicatorView(style: .large)
     private var observation: NSKeyValueObservation?
     private var bufferObservation: NSKeyValueObservation?
+    private var controlObservation: NSKeyValueObservation?
     private var hideTimer: Timer?
     private var wantsPlay = true
     private var stallTimer: Timer?
+    private var pip: AVPictureInPictureController?
+    private var pipActive = false
+    private var detached = false
+    private var orientationEntered = false
 
     init(channels: [Channel], index: Int) {
         self.channels = channels
         self.index = index
         super.init(nibName: nil, bundle: nil)
+        AppOrientation.enterPlayer()
+        orientationEntered = true
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
     deinit {
+        if orientationEntered { AppOrientation.leavePlayer() }
         NotificationCenter.default.removeObserver(self)
         hideTimer?.invalidate()
         stallTimer?.invalidate()
@@ -506,27 +522,29 @@ final class ChannelPlayerViewController: UIViewController, UIGestureRecognizerDe
     override var prefersHomeIndicatorAutoHidden: Bool { return true }
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask { return .allButUpsideDown }
 
+    private func icon(_ names: [String], _ size: CGFloat) -> UIImage? { return PlayerIcon.image(names, size: size, weight: .bold) }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
+        view.semanticContentAttribute = .forceLeftToRight
         let session = AVAudioSession.sharedInstance()
         DispatchQueue.global(qos: .userInitiated).async {
             try? session.setCategory(.playback, mode: .moviePlayback, options: [])
             try? session.setActive(true)
         }
-        addChild(playerVC)
-        playerVC.view.frame = view.bounds
-        playerVC.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        playerVC.view.backgroundColor = .black
-        view.addSubview(playerVC.view)
-        playerVC.didMove(toParent: self)
-        playerVC.allowsPictureInPicturePlayback = true
-        if #available(iOS 14.2, *) { playerVC.canStartPictureInPictureAutomaticallyFromInline = true }
+        surface.backgroundColor = .black
+        surface.playerLayer.player = player
+        surface.playerLayer.videoGravity = AVLayerVideoGravity.resizeAspect
+        view.addSubview(surface)
+        player.automaticallyWaitsToMinimizeStalling = true
+        player.allowsExternalPlayback = true
+        player.usesExternalPlaybackWhileExternalScreenIsActive = true
 
         shade.colors = [UIColor.black.withAlphaComponent(0.75).cgColor, UIColor.clear.cgColor]
         bar.layer.addSublayer(shade)
         view.addSubview(bar)
-        close.setImage(UIImage(systemName: "xmark", withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .bold)), for: .normal)
+        close.setImage(icon(["xmark"], 17), for: .normal)
         close.tintColor = .white
         close.accessibilityLabel = "إغلاق"
         close.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
@@ -540,13 +558,31 @@ final class ChannelPlayerViewController: UIViewController, UIGestureRecognizerDe
         live.textAlignment = .center
         live.layer.cornerRadius = 6
         live.clipsToBounds = true
-        prevButton.setImage(UIImage(systemName: "chevron.right"), for: .normal)
-        nextButton.setImage(UIImage(systemName: "chevron.left"), for: .normal)
+        prevButton.setImage(icon(["chevron.right"], 17), for: .normal)
+        nextButton.setImage(icon(["chevron.left"], 17), for: .normal)
         prevButton.accessibilityLabel = "القناة السابقة"
         nextButton.accessibilityLabel = "القناة التالية"
         [prevButton, nextButton].forEach { $0.tintColor = .white }
         prevButton.addTarget(self, action: #selector(prevTapped), for: .touchUpInside)
         nextButton.addTarget(self, action: #selector(nextTapped), for: .touchUpInside)
+        pipButton.setImage(icon(["pip.enter", "rectangle.on.rectangle"], 18), for: .normal)
+        pipButton.tintColor = .white
+        pipButton.accessibilityLabel = "صورة داخل صورة"
+        pipButton.addTarget(self, action: #selector(pipTapped), for: .touchUpInside)
+        pipButton.isHidden = !AVPictureInPictureController.isPictureInPictureSupported()
+        rotateButton.setImage(icon(["arrow.triangle.2.circlepath", "rotate.right"], 17), for: .normal)
+        rotateButton.tintColor = .white
+        rotateButton.accessibilityLabel = "تدوير الشاشة"
+        rotateButton.addTarget(self, action: #selector(rotateTapped), for: .touchUpInside)
+        routeView.tintColor = .white
+        routeView.activeTintColor = Theme.red
+        routeView.prioritizesVideoDevices = true
+        playButton.setImage(PlayerIcon.image(["pause.fill"], size: 34, weight: .bold), for: .normal)
+        playButton.tintColor = .white
+        playButton.backgroundColor = UIColor(white: 0.05, alpha: 0.55)
+        playButton.layer.cornerRadius = 34
+        playButton.accessibilityLabel = "تشغيل أو إيقاف"
+        playButton.addTarget(self, action: #selector(playTapped), for: .touchUpInside)
         report.setTitle("بلّغ عن القناة", for: .normal)
         report.setTitleColor(.white, for: .normal)
         report.backgroundColor = Theme.red
@@ -561,45 +597,76 @@ final class ChannelPlayerViewController: UIViewController, UIGestureRecognizerDe
         status.isHidden = true
         spinner.color = .white
         spinner.hidesWhenStopped = true
-        [close, prevButton, nextButton].forEach { bar.addSubview($0) }
-        [name, live].forEach { bar.addSubview($0) }
+        for v in [close, prevButton, nextButton, rotateButton, pipButton] as [UIView] { bar.addSubview(v) }
+        bar.addSubview(routeView)
+        bar.addSubview(name)
+        bar.addSubview(live)
+        view.addSubview(playButton)
         view.addSubview(spinner)
         view.addSubview(status)
         view.addSubview(report)
-        // the player's own controls keep working: this tap only shows the bar, it never swallows the touch
-        let tap = UITapGestureRecognizer(target: self, action: #selector(showBar))
-        tap.cancelsTouchesInView = false
+        // a tap only shows / hides the bar; it never swallows a touch of a button
+        let tap = UITapGestureRecognizer(target: self, action: #selector(toggleBar))
         tap.delegate = self
         view.addGestureRecognizer(tap)
         let nc = NotificationCenter.default
         nc.addObserver(self, selector: #selector(audioInterrupted(_:)), name: AVAudioSession.interruptionNotification, object: nil)
         nc.addObserver(self, selector: #selector(becameActive), name: UIApplication.didBecomeActiveNotification, object: nil)
-        nc.addObserver(self, selector: #selector(stalled), name: .AVPlayerItemPlaybackStalled, object: nil)
+        nc.addObserver(self, selector: #selector(stalled(_:)), name: NSNotification.Name.AVPlayerItemPlaybackStalled, object: nil)
+        nc.addObserver(self, selector: #selector(appDidEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
+        nc.addObserver(self, selector: #selector(appWillEnterForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
+        controlObservation = player.observe(\.timeControlStatus, options: [.new]) { [weak self] _, _ in
+            DispatchQueue.main.async { self?.refreshPlay() }
+        }
+        setupPictureInPicture()
         play()
     }
 
-    func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { return true }
-
     func gestureRecognizer(_ g: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        return !(touch.view is UIControl)
+        var v: UIView? = touch.view
+        while let x = v {
+            if x is UIControl || x === routeView { return false }
+            v = x.superview
+        }
+        return true
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        let w = view.bounds.width
-        let top = view.safeAreaInsets.top
-        let side = max(10, max(view.safeAreaInsets.left, view.safeAreaInsets.right))
-        bar.frame = CGRect(x: 0, y: 0, width: w, height: top + 56)
-        shade.frame = CGRect(x: 0, y: 0, width: w, height: top + 80)
-        close.frame = CGRect(x: side, y: top + 6, width: 44, height: 44)
-        nextButton.frame = CGRect(x: side + 46, y: top + 6, width: 44, height: 44)
-        prevButton.frame = CGRect(x: side + 90, y: top + 6, width: 44, height: 44)
-        live.frame = CGRect(x: w - side - 48, y: top + 18, width: 44, height: 20)
-        name.frame = CGRect(x: side + 140, y: top + 8, width: max(40, w - side * 2 - 196), height: 40)
-        spinner.center = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
-        status.frame = CGRect(x: 24, y: view.bounds.midY - 60, width: w - 48, height: 70)
-        report.frame = CGRect(x: (w - 180) / 2, y: view.bounds.midY + 18, width: 180, height: 44)
+        let b = view.bounds
+        let w = b.width
+        let s = view.safeAreaInsets
+        let top = s.top
+        let side = max(10, max(s.left, s.right))
+        surface.frame = b
+        bar.frame = CGRect(x: 0, y: 0, width: w, height: top + 86)
+        shade.frame = CGRect(x: 0, y: 0, width: w, height: top + 110)
+        close.frame = CGRect(x: side, y: top + 4, width: 44, height: 44)
+        nextButton.frame = CGRect(x: side + 46, y: top + 4, width: 44, height: 44)
+        prevButton.frame = CGRect(x: side + 90, y: top + 4, width: 44, height: 44)
+        var rx = w - side
+        live.frame = CGRect(x: rx - 44, y: top + 16, width: 44, height: 20)
+        rx -= 50
+        rotateButton.frame = CGRect(x: rx - 44, y: top + 4, width: 44, height: 44)
+        rx -= 44
+        if !pipButton.isHidden {
+            pipButton.frame = CGRect(x: rx - 44, y: top + 4, width: 44, height: 44)
+            rx -= 44
+        }
+        routeView.frame = CGRect(x: rx - 44, y: top + 4, width: 44, height: 44)
+        name.frame = CGRect(x: side, y: top + 52, width: max(40, w - side * 2), height: 26)
+        playButton.frame = CGRect(x: b.midX - 34, y: b.midY - 34, width: 68, height: 68)
+        spinner.center = CGPoint(x: b.midX, y: b.midY)
+        status.frame = CGRect(x: 24, y: b.midY - 60, width: w - 48, height: 70)
+        report.frame = CGRect(x: (w - 180) / 2, y: b.midY + 18, width: 180, height: 44)
     }
+
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: nil) { [weak self] _ in self?.showBar() }
+    }
+
+    // MARK: playing a channel
 
     private func play(backup: Bool = false) {
         let ch = channels[index]
@@ -634,11 +701,12 @@ final class ChannelPlayerViewController: UIViewController, UIGestureRecognizerDe
         let asset = AVURLAsset(url: url, options: headers.isEmpty ? nil : ["AVURLAssetHTTPHeaderFieldsKey": headers])
         let item = AVPlayerItem(asset: asset)
         item.preferredForwardBufferDuration = 4
+        if #available(iOS 14.0, *) { item.startsOnFirstEligibleVariant = true }
         spinner.startAnimating()
         observation = item.observe(\.status, options: [.new]) { [weak self] it, _ in
             DispatchQueue.main.async {
                 guard let self = self else { return }
-                if it.status == .readyToPlay { self.spinner.stopAnimating(); return }
+                if it.status == .readyToPlay { self.spinner.stopAnimating(); self.refreshPlay(); return }
                 guard it.status == .failed else { return }
                 if !backup && !ch.backup.isEmpty && ch.backup != ch.url {
                     NSLog("CIGRAM_CHECK channel %@ main link failed, trying the backup", ch.name)
@@ -651,67 +719,154 @@ final class ChannelPlayerViewController: UIViewController, UIGestureRecognizerDe
         bufferObservation = item.observe(\.isPlaybackLikelyToKeepUp, options: [.new]) { [weak self] it, _ in
             DispatchQueue.main.async {
                 guard let self = self else { return }
-                if it.isPlaybackLikelyToKeepUp { self.spinner.stopAnimating(); if self.wantsPlay { self.playerVC.player?.play() } }
+                if it.isPlaybackLikelyToKeepUp { self.spinner.stopAnimating(); if self.wantsPlay { self.player.play() }; self.refreshPlay() }
             }
         }
-        let player = AVPlayer(playerItem: item)
-        player.automaticallyWaitsToMinimizeStalling = true
-        playerVC.player = player
+        player.replaceCurrentItem(with: item)
         player.play()
+        refreshPlay()
         showBar()
     }
 
     private func fail(_ text: String) {
         spinner.stopAnimating()
-        playerVC.player?.pause()
+        player.pause()
         status.text = text
         status.isHidden = false
         report.isHidden = false
+        refreshPlay()
         showBar()
     }
 
-    @objc private func showBar() {
-        UIView.animate(withDuration: 0.2) { self.bar.alpha = 1 }
-        hideTimer?.invalidate()
-        hideTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: false) { [weak self] _ in
-            UIView.animate(withDuration: 0.3) { self?.bar.alpha = 0 }
+    private func refreshPlay() {
+        let playing = wantsPlay && player.timeControlStatus != .paused
+        playButton.setImage(PlayerIcon.image([playing ? "pause.fill" : "play.fill"], size: 34, weight: .bold), for: .normal)
+        playButton.isHidden = spinner.isAnimating && wantsPlay
+        if player.timeControlStatus == .playing { spinner.stopAnimating() }
+    }
+
+    // MARK: bar
+
+    @objc private func toggleBar() {
+        if bar.alpha > 0.5 && playButton.alpha > 0.5 {
+            hideBar()
+        } else {
+            showBar()
         }
     }
+
+    private func hideBar() {
+        hideTimer?.invalidate()
+        UIView.animate(withDuration: 0.25) { self.bar.alpha = 0; self.playButton.alpha = 0 }
+    }
+
+    @objc private func showBar() {
+        UIView.animate(withDuration: 0.2) { self.bar.alpha = 1; self.playButton.alpha = 1 }
+        hideTimer?.invalidate()
+        hideTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: false) { [weak self] _ in
+            guard let self = self, self.player.timeControlStatus != .paused else { return }
+            self.hideBar()
+        }
+    }
+
+    @objc private func playTapped() {
+        if wantsPlay && player.timeControlStatus != .paused {
+            wantsPlay = false
+            player.pause()
+        } else {
+            wantsPlay = true
+            resume(force: true)
+        }
+        refreshPlay()
+        showBar()
+    }
+
+    @objc private func rotateTapped() {
+        AppOrientation.rotate(from: view)
+        showBar()
+    }
+
+    // MARK: Siri / a call / the background
 
     /// Siri, a call, an alarm: iOS pauses the stream. When it ends, the live picture comes back by itself.
     @objc private func audioInterrupted(_ n: Notification) {
         guard let raw = n.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
               let type = AVAudioSession.InterruptionType(rawValue: raw), type == .ended else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.resume() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.resume(force: false) }
     }
 
-    @objc private func becameActive() { DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.resume() } }
+    @objc private func becameActive() { DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.resume(force: false) } }
 
-    private func resume() {
-        guard wantsPlay, status.isHidden, let p = playerVC.player, p.timeControlStatus == .paused else { return }
+    private func resume(force: Bool) {
+        guard wantsPlay, status.isHidden, player.currentItem != nil, force || player.timeControlStatus == .paused else { return }
         try? AVAudioSession.sharedInstance().setActive(true)
         // a live stream: jump back to the live edge rather than resuming minutes behind
-        if let range = p.currentItem?.seekableTimeRanges.last?.timeRangeValue, range.duration.seconds > 30 {
-            p.seek(to: CMTimeRangeGetEnd(range))
+        if let range = player.currentItem?.seekableTimeRanges.last?.timeRangeValue, range.duration.seconds > 30 {
+            player.seek(to: CMTimeRangeGetEnd(range))
         }
-        p.play()
+        player.play()
+    }
+
+    /// The app leaves the front: the layer that shows the video is detached so iOS keeps the stream (and its sound) alive; Picture in
+    /// Picture, when it is on, keeps the picture too.
+    @objc private func appDidEnterBackground() {
+        guard !pipActive, !detached else { return }
+        surface.playerLayer.player = nil
+        detached = true
+    }
+
+    @objc private func appWillEnterForeground() {
+        if detached {
+            surface.playerLayer.player = player
+            detached = false
+        }
     }
 
     /// A stream that stalls for 12 s is nudged (a fresh request of the live playlist), like the Android player.
     @objc private func stalled(_ n: Notification) {
-        guard (n.object as? AVPlayerItem) === playerVC.player?.currentItem else { return }
+        guard (n.object as? AVPlayerItem) === player.currentItem else { return }
         spinner.startAnimating()
+        refreshPlay()
         stallTimer?.invalidate()
         stallTimer = Timer.scheduledTimer(withTimeInterval: 12, repeats: false) { [weak self] _ in
-            guard let self = self, let item = self.playerVC.player?.currentItem, !item.isPlaybackLikelyToKeepUp, self.status.isHidden else { return }
+            guard let self = self, let item = self.player.currentItem, !item.isPlaybackLikelyToKeepUp, self.status.isHidden else { return }
             self.play()
         }
     }
 
+    // MARK: Picture in Picture
+
+    private func setupPictureInPicture() {
+        guard AVPictureInPictureController.isPictureInPictureSupported() else { return }
+        pip = AVPictureInPictureController(playerLayer: surface.playerLayer)
+        pip?.delegate = self
+        if #available(iOS 14.2, *) { pip?.canStartPictureInPictureAutomaticallyFromInline = true }
+    }
+
+    @objc private func pipTapped() {
+        guard let p = pip else { return }
+        if p.isPictureInPictureActive { p.stopPictureInPicture() } else { p.startPictureInPicture() }
+    }
+
+    func pictureInPictureControllerWillStartPictureInPicture(_ c: AVPictureInPictureController) { pipActive = true }
+    func pictureInPictureControllerDidStopPictureInPicture(_ c: AVPictureInPictureController) { pipActive = false }
+    func pictureInPictureController(_ c: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) { pipActive = false }
+    func pictureInPictureController(_ c: AVPictureInPictureController,
+                                    restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void) {
+        completionHandler(true)
+    }
+
+    // MARK: actions
+
     @objc private func closeTapped() {
         wantsPlay = false
-        playerVC.player?.pause()
-        playerVC.player = nil
+        player.pause()
+        player.replaceCurrentItem(with: nil)
+        if pip?.isPictureInPictureActive == true { pip?.stopPictureInPicture() }
+        if orientationEntered {
+            orientationEntered = false
+            AppOrientation.leavePlayer()
+        }
         dismiss(animated: true)
     }
 

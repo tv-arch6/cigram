@@ -2,7 +2,7 @@ import UIKit
 import AVFoundation
 
 @UIApplicationMain
-final class AppDelegate: UIResponder, UIApplicationDelegate {
+final class AppDelegate: UIResponder, UIApplicationDelegate, UITabBarControllerDelegate {
     var window: UIWindow?
     private var tabs: UITabBarController?
 
@@ -34,10 +34,13 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
             nav(SearchViewController(), title: "البحث", icon: "magnifyingglass", selected: "magnifyingglass"),
             nav(AccountViewController(), title: "حسابي", icon: "person.crop.circle", selected: "person.crop.circle.fill"),
         ]
+        t.delegate = self
         tabs = t
         w.rootViewController = t
         w.makeKeyAndVisible()
 
+        DownloadUI.install()
+        DownloadManager.shared.launch()           // re-attaches the background downloads the system kept
         CatalogStore.shared.start()
         ChannelStore.shared.start()
         SupportCenter.shared.start()
@@ -53,7 +56,27 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 
+    /// Portrait everywhere, landscape too while a player is open or the channels tab is selected (see AppOrientation).
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        return AppOrientation.mask
+    }
+
+    func tabBarController(_ tabBarController: UITabBarController, didSelect viewController: UIViewController) {
+        AppOrientation.channelsTabChanged(tabBarController.selectedIndex == 1)
+    }
+
+    /// The system finished downloads while the app was not running: the sessions are opened again and it is told when to stop.
+    func application(_ application: UIApplication, handleEventsForBackgroundURLSession identifier: String, completionHandler: @escaping () -> Void) {
+        DownloadManager.shared.backgroundCompletion = completionHandler
+        DownloadManager.shared.launch()
+    }
+
+    func applicationWillTerminate(_ application: UIApplication) {
+        DownloadManager.shared.flush()
+    }
+
     func applicationDidBecomeActive(_ application: UIApplication) {
+        DownloadManager.shared.becameActive()
         CatalogStore.shared.startPulse()          // a title the admin adds appears within ~20 s
         RequestsStore.shared.refresh()
         if case .tampered = Integrity.check(), !(window?.rootViewController is BlockedViewController) {
@@ -62,6 +85,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationDidEnterBackground(_ application: UIApplication) {
+        DownloadManager.shared.flush()
         CatalogStore.shared.stopPulse()
         Notifier.shared.schedule()
     }

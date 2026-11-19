@@ -44,6 +44,25 @@ final class EmbedResolver {
     /// Forget a resolved stream (it stopped working: expired link): the next resolve starts again.
     func invalidate(page: String) { cache[StreamLink.clean(page)] = nil }
 
+    /// A title being resolved in advance (the details page, the end of an episode): the player that asks for the same page
+    /// joins it instead of starting a second browser, or finds the answer in the cache.
+    private var prewarming: [String: EmbedJob] = [:]
+    private var waiters: [String: [(job: EmbedJob, done: (ResolvedStream?, String) -> Void)]] = [:]
+
+    /// Starts resolving `page` now (nothing is shown). The hidden browser lives on the app window, not on a screen that may close.
+    func prewarm(page rawPage: String) {
+        let page = StreamLink.clean(rawPage)
+        guard cache[page] == nil, prewarming[page] == nil, StreamLink.kind(of: page) == nil, StreamLink.isEmbed(page),
+              let host = (UIApplication.shared.delegate as? AppDelegate)?.window else { return }
+        prewarming[page] = resolve(page: page, host: host, timeout: 26) { [weak self] stream, reason in
+            guard let self = self else { return }
+            self.prewarming[page] = nil
+            let list = self.waiters[page] ?? []
+            self.waiters[page] = nil
+            for w in list where !w.job.cancelled { w.done(stream, reason) }
+        }
+    }
+
     /// Resolves in the background; `completion` runs on the main thread. `host` is the view the hidden browser lives in.
     @discardableResult
     func resolve(page rawPage: String, host: UIView, timeout: TimeInterval = 28,
@@ -52,6 +71,10 @@ final class EmbedResolver {
         let job = EmbedJob()
         if let c = cache[page], Date().timeIntervalSince(c.at) < cacheTTL {
             DispatchQueue.main.async { if !job.cancelled { completion(c.stream, "") } }
+            return job
+        }
+        if prewarming[page] != nil {
+            waiters[page, default: []].append((job: job, done: completion))
             return job
         }
         let finish: (ResolvedStream?, String) -> Void = { [weak self, weak job] stream, reason in
@@ -260,7 +283,7 @@ final class StreamSniffer: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         if cands.count == 1 {
             firstAt = Date()
             // first sign of a video: give the page a moment to ask for the MASTER playlist too
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in self?.decide() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in self?.decide() }
         }
         StreamSniffer.queue.addOperation { [weak self] in
             guard let self = self else { return }
@@ -275,7 +298,7 @@ final class StreamSniffer: NSObject, WKScriptMessageHandler, WKNavigationDelegat
                 let complete = (c.type == .master && c.masterHasAudio) || c.type == .bigMP4
                     || (c.type == .media && (c.content == .muxed || c.content == .audio))
                 // after the waiting window every newly classified candidate may be the one that finishes the decision
-                if complete || Date().timeIntervalSince(self.firstAt) >= 7 { self.decide() }
+                if complete || Date().timeIntervalSince(self.firstAt) >= 4 { self.decide() }
             }
         }
     }
@@ -321,7 +344,7 @@ final class StreamSniffer: NSObject, WKScriptMessageHandler, WKNavigationDelegat
 
     /// True when a master playlist brings sound: it declares an audio group, or its first quality's pieces really carry audio.
     private func masterBringsAudio(_ master: Cand, _ text: String) -> Bool {
-        if text.contains("TYPE=AUDIO") { return true }
+        if text.contains("TYPE=AUDIO") || text.contains("mp4a") || text.contains("ac-3") || text.contains("ec-3") { return true }
         guard let variant = HLS.firstVariantURI(text), let abs = StreamLink.absolute(base: master.url, rel: variant) else { return true }
         let h = headers(origin: master.origin)
         guard let r = StreamNet.get(abs, headers: h, maxBytes: 65536, timeout: 8), r.status / 100 == 2 else { return true }
@@ -414,9 +437,9 @@ final class StreamSniffer: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         }
         if pick == nil {
             let waited = Date().timeIntervalSince(firstAt)
-            if (pending || audio == nil) && waited < 7 {
+            if (pending || audio == nil) && waited < 4 {
                 // the sound playlist is usually asked for right after the picture: give it a little longer
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in self?.decide() }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.decide() }
                 return
             }
             pick = masterNoSound ?? videoOnly ?? unknownMedia ?? loose
@@ -585,7 +608,7 @@ final class StreamSniffer: NSObject, WKScriptMessageHandler, WKNavigationDelegat
           }
         } catch (e) {}
       };
-      setInterval(scan, 1000);
+      setInterval(scan, 500);
     })();
     """
 
@@ -595,7 +618,7 @@ final class StreamSniffer: NSObject, WKScriptMessageHandler, WKNavigationDelegat
       if (window.__cgAuto) return; window.__cgAuto = 1;
       var n = 0;
       var iv = setInterval(function(){
-        n++; if (n > 16) { clearInterval(iv); return; }
+        n++; if (n > 30) { clearInterval(iv); return; }
         try {
           var v = document.querySelectorAll('video');
           for (var i = 0; i < v.length; i++) {
@@ -608,7 +631,7 @@ final class StreamSniffer: NSObject, WKScriptMessageHandler, WKNavigationDelegat
           var el = document.elementFromPoint((document.documentElement.clientWidth || 300) / 2, (document.documentElement.clientHeight || 200) / 2);
           if (el && el.click) el.click();
         } catch (e) {}
-      }, 1500);
+      }, 700);
     })();
     """
 }
